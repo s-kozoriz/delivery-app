@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Маршрут Лёша">
 <meta name="theme-color" content="#1a7a40">
-<link rel="manifest" href="/delivery-app/manifest-l.json">
+<link rel="manifest" href="/delivery-app/manifest-lesha.json">
 <link rel="apple-touch-icon" href="/delivery-app/icons/lesha-192.png">
 <title>Маршрут — Лёша</title>
 <style>
@@ -15,11 +15,11 @@
 body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-size:15px;padding-bottom:40px}
 .hdr{background:#1a7a40;padding:16px 20px;position:sticky;top:0;z-index:10}
 .hdr h1{color:#fff;font-size:18px;font-weight:700;margin-bottom:10px}
-.dnav{display:flex;align-items:center;gap:8px}
-.dnav button{border:none;background:rgba(255,255,255,.2);color:#fff;border-radius:10px;width:36px;height:36px;font-size:20px;cursor:pointer}
-.dnav button:active{background:rgba(255,255,255,.35)}
-.dlbl{flex:1;text-align:center;color:#fff;font-size:14px;font-weight:600;background:rgba(255,255,255,.15);border-radius:10px;padding:8px}
-.prog{display:flex;align-items:center;gap:8px;margin-top:10px}
+.nav{display:flex;align-items:center;gap:8px}
+.nav button{border:none;background:rgba(255,255,255,.2);color:#fff;border-radius:10px;width:36px;height:36px;font-size:20px;cursor:pointer}
+.nav button:active{background:rgba(255,255,255,.35)}
+.lbl{flex:1;text-align:center;color:#fff;font-size:14px;font-weight:600;background:rgba(255,255,255,.15);border-radius:10px;padding:8px}
+.prg{display:flex;align-items:center;gap:8px;margin-top:10px}
 .pb{flex:1;height:5px;background:rgba(255,255,255,.25);border-radius:3px;overflow:hidden}
 .pf{height:100%;background:#fff;border-radius:3px;transition:width .3s}
 .pt{color:rgba(255,255,255,.9);font-size:12px;min-width:36px;text-align:right}
@@ -31,37 +31,36 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .card.dn{opacity:.55}
 .cb{display:flex;align-items:flex-start;gap:10px;padding:13px 14px}
 .num{width:26px;height:26px;border-radius:50%;background:#1a7a40;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
-.num.dn{background:rgba(0,0,0,.15);color:#fff}
+.num.dn{background:rgba(0,0,0,.15)}
 .info{flex:1;min-width:0}
-.addr{font-size:15px;font-weight:600;color:#141a16;text-decoration:none;display:block;margin-bottom:3px}
-.dn .addr{text-decoration:line-through;color:#888}
+.adr{font-size:15px;font-weight:600;color:#141a16;text-decoration:none;display:block;margin-bottom:3px}
+.card.dn .adr{text-decoration:line-through;color:#888}
 .ttag{display:inline-flex;align-items:center;gap:3px;background:#fff3da;color:#7a4a00;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;margin-bottom:4px}
 .invs{font-size:12px;color:#5a7060;margin-top:3px}
 .inv{display:inline-block;background:#eef3fb;color:#1856a0;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500;margin:1px}
-.st{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:500;margin-top:4px}
-.st-tr{background:#fff3da;color:#7a4a00}
-.st-sv{background:#e6f5ec;color:#1a7a40}
-.st-ur{background:#fff0f2;color:#b00020}
-.st-pk{background:#fff3da;color:#7a4a00}
+.stag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:500;margin-top:4px}
+.str{background:#fff3da;color:#7a4a00}
+.ssv{background:#e6f5ec;color:#1a7a40}
+.sur{background:#fff0f2;color:#b00020}
 .cmt{font-size:12px;color:#5a7060;margin-top:3px;font-style:italic}
-.dnbtn{flex-shrink:0;width:44px;height:44px;border-radius:50%;border:2px solid #d8ede2;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;color:#ccc;margin-top:1px;transition:.15s}
-.dnbtn.dn{background:#1a7a40;border-color:#1a7a40;color:#fff}
-.dnbtn:active{transform:scale(.92)}
-.mlink{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid #d8ede2;background:rgba(0,0,0,.02);color:#1a7a40;font-size:13px;font-weight:500;text-decoration:none}
+.dbtn{flex-shrink:0;width:44px;height:44px;border-radius:50%;border:2px solid #d8ede2;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;color:#ccc;margin-top:1px;transition:.15s}
+.dbtn.dn{background:#1a7a40;border-color:#1a7a40;color:#fff}
+.dbtn:active{transform:scale(.92)}
+.mln{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid #d8ede2;background:rgba(0,0,0,.02);color:#1a7a40;font-size:13px;font-weight:500;text-decoration:none}
 .empty{text-align:center;padding:60px 20px;color:#5a7060}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2a1e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:999;opacity:0;transition:.22s;pointer-events:none;white-space:nowrap}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2a1e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:999;opacity:0;transition:.22s;pointer-events:none}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
 <div class="hdr">
   <h1 id="dn">Лёша <span class="sync" id="sync"></span></h1>
-  <div class="dnav">
-    <button onclick="sh(-1)">&#8249;</button>
-    <div class="dlbl" id="dl">загрузка...</div>
-    <button onclick="sh(1)">&#8250;</button>
+  <div class="nav">
+    <button id="prev">&#8249;</button>
+    <div class="lbl" id="dl">загрузка...</div>
+    <button id="next">&#8250;</button>
   </div>
-  <div class="prog" id="prog" style="display:none">
+  <div class="prg" id="prg" style="display:none">
     <div class="pb"><div class="pf" id="pf"></div></div>
     <div class="pt" id="pt"></div>
   </div>
@@ -72,81 +71,160 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
-var DRV='L';
-firebase.initializeApp({
-  apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
-  databaseURL:'https://lk-bauservice-bb872-default-rtdb.europe-west1.firebasedatabase.app',
-  projectId:'lk-bauservice-bb872',
-  appId:'1:704709078597:web:1e336d874a8cf524583d2c'
-});
-var db=firebase.database();
-var rows=[],cfg={nL:'Лёша',nR:'Рома'},curD='';
+var DRV = 'L';
+var rows = [], cfg = {nL:'Лёша', nR:'Рома'}, curD = '';
 
-function isoD(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
-function fmt(iso){
-  var d=new Date(iso+'T12:00:00');
-  var dn=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
-  var mn=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-  return dn[d.getDay()]+', '+d.getDate()+' '+mn[d.getMonth()];
+firebase.initializeApp({
+  apiKey: 'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
+  databaseURL: 'https://lk-bauservice-bb872-default-rtdb.europe-west1.firebasedatabase.app',
+  projectId: 'lk-bauservice-bb872',
+  appId: '1:704709078597:web:1e336d874a8cf524583d2c'
+});
+var db = firebase.database();
+
+function isoD(n) {
+  var d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
 }
-function sh(n){var d=new Date(curD+'T12:00:00');d.setDate(d.getDate()+n);curD=d.toISOString().slice(0,10);render();}
-function xe(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
-function st(s){
-  if(s==='вывоз мусора')return'<span class="st st-tr">&#128465; вывоз мусора</span>';
-  if(s==='самовывоз')return'<span class="st st-sv">&#128666; самовывоз</span>';
-  if(s==='срочно')return'<span class="st st-ur">&#9888; срочно</span>';
-  if(s==='забрать товар')return'<span class="st st-pk">&#128722; забрать товар</span>';
-  if(s==='перенесено')return'<span class="st st-ur">&#8594; перенесено</span>';
-  return'';
+
+function fmt(iso) {
+  var d = new Date(iso + 'T12:00:00');
+  var dn = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+  var mn = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  return dn[d.getDay()] + ', ' + d.getDate() + ' ' + mn[d.getMonth()];
 }
-function done(id,v){db.ref('rows/'+id).update({done:v});toast(v?'Выполнено &#10003;':'Отменено');}
-function render(){
-  document.getElementById('dl').textContent=fmt(curD);
-  var dr=rows.filter(function(r){return r.date===curD&&r.drv===DRV&&r.addr&&r.addr.trim()&&r.inRoute!==false;});
-  var tot=dr.length,dn=dr.filter(function(r){return r.done;}).length;
-  var pg=document.getElementById('prog');
-  if(tot>0){pg.style.display='flex';document.getElementById('pf').style.width=Math.round(dn/tot*100)+'%';document.getElementById('pt').textContent=dn+'/'+tot;}
-  else pg.style.display='none';
-  var w=document.getElementById('wrap');
-  if(!tot){w.innerHTML='<div class="empty"><div style="font-size:48px;margin-bottom:12px">&#128666;</div><p>Нет доставок на этот день</p></div>';return;}
-  var bc={};var n=1;
-  dr.forEach(function(r){if(!bc[r.city])bc[r.city]=[];bc[r.city].push({r:r,n:n++});});
-  var h='';
-  Object.keys(bc).forEach(function(city){
-    h+='<div class="city">&#128205; '+xe(city)+'</div>';
-    bc[city].forEach(function(item){
-      var r=item.r,num=item.n;
-      var mu='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent((r.addr||'')+', '+r.city+', Germany')+'&travelmode=driving';
-      var iv=(r.invs||[]).map(function(i){return i.trim();}).filter(Boolean);
-      h+='<div class="card'+(r.done?' dn':'')+'">';
-      h+='<div class="cb">';
-      h+='<div class="num'+(r.done?' dn':'')+'">'+num+'</div>';
-      h+='<div class="info">';
-      h+='<a class="addr" href="'+mu+'" target="_blank">'+xe(r.addr)+'</a>';
-      if(r.timeSlot)h+='<div class="ttag">&#9201; до '+xe(r.timeSlot)+'</div>';
-      if(iv.length)h+='<div class="invs">'+iv.map(function(i){return'<span class="inv">'+xe(i)+'</span>';}).join('')+'</div>';
-      h+=st(r.status||'');
-      if(r.comment&&r.comment.trim())h+='<div class="cmt">'+xe(r.comment)+'</div>';
-      if(r.done)h+='<div style="color:#1a7a40;font-size:11px;margin-top:3px">&#10003; выполнено</div>';
-      h+='</div>';
-      h+='<button class="dnbtn'+(r.done?' dn':'')+'" onclick="done(''+r.id+'','+(r.done?'false':'true')+')">'+( r.done?'&#10003;':'&#9675;')+'</button>';
-      h+='</div>';
-      h+='<a class="mlink" href="'+mu+'" target="_blank">&#128247; Открыть в картах</a>';
-      h+='</div>';
+
+function xe(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+}
+
+function stTag(s) {
+  if (s === 'вывоз мусора') return '<span class="stag str">&#128465; вывоз мусора</span>';
+  if (s === 'самовывоз')    return '<span class="stag ssv">&#128666; самовывоз</span>';
+  if (s === 'срочно')       return '<span class="stag sur">&#9888; срочно</span>';
+  if (s === 'забрать товар') return '<span class="stag str">&#128722; забрать товар</span>';
+  if (s === 'перенесено')   return '<span class="stag sur">&#8594; перенесено</span>';
+  return '';
+}
+
+function markDone(id, val) {
+  db.ref('rows/' + id).update({done: val});
+  showToast(val ? 'Выполнено &#10003;' : 'Отменено');
+}
+
+function render() {
+  document.getElementById('dl').textContent = fmt(curD);
+  var dr = rows.filter(function(r) {
+    return r.date === curD && r.drv === DRV && r.addr && r.addr.trim() && r.inRoute !== false;
+  });
+  var tot = dr.length;
+  var dn = dr.filter(function(r) { return r.done; }).length;
+  var prg = document.getElementById('prg');
+  if (tot > 0) {
+    prg.style.display = 'flex';
+    document.getElementById('pf').style.width = Math.round(dn / tot * 100) + '%';
+    document.getElementById('pt').textContent = dn + '/' + tot;
+  } else {
+    prg.style.display = 'none';
+  }
+
+  var wrap = document.getElementById('wrap');
+  if (!tot) {
+    wrap.innerHTML = '<div class="empty"><div style="font-size:48px;margin-bottom:12px">&#128666;</div><p>Нет доставок на этот день</p></div>';
+    return;
+  }
+
+  var byCity = {};
+  var n = 1;
+  dr.forEach(function(r) {
+    if (!byCity[r.city]) byCity[r.city] = [];
+    byCity[r.city].push({r: r, n: n++});
+  });
+
+  var html = '';
+  Object.keys(byCity).forEach(function(city) {
+    html += '<div class="city">&#128205; ' + xe(city) + '</div>';
+    byCity[city].forEach(function(item) {
+      var r = item.r;
+      var num = item.n;
+      var mapsUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent((r.addr || '') + ', ' + r.city + ', Germany') + '&travelmode=driving';
+      var invs = (r.invs || []).map(function(i) { return i.trim(); }).filter(Boolean);
+      var isDone = r.done ? true : false;
+
+      html += '<div class="card' + (isDone ? ' dn' : '') + '">';
+      html += '<div class="cb">';
+      html += '<div class="num' + (isDone ? ' dn' : '') + '">' + num + '</div>';
+      html += '<div class="info">';
+      html += '<a class="adr" href="' + mapsUrl + '" target="_blank">' + xe(r.addr) + '</a>';
+      if (r.timeSlot) html += '<div class="ttag">&#9201; до ' + xe(r.timeSlot) + '</div>';
+      if (invs.length) {
+        html += '<div class="invs">';
+        invs.forEach(function(i) { html += '<span class="inv">' + xe(i) + '</span>'; });
+        html += '</div>';
+      }
+      html += stTag(r.status || '');
+      if (r.comment && r.comment.trim()) html += '<div class="cmt">' + xe(r.comment) + '</div>';
+      if (isDone) html += '<div style="color:#1a7a40;font-size:11px;margin-top:3px">&#10003; выполнено</div>';
+      html += '</div>';
+
+      html += '<button class="dbtn' + (isDone ? ' dn' : '') + '" data-id="' + r.id + '" data-done="' + (isDone ? '1' : '0') + '">';
+      html += isDone ? '&#10003;' : '&#9675;';
+      html += '</button>';
+
+      html += '</div>';
+      html += '<a class="mln" href="' + mapsUrl + '" target="_blank">&#128247; Открыть в картах</a>';
+      html += '</div>';
     });
   });
-  w.innerHTML=h;
+
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('.dbtn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      var isDone = this.getAttribute('data-done') === '1';
+      markDone(id, !isDone);
+    });
+  });
 }
-function toast(m){var t=document.getElementById('toast');t.innerHTML=m;t.classList.add('on');setTimeout(function(){t.classList.remove('on');},2000);}
-db.ref('rows').on('value',function(s){
-  rows=s.val()?Object.values(s.val()):[];
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.innerHTML = msg;
+  t.classList.add('on');
+  setTimeout(function() { t.classList.remove('on'); }, 2000);
+}
+
+function shift(n) {
+  var d = new Date(curD + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  curD = d.toISOString().slice(0, 10);
   render();
-  document.getElementById('sync').className='sync ok';
-},function(){document.getElementById('sync').className='sync';});
-db.ref('cfg').on('value',function(s){
-  if(s.val()){cfg=s.val();document.getElementById('dn').innerHTML=(DRV==='L'?cfg.nL:cfg.nR)+' <span class="sync ok" id="sync"></span>';}
+}
+
+document.getElementById('prev').addEventListener('click', function() { shift(-1); });
+document.getElementById('next').addEventListener('click', function() { shift(1); });
+
+db.ref('rows').on('value', function(snap) {
+  rows = snap.val() ? Object.values(snap.val()) : [];
+  render();
+  document.getElementById('sync').className = 'sync ok';
+}, function(err) {
+  console.error('Firebase error:', err);
+  document.getElementById('sync').className = 'sync';
 });
-curD=isoD(0);render();
+
+db.ref('cfg').on('value', function(snap) {
+  if (snap.val()) {
+    cfg = snap.val();
+    var dname = DRV === 'L' ? cfg.nL : cfg.nR;
+    document.getElementById('dn').innerHTML = dname + ' <span class="sync ok" id="sync"></span>';
+  }
+});
+
+curD = isoD(0);
+render();
 </script>
 </body>
 </html>
