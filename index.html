@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Диспетчер">
+<meta name="theme-color" content="#1856a0">
+<title>Доставки — Диспетчер</title>
+<style>
+:root{--acc:#1856a0;--acc2:#e6eef9;--g:#1a7a40;--g2:#e6f5ec;--g3:#9fe0be;--r:#a03018;--r2:#faede8;--r3:#f0b8a0;--am:#7a4a00;--am2:#fff3da;--bg:#f0efe9;--card:#fff;--bd:#e0ddd4;--bd2:#c4c0b4;--tx:#181816;--mu:#80786e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:'Segoe UI',sans-serif;font-size:14px;min-height:100vh;padding-bottom:20px}
+/* PIN */
+.pin-wrap{position:fixed;inset:0;background:var(--acc);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:1000}
+.pin-wrap h2{color:#fff;font-size:20px;font-weight:600}
+.pin-dots{display:flex;gap:12px}
+.dot{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.5);background:transparent;transition:.15s}
+.dot.on{background:#fff;border-color:#fff}
+.pad{display:grid;grid-template-columns:repeat(3,72px);gap:10px}
+.pb{height:72px;border-radius:14px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:24px;font-weight:500;cursor:pointer}
+.pb:active{background:rgba(255,255,255,.3)}
+.pin-err{color:#ffaaaa;font-size:13px;height:18px;text-align:center}
+/* HEADER */
+.hdr{background:var(--card);border-bottom:1px solid var(--bd);padding:11px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.hdr h1{font-size:15px;font-weight:600}
+.sync{width:8px;height:8px;border-radius:50%;background:#ccc;margin-right:8px;flex-shrink:0;transition:.3s}
+.sync.ok{background:var(--g)}.sync.err{background:#c00}
+.tabs{display:flex;gap:2px;background:var(--bg);border-radius:8px;padding:3px}
+.tab{padding:5px 13px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--mu)}
+.tab.on{background:var(--card);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.09)}
+/* LAYOUT */
+.wrap{max-width:1100px;margin:0 auto;padding:14px 16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:14px}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--bd)}
+.ch h2{font-size:14px;font-weight:600}
+/* DATE BAR */
+.dbar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--bd);flex-wrap:wrap}
+.dbar label{font-size:12px;color:var(--mu)}
+.dnav{display:flex;align-items:center;gap:3px}
+.dnav button{border:1px solid var(--bd2);background:var(--card);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:15px;color:var(--mu);display:flex;align-items:center;justify-content:center}
+.dnav button:hover{background:var(--bg)}
+.dd{font-size:13px;font-weight:600;min-width:168px;text-align:center;padding:4px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--bd)}
+input[type=date]{border:1px solid var(--bd2);border-radius:6px;padding:4px 9px;font-size:13px;background:var(--card);color:var(--tx)}
+/* TABLE */
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:#f7f6f2;color:var(--mu);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:7px 10px;text-align:left;border-bottom:1px solid var(--bd);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--bd)}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:#fafaf8}
+tbody td{padding:0;vertical-align:middle}
+td input[type=text],td select,td input[type=time]{border:none;background:transparent;font-size:13px;color:var(--tx);padding:6px 8px;width:100%;min-height:34px}
+td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:2px solid var(--acc);outline-offset:-1px;background:var(--acc2);border-radius:4px}
+.dbtn{border:none;background:none;cursor:pointer;color:#ccc;font-size:16px;line-height:1;padding:3px;display:block;width:100%}
+.dbtn:hover{color:#c00}
+.rchk{width:15px;height:15px;cursor:pointer;accent-color:var(--acc);display:block;margin:0 auto}
+/* INVOICE CELL */
+.icel{display:flex;flex-direction:column;gap:2px;padding:4px 6px}
+.irow{display:flex;align-items:center;gap:3px}
+.iinp{flex:1;border:1px solid var(--bd2);border-radius:4px;padding:3px 6px;font-size:12px;background:var(--card);color:var(--tx);min-width:0}
+.iinp:focus{outline:2px solid var(--acc);outline-offset:1px}
+.ix{border:none;background:none;cursor:pointer;color:#ccc;font-size:12px;padding:0 2px;line-height:1}
+.ix:hover{color:#c00}
+.iadd{border:none;background:none;font-size:11px;color:var(--acc);cursor:pointer;padding:1px 0;text-align:left}
+.iadd:hover{text-decoration:underline}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--bd2);background:var(--card);color:var(--tx);transition:.12s;text-decoration:none}
+.btn:hover{background:var(--bg)}
+.btn-sm{padding:4px 10px;font-size:12px;border-radius:6px}
+.btn-add{border-style:dashed;color:var(--mu)}
+.btn-add:hover{border-color:var(--acc);color:var(--acc);background:var(--acc2)}
+.btn-rt{background:var(--g2);color:var(--g);border-color:var(--g3)}
+.btn-rt:hover{background:#d0f0e0}
+/* MSG PANELS */
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 16px}
+@media(max-width:680px){.mgrid{grid-template-columns:1fr}}
+.mc{border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+.mhd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--bd)}
+.mhdl{display:flex;align-items:center;gap:8px}
+.av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+.avl{background:var(--g2);color:var(--g);border:1px solid var(--g3)}
+.avr{background:var(--r2);color:var(--r);border:1px solid var(--r3)}
+.mn{font-weight:600;font-size:13px}
+.mcnt{font-size:11px;color:var(--mu)}
+.sbadge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:var(--g2);color:var(--g);border:1px solid var(--g3)}
+.mbody{padding:12px 14px;font-size:13px;line-height:1.75;min-height:60px;background:#fafaf8;border-bottom:1px solid var(--bd);color:var(--tx);max-height:360px;overflow-y:auto}
+.mempty{color:var(--mu);font-style:italic}
+.mft{padding:9px 14px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.wac{background:var(--bg)}
+.wal{background:var(--g2);color:var(--g);border-color:var(--g3)}.wal:hover{background:#d0f0e0}
+.war{background:var(--r2);color:var(--r);border-color:var(--r3)}.war:hover{background:#f5ddd4}
+.wag{background:#25D366;color:#fff;border:none}.wag:hover{background:#1fb356}
+.cpd{background:var(--g2)!important;color:var(--g)!important;border-color:var(--g3)!important}
+.rbar{padding:7px 14px;font-size:12px;font-weight:500;border-top:1px solid var(--bd);display:flex;gap:12px;flex-wrap:wrap}
+/* DONE BADGE */
+.dnbadge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:12px}
+.dn-yes{background:var(--g2);color:var(--g)}
+.dn-no{background:#f3f2ef;color:#bbb}
+/* PROGRESS */
+.pwrap{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
+.pbar{flex:1;height:6px;background:var(--bd);border-radius:3px;overflow:hidden;max-width:100px}
+.pfill{height:100%;background:var(--g);border-radius:3px;transition:.3s}
+/* HISTORY */
+.hlist{padding:12px 16px;display:flex;flex-direction:column;gap:5px}
+.hi{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:1px solid var(--bd);border-radius:8px;cursor:pointer}
+.hi:hover{background:var(--bg)}
+.hd{font-weight:600;font-size:13px}
+.hs{font-size:11px;color:var(--mu);margin-top:1px}
+.hb{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+.hbl{background:var(--g2);color:var(--g)}.hbr{background:var(--r2);color:var(--r)}.hbn{background:#f0efe9;color:var(--mu)}
+/* SETTINGS */
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px}
+@media(max-width:560px){.sg{grid-template-columns:1fr}}
+.fl{font-size:12px;color:var(--mu);font-weight:500;margin-bottom:3px}
+.fi{width:100%;border:1px solid var(--bd2);border-radius:6px;padding:6px 10px;font-size:13px;background:var(--card);color:var(--tx)}
+.fi:focus{outline:2px solid var(--acc);outline-offset:1px}
+.drvlink{display:block;padding:10px 14px;border-radius:8px;font-size:13px;border:1px solid var(--bd);margin-bottom:8px;color:var(--acc);word-break:break-all}
+.empty{padding:28px;text-align:center;color:var(--mu);font-size:13px}
+.toast{position:fixed;bottom:18px;right:18px;background:#202020;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transform:translateY(8px);transition:.22s;pointer-events:none}
+.toast.on{opacity:1;transform:translateY(0)}
+@media(max-width:600px){
+  .hdr{padding:10px 12px}
+  .tabs .tab{padding:5px 8px;font-size:11px}
+  .wrap{padding:10px 8px}
+  td input[type=text],td select,td input[type=time]{font-size:16px!important}
+}
+body{padding-bottom:env(safe-area-inset-bottom)}
+</style>
+</head>
+<body>
+
+<!-- PIN -->
+<div class="pin-wrap" id="pinWrap">
+  <h2>Доставки</h2>
+  <p style="color:rgba(255,255,255,.7);font-size:13px">PIN-код диспетчера</p>
+  <div class="pin-dots">
+    <div class="dot" id="d0"></div><div class="dot" id="d1"></div>
+    <div class="dot" id="d2"></div><div class="dot" id="d3"></div>
+  </div>
+  <div class="pin-err" id="perr"></div>
+  <div class="pad">
+    <button class="pb" onclick="pp('1')">1</button><button class="pb" onclick="pp('2')">2</button><button class="pb" onclick="pp('3')">3</button>
+    <button class="pb" onclick="pp('4')">4</button><button class="pb" onclick="pp('5')">5</button><button class="pb" onclick="pp('6')">6</button>
+    <button class="pb" onclick="pp('7')">7</button><button class="pb" onclick="pp('8')">8</button><button class="pb" onclick="pp('9')">9</button>
+    <button class="pb" onclick="pp('X')" style="font-size:16px">&#9003;</button><button class="pb" onclick="pp('0')">0</button>
+    <button class="pb" style="opacity:0" disabled></button>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+<div class="hdr">
+  <div style="display:flex;align-items:center">
+    <div class="sync" id="sync"></div>
+    <h1>Доставки</h1>
+  </div>
+  <div class="tabs">
+    <button class="tab on" onclick="sw('plan')">Маршрут</button>
+    <button class="tab" onclick="sw('hist')">История</button>
+    <button class="tab" onclick="sw('cfg')">Настройки</button>
+  </div>
+</div>
+<div class="wrap">
+
+<div id="tp">
+  <div class="card">
+    <div class="ch">
+      <h2>Таблица доставок</h2>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-add" onclick="addRow()">+ строка</button>
+        <button class="btn btn-sm" onclick="sample()">Пример</button>
+      </div>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr>
+          <th style="width:28px"></th>
+          <th style="width:32px" title="В маршрут">&#128506;</th>
+          <th style="width:90px">Дата</th>
+          <th style="width:80px">Водитель</th>
+          <th style="width:110px">Город</th>
+          <th style="width:70px">До</th>
+          <th style="min-width:170px">Адрес</th>
+          <th style="min-width:140px">Накладные</th>
+          <th style="width:128px">Статус</th>
+          <th style="min-width:100px">Комментарий</th>
+          <th style="width:32px">&#10003;</th>
+        </tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+    <div style="padding:10px 14px;border-top:1px solid var(--bd)">
+      <button class="btn btn-sm btn-add" onclick="addRow()" style="width:100%;justify-content:center">+ добавить строку</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="dbar">
+      <label>Маршрут на:</label>
+      <div class="dnav">
+        <button onclick="shD(-1)">&#8249;</button>
+        <div class="dd" id="dd">—</div>
+        <button onclick="shD(1)">&#8250;</button>
+      </div>
+      <input type="date" id="dp" onchange="chD()">
+      <button class="btn btn-sm" onclick="sd(0)">Сегодня</button>
+      <button class="btn btn-sm" onclick="sd(1)">Завтра</button>
+      <span id="fc" style="font-size:12px;color:var(--mu);margin-left:4px"></span>
+    </div>
+    <div class="mgrid">
+      <div class="mc">
+        <div class="mhd">
+          <div class="mhdl"><div class="av avl">Л</div><div><div class="mn" id="nL">Лёша</div><div class="mcnt" id="cL">0 адресов</div></div></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="pwrap" id="pwL" style="display:none"><div class="pbar"><div class="pfill" id="pfL"></div></div><span id="ptL"></span></div>
+            <span class="sbadge" id="sbL" style="display:none">&#10003; отправлено</span>
+          </div>
+        </div>
+        <div class="mbody" id="mL"></div>
+        <div class="rbar" id="rbL" style="display:none"></div>
+        <div class="mft">
+          <button class="btn btn-sm wac" id="cpL" onclick="cp('L')">Копировать</button>
+          <button class="btn btn-sm wal" onclick="wa('L',true)">WA Лёша</button>
+          <button class="btn btn-sm wag" onclick="wa('L',false)">&#8599; Чат</button>
+          <button class="btn btn-sm btn-rt" onclick="optR('L')">&#128506; Маршрут</button>
+          <button class="btn btn-sm" style="margin-left:auto" onclick="mks('L')">&#10003; Отправлено</button>
+        </div>
+      </div>
+      <div class="mc">
+        <div class="mhd">
+          <div class="mhdl"><div class="av avr">Р</div><div><div class="mn" id="nR">Рома</div><div class="mcnt" id="cR">0 адресов</div></div></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div class="pwrap" id="pwR" style="display:none"><div class="pbar"><div class="pfill" id="pfR"></div></div><span id="ptR"></span></div>
+            <span class="sbadge" id="sbR" style="display:none">&#10003; отправлено</span>
+          </div>
+        </div>
+        <div class="mbody" id="mR"></div>
+        <div class="rbar" id="rbR" style="display:none"></div>
+        <div class="mft">
+          <button class="btn btn-sm wac" id="cpR" onclick="cp('R')">Копировать</button>
+          <button class="btn btn-sm war" onclick="wa('R',true)">WA Рома</button>
+          <button class="btn btn-sm wag" onclick="wa('R',false)">&#8599; Чат</button>
+          <button class="btn btn-sm btn-rt" onclick="optR('R')">&#128506; Маршрут</button>
+          <button class="btn btn-sm" style="margin-left:auto" onclick="mks('R')">&#10003; Отправлено</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="th" style="display:none">
+  <div class="card"><div class="ch"><h2>История</h2></div><div id="hl" class="hlist"></div></div>
+</div>
+
+<div id="tc" style="display:none">
+  <div class="card"><div class="ch"><h2>Водители</h2></div>
+    <div class="sg">
+      <div><div class="fl">Имя водителя 1</div><input class="fi" id="cNL" value="Лёша" oninput="scfg()"></div>
+      <div><div class="fl">Телефон</div><input class="fi" id="cPL" placeholder="+49151..." oninput="scfg()"></div>
+      <div><div class="fl">Имя водителя 2</div><input class="fi" id="cNR" value="Рома" oninput="scfg()"></div>
+      <div><div class="fl">Телефон</div><input class="fi" id="cPR" placeholder="+49151..." oninput="scfg()"></div>
+    </div>
+  </div>
+  <div class="card"><div class="ch"><h2>PIN-код</h2></div>
+    <div class="sg"><div><div class="fl">Новый PIN (4 цифры)</div><input class="fi" id="cPin" type="password" maxlength="4" placeholder="****" oninput="scfg()"></div></div>
+  </div>
+  <div class="card"><div class="ch"><h2>Шаблон сообщения</h2></div>
+    <div class="sg">
+      <div style="grid-column:1/-1"><div class="fl">Заголовок ({date}, {driver})</div><input class="fi" id="cHdr" value="Маршрут на {date}" oninput="scfg()"></div>
+      <div style="grid-column:1/-1"><div class="fl">Подпись</div><input class="fi" id="cFtr" value="Удачной дороги!" oninput="scfg()"></div>
+    </div>
+  </div>
+  <div class="card"><div class="ch"><h2>Ссылки для водителей</h2></div>
+    <div style="padding:12px 16px">
+      <div class="fl" style="margin-bottom:8px">Отправьте водителям — открывают в браузере и добавляют на экран:</div>
+      <a class="drvlink" id="lnkL" target="_blank"></a>
+      <a class="drvlink" id="lnkR" target="_blank"></a>
+    </div>
+  </div>
+</div>
+
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+var CITIES=['Wolfsburg','Braunschweig','Hannover','Göttingen','Aurich','Wilhelmshaven'];
+var STATS=['—','вывоз мусора','самовывоз','перенесено','срочно','забрать товар'];
+var COORDS={Salzgitter:{a:52.094,o:10.370},Wolfsburg:{a:52.423,o:10.787},Braunschweig:{a:52.268,o:10.527},Hannover:{a:52.374,o:9.739},'Göttingen':{a:51.534,o:9.932},Aurich:{a:53.470,o:7.483},Wilhelmshaven:{a:53.529,o:8.104}};
+
+var PIN_DEFAULT='1234';
+var cfg={nL:'Лёша',nR:'Рома',pL:'',pR:'',hdr:'Маршрут на {date}',ftr:'Удачной дороги!',pin:PIN_DEFAULT};
+var rows=[];
+var sent={};
+var curD='';
+var pinBuf='';
+
+// Firebase
+firebase.initializeApp({
+  apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
+  databaseURL:'https://lk-bauservice-bb872-default-rtdb.europe-west1.firebasedatabase.app',
+  projectId:'lk-bauservice-bb872',
+  appId:'1:704709078597:web:1e336d874a8cf524583d2c'
+});
+var db=firebase.database();
+
+db.ref('rows').on('value',function(s){
+  rows=s.val()?Object.values(s.val()):[];
+  rtbl();gm();
+  document.getElementById('sync').className='sync ok';
+},function(){document.getElementById('sync').className='sync err';});
+
+db.ref('cfg').on('value',function(s){
+  if(s.val()){Object.assign(cfg,s.val());lcfg();}
+});
+db.ref('sent').on('value',function(s){
+  sent=s.val()||{};gm();rh();
+});
+
+// PIN
+function pp(d){
+  if(d==='X'){pinBuf=pinBuf.slice(0,-1);}
+  else if(pinBuf.length<4){pinBuf+=d;}
+  [0,1,2,3].forEach(function(i){document.getElementById('d'+i).className='dot'+(i<pinBuf.length?' on':'');});
+  if(pinBuf.length===4){
+    if(pinBuf===(cfg.pin||PIN_DEFAULT)){
+      document.getElementById('pinWrap').style.display='none';
+      document.getElementById('app').style.display='';
+      sessionStorage.setItem('ok','1');
+    } else {
+      document.getElementById('perr').textContent='Неверный PIN';
+      pinBuf='';
+      [0,1,2,3].forEach(function(i){document.getElementById('d'+i).className='dot';});
+      setTimeout(function(){document.getElementById('perr').textContent='';},1500);
+    }
+  }
+}
+if(sessionStorage.getItem('ok')==='1'){
+  document.getElementById('pinWrap').style.display='none';
+  document.getElementById('app').style.display='';
+}
+
+// DATE
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function isoD(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function fmt(iso){
+  var d=new Date(iso+'T12:00:00');
+  var dn=['вс','пн','вт','ср','чт','пт','сб'];
+  var mn=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  return dn[d.getDay()]+', '+d.getDate()+' '+mn[d.getMonth()]+' '+d.getFullYear();
+}
+function sd(n){curD=isoD(n);document.getElementById('dp').value=curD;upd();gm();}
+function shD(n){var d=new Date(curD+'T12:00:00');d.setDate(d.getDate()+n);curD=d.toISOString().slice(0,10);document.getElementById('dp').value=curD;upd();gm();}
+function chD(){curD=document.getElementById('dp').value;upd();gm();}
+function upd(){document.getElementById('dd').textContent=curD?fmt(curD):'—';}
+
+// ROWS
+function addRow(data){
+  var r=data||{id:uid(),date:curD||isoD(1),drv:'L',city:'Wolfsburg',timeSlot:'',addr:'',invs:[''],status:'—',comment:'',inRoute:true,done:false};
+  if(!data)r.id=uid();
+  db.ref('rows/'+r.id).set(r);
+}
+function dr(id){db.ref('rows/'+id).remove();}
+function ur(id,f,v){var r=rows.find(function(r){return r.id===id;});if(r){r[f]=v;db.ref('rows/'+id+'/'+f).set(v);}}
+function tr(id,v){db.ref('rows/'+id+'/inRoute').set(v);}
+function ai(id){var r=rows.find(function(r){return r.id===id;});if(!r)return;var inv=[].concat(r.invs||[]);inv.push('');db.ref('rows/'+id+'/invs').set(inv);}
+function di(id,i){var r=rows.find(function(r){return r.id===id;});if(!r)return;var inv=[].concat(r.invs||['']);if(inv.length===1){inv[0]='';}else{inv.splice(i,1);}db.ref('rows/'+id+'/invs').set(inv);}
+function ui(id,i,v){var r=rows.find(function(r){return r.id===id;});if(!r)return;var inv=[].concat(r.invs||['']);inv[i]=v;db.ref('rows/'+id+'/invs').set(inv);}
+
+// TABLE
+function xe(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+function rtbl(){
+  var tb=document.getElementById('tb');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="11"><div class="empty">Нет строк — нажмите «+ строка»</div></td></tr>';return;}
+  var h='';
+  rows.forEach(function(r){
+    var dim=r.inRoute===false?'opacity:.5':'';
+    var sc=r.status==='забрать товар'?'color:var(--am);font-weight:600':'';
+    var dc=r.drv==='L'?'color:#1a7a40':'color:var(--r)';
+    var ih='';
+    (r.invs||['']).forEach(function(v,i){
+      ih+='<div class="irow"><input class="iinp" type="text" value="'+xe(v)+'" placeholder="LK-..." oninput="ui(\''+r.id+'\','+i+',this.value)"><button class="ix" onclick="di(\''+r.id+'\','+i+')">&#215;</button></div>';
+    });
+    var co=CITIES.map(function(c){return'<option value="'+c+'"'+(r.city===c?' selected':'')+'>'+c+'</option>';}).join('');
+    var so=STATS.map(function(s){return'<option value="'+s+'"'+(r.status===s?' selected':'')+'>'+s+'</option>';}).join('');
+    var dn=r.done?'<span class="dnbadge dn-yes">&#10003;</span>':'<span class="dnbadge dn-no">—</span>';
+    h+='<tr style="'+dim+'">';
+    h+='<td style="width:28px;text-align:center"><button class="dbtn" onclick="dr(\''+r.id+'\')">&#215;</button></td>';
+    h+='<td style="width:32px;text-align:center"><input type="checkbox" class="rchk"'+(r.inRoute!==false?' checked':'')+' onchange="tr(\''+r.id+'\',this.checked)"></td>';
+    h+='<td style="width:90px"><input type="date" value="'+(r.date||'')+'" onchange="ur(\''+r.id+'\',\'date\',this.value)" style="font-size:12px;padding:5px 4px"></td>';
+    h+='<td style="width:80px"><select onchange="ur(\''+r.id+'\',\'drv\',this.value)" style="'+dc+'"><option value="L"'+(r.drv==='L'?' selected':'')+'>Лёша</option><option value="R"'+(r.drv==='R'?' selected':'')+'>Рома</option></select></td>';
+    h+='<td style="width:110px"><select onchange="ur(\''+r.id+'\',\'city\',this.value)">'+co+'</select></td>';
+    h+='<td style="width:70px"><input type="time" value="'+(r.timeSlot||'')+'" onchange="ur(\''+r.id+'\',\'timeSlot\',this.value)"></td>';
+    h+='<td><input type="text" value="'+xe(r.addr)+'" placeholder="Улица, дом..." oninput="ur(\''+r.id+'\',\'addr\',this.value)"></td>';
+    h+='<td><div class="icel">'+ih+'<button class="iadd" onclick="ai(\''+r.id+'\')">+ накладная</button></div></td>';
+    h+='<td><select onchange="ur(\''+r.id+'\',\'status\',this.value)" style="'+sc+'">'+so+'</select></td>';
+    h+='<td><input type="text" value="'+xe(r.comment)+'" placeholder="..." oninput="ur(\''+r.id+'\',\'comment\',this.value)"></td>';
+    h+='<td style="width:32px;text-align:center">'+dn+'</td>';
+    h+='</tr>';
+  });
+  tb.innerHTML=h;
+}
+
+// MESSAGES
+function bm(d){
+  var name=d==='L'?cfg.nL:cfg.nR;
+  var dr=rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false;});
+  if(!dr.length)return'';
+  var ds=curD?fmt(curD):'?';
+  var m='*'+cfg.hdr.replace('{date}',ds).replace('{driver}',name)+'*\n';
+  m+='Водитель: '+name+'\n'+'-'.repeat(22)+'\n\n';
+  var bc={};
+  dr.forEach(function(r){if(!bc[r.city])bc[r.city]=[];bc[r.city].push(r);});
+  var n=1;
+  Object.keys(bc).forEach(function(city){
+    m+='[ '+city+' ]\n';
+    bc[city].forEach(function(r){
+      var ip=r.status==='забрать товар';
+      m+='  '+n+'. '+(ip?'[магазин] ':'')+r.addr;
+      if(r.timeSlot)m+=' (до '+r.timeSlot+')';
+      m+='\n';
+      var iv=(r.invs||[]).map(function(i){return i.trim();}).filter(Boolean);
+      if(iv.length)m+='     Накл.: '+iv.join(', ')+'\n';
+      var ex=[];
+      if(r.status&&r.status!=='—')ex.push(r.status);
+      if(r.comment&&r.comment.trim())ex.push(r.comment.trim());
+      if(ex.length)m+='     '+ex.join(' / ')+'\n';
+      n++;
+    });
+    m+='\n';
+  });
+  m+='Всего: '+dr.length+' адресов';
+  if(cfg.ftr)m+='\n'+cfg.ftr;
+  return m;
+}
+
+function bp(d){
+  var name=d==='L'?cfg.nL:cfg.nR;
+  var dr=rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false;});
+  if(!dr.length)return'';
+  var ds=curD?fmt(curD):'?';
+  var h='<div style="font-size:13px;line-height:1.75">';
+  h+='<div style="font-weight:700;margin-bottom:4px">'+xe(cfg.hdr.replace('{date}',ds).replace('{driver}',name))+'</div>';
+  var bc={};
+  dr.forEach(function(r){if(!bc[r.city])bc[r.city]=[];bc[r.city].push(r);});
+  var n=1;
+  Object.keys(bc).forEach(function(city){
+    h+='<div style="font-weight:600;color:var(--acc);margin:8px 0 3px">&#128205; '+xe(city)+'</div>';
+    bc[city].forEach(function(r){
+      var ip=r.status==='забрать товар';
+      var mu='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((r.addr||'')+', '+r.city+', Germany');
+      var ds2=r.done?'text-decoration:line-through;opacity:.5':'';
+      h+='<div style="margin-left:8px;'+ds2+'">';
+      h+='<span style="color:var(--mu)">'+n+'.</span> '+(ip?'&#128722; ':'');
+      h+='<a href="'+mu+'" target="_blank" style="color:var(--acc);font-weight:500;text-decoration:none">'+xe(r.addr)+'</a>';
+      if(r.timeSlot)h+=' <span style="color:var(--mu);font-size:11px">до '+r.timeSlot+'</span>';
+      if(r.done)h+=' <span style="color:var(--g);font-size:11px">&#10003; выполнено</span>';
+      var iv=(r.invs||[]).map(function(i){return i.trim();}).filter(Boolean);
+      if(iv.length)h+='<div style="margin-left:14px;font-size:11.5px;color:var(--mu)">&#128196; '+xe(iv.join(', '))+'</div>';
+      var ex=[];
+      if(r.status&&r.status!=='—')ex.push(r.status);
+      if(r.comment&&r.comment.trim())ex.push(r.comment.trim());
+      if(ex.length)h+='<div style="margin-left:14px;font-size:11.5px;color:#7a5500">'+xe(ex.join(' · '))+'</div>';
+      h+='</div>';
+      n++;
+    });
+  });
+  h+='<div style="margin-top:8px;color:var(--mu);font-size:12px">Всего: '+dr.length+' адресов</div></div>';
+  return h;
+}
+
+function gm(){
+  ['L','R'].forEach(function(d){
+    var pv=bp(d);
+    var el=document.getElementById('m'+d);
+    if(pv){el.innerHTML=pv;el.classList.remove('mempty');}
+    else{el.textContent='Нет адресов на этот день';el.classList.add('mempty');}
+    var dr=rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false;});
+    var cnt=dr.length;
+    var dn=dr.filter(function(r){return r.done;}).length;
+    document.getElementById('c'+d).textContent=cnt+' адресов';
+    var pw=document.getElementById('pw'+d);
+    if(cnt>0&&dn>0){
+      pw.style.display='flex';
+      document.getElementById('pf'+d).style.width=Math.round(dn/cnt*100)+'%';
+      document.getElementById('pt'+d).textContent=dn+'/'+cnt;
+    } else pw.style.display='none';
+    document.getElementById('sb'+d).style.display=sent[curD+'_'+d]?'':'none';
+    var rb=document.getElementById('rb'+d);
+    var ir=rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false;}).length;
+    var pk=rows.filter(function(r){return r.date===curD&&r.drv===d&&r.status==='забрать товар';}).length;
+    var nr=rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute===false;}).length;
+    if(ir||pk){
+      var rh='<span style="color:var(--g)">&#128506; В маршруте: '+ir+' адр.</span>';
+      if(nr)rh+='<span style="color:var(--mu)"> · вне: '+nr+'</span>';
+      if(pk)rh+='<span style="color:var(--am)"> · &#128722; Забрать: '+pk+'</span>';
+      rb.innerHTML=rh;rb.style.display='flex';
+    } else rb.style.display='none';
+  });
+  var tot=rows.filter(function(r){return r.date===curD&&r.addr&&r.addr.trim()&&r.inRoute!==false;}).length;
+  document.getElementById('fc').textContent=tot?tot+' адр. на этот день':'';
+  document.getElementById('nL').textContent=cfg.nL||'Лёша';
+  document.getElementById('nR').textContent=cfg.nR||'Рома';
+}
+
+// OPTIMIZE
+function hav(a,b){var R=6371,dl=(b.a-a.a)*Math.PI/180,do_=(b.o-a.o)*Math.PI/180,s=Math.sin(dl/2)*Math.sin(dl/2)+Math.cos(a.a*Math.PI/180)*Math.cos(b.a*Math.PI/180)*Math.sin(do_/2)*Math.sin(do_/2);return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));}
+function hn(a){var m=a.match(/\b(\d+)\b/);return m?parseInt(m[1]):9999;}
+function optR(d){
+  var dr=rows.filter(function(r){return r.date===curD&&r.drv===d;});
+  if(!dr.length){toast('Нет адресов');return;}
+  var ir=dr.filter(function(r){return r.addr&&r.addr.trim()&&r.inRoute!==false;});
+  var or=dr.filter(function(r){return !r.addr||!r.addr.trim()||r.inRoute===false;});
+  if(!ir.length){toast('Нет адресов с галочкой');return;}
+  var cs=[...new Set(ir.map(function(r){return r.city;}))];
+  var cur=COORDS['Salzgitter'],rem=cs.slice(),ord=[];
+  while(rem.length){var bi=0,bd=Infinity;rem.forEach(function(c,i){var cd=hav(cur,COORDS[c]||COORDS['Wolfsburg']);if(cd<bd){bd=cd;bi=i;}});ord.push(rem[bi]);cur=COORDS[rem[bi]]||COORDS['Wolfsburg'];rem.splice(bi,1);}
+  var sr=[];
+  ord.forEach(function(city){
+    var cr=ir.filter(function(r){return r.city===city;});
+    var pk=cr.filter(function(r){return r.status==='забрать товар';});
+    var dl=cr.filter(function(r){return r.status!=='забрать товар';}).sort(function(a,b){var sa=a.addr.toLowerCase(),sb=b.addr.toLowerCase();if(sa<sb)return -1;if(sa>sb)return 1;return hn(a.addr)-hn(b.addr);});
+    pk.forEach(function(r){sr.push(r);});
+    dl.forEach(function(r){sr.push(r);});
+  });
+  var fi=rows.findIndex(function(r){return r.date===curD&&r.drv===d;});
+  var ot=rows.filter(function(r){return r.date!==curD||r.drv!==d;});
+  var ins=fi<0?ot.length:Math.min(fi,ot.length);
+  rows=[].concat(ot.slice(0,ins),sr,or,ot.slice(ins));
+  sr.concat(or).forEach(function(r,i){r.order=i;db.ref('rows/'+r.id).set(r);});
+  rtbl();gm();
+  toast('Маршрут: '+ord.join(' → '));
+}
+
+// ACTIONS
+function cp(d){
+  var m=bm(d);if(!m){toast('Нет адресов');return;}
+  var btn=document.getElementById('cp'+d);
+  navigator.clipboard.writeText(m).then(function(){
+    btn.classList.add('cpd');btn.textContent='&#10003; Скопировано';
+    setTimeout(function(){btn.classList.remove('cpd');btn.textContent='Копировать';},2000);
+  });
+}
+function wa(d,dir){
+  var m=bm(d);if(!m){toast('Нет адресов');return;}
+  var p=(d==='L'?cfg.pL:cfg.pR||'').replace(/\D/g,'');
+  window.open((dir&&p)?'https://wa.me/'+p+'?text='+encodeURIComponent(m):'https://wa.me/?text='+encodeURIComponent(m),'_blank');
+}
+function mks(d){
+  if(!curD)return;
+  db.ref('sent/'+curD+'_'+d).set(true);
+  toast('Отмечено &#10003;');
+}
+
+// HISTORY
+function rh(){
+  var el=document.getElementById('hl');
+  var ds=[...new Set(rows.map(function(r){return r.date;}))].filter(Boolean).sort().reverse();
+  if(!ds.length){el.innerHTML='<div class="empty">Записей нет</div>';return;}
+  el.innerHTML=ds.map(function(iso){
+    var cL=rows.filter(function(r){return r.date===iso&&r.drv==='L'&&r.addr&&r.addr.trim();}).length;
+    var cR=rows.filter(function(r){return r.date===iso&&r.drv==='R'&&r.addr&&r.addr.trim();}).length;
+    var dL=rows.filter(function(r){return r.date===iso&&r.drv==='L'&&r.done;}).length;
+    var dR=rows.filter(function(r){return r.date===iso&&r.drv==='R'&&r.done;}).length;
+    var sL=sent[iso+'_L'],sR=sent[iso+'_R'];
+    return'<div class="hi" onclick="jt(\''+iso+'\')"><div><div class="hd">'+fmt(iso)+'</div><div class="hs">'+cfg.nL+': '+dL+'/'+cL+' · '+cfg.nR+': '+dR+'/'+cR+'</div></div><div style="display:flex;gap:5px"><span class="hb '+(sL?'hbl':'hbn')+'">'+(sL?'&#10003;':'-')+' '+cfg.nL+'</span><span class="hb '+(sR?'hbr':'hbn')+'">'+(sR?'&#10003;':'-')+' '+cfg.nR+'</span></div></div>';
+  }).join('');
+}
+function jt(iso){curD=iso;document.getElementById('dp').value=iso;upd();gm();sw('plan');}
+
+// SETTINGS
+function scfg(){
+  cfg.nL=document.getElementById('cNL').value;
+  cfg.nR=document.getElementById('cNR').value;
+  cfg.pL=document.getElementById('cPL').value;
+  cfg.pR=document.getElementById('cPR').value;
+  cfg.hdr=document.getElementById('cHdr').value;
+  cfg.ftr=document.getElementById('cFtr').value;
+  var p=document.getElementById('cPin').value;
+  if(p.length===4&&/^\d{4}$/.test(p))cfg.pin=p;
+  db.ref('cfg').set(cfg);gm();
+}
+function lcfg(){
+  document.getElementById('cNL').value=cfg.nL||'Лёша';
+  document.getElementById('cNR').value=cfg.nR||'Рома';
+  document.getElementById('cPL').value=cfg.pL||'';
+  document.getElementById('cPR').value=cfg.pR||'';
+  document.getElementById('cHdr').value=cfg.hdr||'Маршрут на {date}';
+  document.getElementById('cFtr').value=cfg.ftr||'Удачной дороги!';
+  var base=location.origin+'/delivery-app';
+  document.getElementById('lnkL').href=base+'/lesha/';
+  document.getElementById('lnkL').textContent=base+'/lesha/  — '+(cfg.nL||'Лёша');
+  document.getElementById('lnkR').href=base+'/roma/';
+  document.getElementById('lnkR').textContent=base+'/roma/  — '+(cfg.nR||'Рома');
+}
+
+function sample(){
+  var d=isoD(1);
+  [{id:uid(),date:d,drv:'L',city:'Wolfsburg',timeSlot:'11:00',addr:'Potsdamer Weg 19 1_L',invs:['LK-00103070'],status:'вывоз мусора',comment:'',inRoute:true,done:false},
+   {id:uid(),date:d,drv:'L',city:'Braunschweig',timeSlot:'',addr:'Eiderstraße 26 5_M',invs:['LK-00103073'],status:'—',comment:'',inRoute:true,done:true},
+   {id:uid(),date:d,drv:'R',city:'Wolfsburg',timeSlot:'10:00',addr:'Hermann-Löns-Str. 7 3_L',invs:['LK-00102882','LK-00102883'],status:'самовывоз',comment:'',inRoute:true,done:false},
+   {id:uid(),date:d,drv:'R',city:'Göttingen',timeSlot:'',addr:'Deisterstraße 23 4_R',invs:['LK-00103133'],status:'—',comment:'накладные МТ',inRoute:true,done:false},
+  ].forEach(function(r){db.ref('rows/'+r.id).set(r);});
+  toast('Пример загружен');
+}
+
+function sw(n){
+  ['plan','hist','cfg'].forEach(function(t){document.getElementById('t'+t[0]).style.display=t===n?'':'none';});
+  document.querySelectorAll('.tab').forEach(function(b,i){b.classList.toggle('on',['plan','hist','cfg'][i]===n);});
+  if(n==='hist')rh();
+  if(n==='cfg')lcfg();
+}
+
+function toast(m){var t=document.getElementById('toast');t.innerHTML=m;t.classList.add('on');setTimeout(function(){t.classList.remove('on');},2200);}
+
+sd(1);
+</script>
+</body>
+</html>
