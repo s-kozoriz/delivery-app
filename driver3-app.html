@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Маршрут Водитель 3">
+<meta name="theme-color" content="#1856a0">
+<link rel="manifest" href="/delivery-app/manifest-driver3.json">
+<link rel="apple-touch-icon" href="/delivery-app/driver3-192.png">
+<title>Маршрут — Водитель 3</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f0f4fc;color:#141a16;font-family:'Segoe UI',sans-serif;font-size:15px;padding-bottom:100px}
+.hdr{background:#1856a0;padding:16px 20px;position:sticky;top:0;z-index:10}
+.hdr h1{color:#fff;font-size:18px;font-weight:700;margin-bottom:10px}
+.nav{display:flex;align-items:center;gap:8px}
+.nav button{border:none;background:rgba(255,255,255,.2);color:#fff;border-radius:10px;width:36px;height:36px;font-size:20px;cursor:pointer}
+.nav button:active{background:rgba(255,255,255,.35)}
+.lbl{flex:1;text-align:center;color:#fff;font-size:14px;font-weight:600;background:rgba(255,255,255,.15);border-radius:10px;padding:8px}
+.prg{display:flex;align-items:center;gap:8px;margin-top:10px}
+.pb{flex:1;height:5px;background:rgba(255,255,255,.25);border-radius:3px;overflow:hidden}
+.pf{height:100%;background:#fff;border-radius:3px;transition:width .3s}
+.pt{color:rgba(255,255,255,.9);font-size:12px;min-width:36px;text-align:right}
+.sync{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.4);display:inline-block;margin-left:8px;vertical-align:middle}
+.sync.ok{background:#fff}
+/* TRIP BUTTONS */
+.trip-bar{display:flex;gap:8px;margin-top:10px}
+.trip-btn{flex:1;border:none;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s}
+.trip-btn:active{background:rgba(255,255,255,.35);transform:scale(.97)}
+.trip-btn.active{background:rgba(255,255,255,.9);color:#1856a0}
+.trip-btn.done-all{background:rgba(255,255,255,.9);color:#1856a0}
+.trip-status{margin-top:8px;font-size:12px;color:rgba(255,255,255,.85);text-align:center;min-height:18px}
+.wrap{padding:12px}
+.city{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#1856a0;margin:12px 0 6px 4px}
+.card{background:#fff;border-radius:14px;border:2px solid #c8d8f0;margin-bottom:10px;overflow:hidden}
+.card.dn{opacity:.7}
+.cb{display:flex;align-items:flex-start;gap:10px;padding:13px 14px}
+.num{width:26px;height:26px;border-radius:50%;background:#1856a0;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.num.dn{background:rgba(0,0,0,.15)}
+.info{flex:1;min-width:0}
+.adr{font-size:15px;font-weight:600;color:#141a16;text-decoration:none;display:block;margin-bottom:3px}
+.ttag{display:inline-flex;align-items:center;gap:3px;background:#fff3da;color:#7a4a00;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;margin-bottom:4px}
+.invs{font-size:12px;color:#5a7060;margin-top:3px}
+.inv{display:inline-block;background:#eef3fb;color:#1856a0;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500;margin:1px}
+.stag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:500;margin-top:4px}
+.str{background:#fff3da;color:#7a4a00}
+.ssv{background:#e6f5ec;color:#1a7a40}
+.sur{background:#fff0f2;color:#b00020}
+.cmt{font-size:12px;color:#5a7060;margin-top:3px;font-style:italic}
+.dbtn{flex-shrink:0;width:44px;height:44px;border-radius:50%;border:2px solid #c8d8f0;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;color:#ccc;margin-top:1px;transition:.15s}
+.dbtn.dn{background:#1856a0;border-color:#1856a0;color:#fff}
+.dbtn:active{transform:scale(.92)}
+.dbtn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.mln{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:2px solid #c8d8f0;background:rgba(0,0,0,.02);color:#1856a0;font-size:13px;font-weight:500;text-decoration:none}
+.photo-section{padding:10px 14px;border-top:2px solid #c8d8f0;background:#fafaf8}
+.photo-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.photo-thumb{width:56px;height:56px;border-radius:8px;object-fit:cover;cursor:pointer;border:2px solid #c8d8f0;transition:.15s}
+.photo-thumb:active{transform:scale(.95)}
+.photo-add{width:56px;height:56px;border-radius:8px;border:2px dashed #c8d8f0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;color:#aaa;flex-shrink:0}
+.photo-hint{font-size:11px;color:#e07000;margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.photo-count{font-size:11px;color:#5a7060;margin-top:4px}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.lb img{max-width:96vw;max-height:80vh;border-radius:8px;object-fit:contain}
+.lb-close{color:#fff;font-size:28px;cursor:pointer;padding:8px 16px;background:rgba(255,255,255,.15);border-radius:20px;border:none}
+.empty{text-align:center;padding:60px 20px;color:#5a7060}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2a1e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:998;opacity:0;transition:.22s;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <h1 id="dn">Водитель 3 <span class="sync" id="sync"></span></h1>
+  <div class="nav">
+    <button id="prev">&#8249;</button>
+    <div class="lbl" id="dl">загрузка...</div>
+    <button id="next">&#8250;</button>
+  </div>
+  <div class="prg" id="prg" style="display:none">
+    <div class="pb"><div class="pf" id="pf"></div></div>
+    <div class="pt" id="pt"></div>
+  </div>
+  <div class="trip-bar">
+    <button class="trip-btn" id="btnStart" onclick="tripStart()">&#9654; Маршрут начат</button>
+    <button class="trip-btn" id="btnEnd" onclick="tripEnd()">&#9632; Вернулся на склад</button>
+  </div>
+  <div class="trip-status" id="tripStatus"></div>
+</div>
+<div class="wrap" id="wrap"></div>
+<div class="lb" id="lb" style="display:none">
+  <button class="lb-close" id="lbClose">&#215;</button>
+  <img id="lbImg" src="" alt="">
+</div>
+<input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script>
+var DRV = 'C';
+var TODAY_KEY = '';
+firebase.initializeApp({
+  apiKey: 'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
+  databaseURL: 'https://lk-bauservice-bb872-default-rtdb.europe-west1.firebasedatabase.app',
+  storageBucket: 'lk-bauservice-bb872.firebasestorage.app',
+  projectId: 'lk-bauservice-bb872',
+  appId: '1:704709078597:web:1e336d874a8cf524583d2c'
+});
+var db = firebase.database();
+var storage = firebase.storage();
+var rows = [], cfg = {drivers:{}}, curD = '', tripData = {};
+var activeUploadRowId = null;
+
+function isoD(n) {
+  var d = new Date(); d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function nowTime() {
+  var d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function fmt(iso) {
+  var d = new Date(iso + 'T12:00:00');
+  var dn = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+  var mn = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  return dn[d.getDay()] + ', ' + d.getDate() + ' ' + mn[d.getMonth()];
+}
+function sh(n) {
+  var d = new Date(curD + 'T12:00:00'); d.setDate(d.getDate() + n);
+  curD = d.toISOString().slice(0, 10); updateTripUI(); render();
+}
+function xe(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function cleanAddr(a) {
+  var s = (a||'').trim();
+  s = s.replace(/\s+\d*[A-Za-z]*_[A-Za-z]+$/, '');
+  s = s.replace(/\s+(EG|DG|OG|\d+OG)$/i, '');
+  return s.trim();
+}
+function stTag(s) {
+  if (s==='вывоз мусора') return '<span class="stag str">&#128465; вывоз мусора</span>';
+  if (s==='самовывоз')    return '<span class="stag ssv">&#128666; самовывоз</span>';
+  if (s==='срочно')       return '<span class="stag sur">&#9888; срочно</span>';
+  if (s==='забрать товар') return '<span class="stag str">&#128722; забрать товар</span>';
+  if (s==='перенесено')   return '<span class="stag sur">&#8594; перенесено</span>';
+  return '';
+}
+function driverName() {
+  if (cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].name) return cfg.drivers[DRV].name;
+  return DRV==='L'?'Лёша':DRV==='R'?'Рома':'Водитель 3';
+}
+function needsPhoto(r) {
+  // Photo required for all statuses (deliveries, trash pickup, store pickup)
+  return true;
+}
+
+// TRIP
+function tripKey() { return curD + '_' + DRV; }
+function tripStart() {
+  var t = nowTime();
+  var data = tripData[tripKey()] || {};
+  if (data.start) { showToast('Маршрут уже начат в ' + data.start); return; }
+  data.start = t;
+  db.ref('trips/' + tripKey()).set(data);
+  if (navigator.vibrate) navigator.vibrate(100);
+  showToast('Маршрут начат в ' + t);
+  updateTripUI();
+}
+function tripEnd() {
+  var t = nowTime();
+  var data = tripData[tripKey()] || {};
+  if (!data.start) { showToast('Сначала нажмите «Маршрут начат»'); return; }
+  if (data.end) { showToast('Уже отмечено в ' + data.end); return; }
+  data.end = t;
+  db.ref('trips/' + tripKey()).set(data);
+  if (navigator.vibrate) navigator.vibrate([100,50,100]);
+  showToast('Возвращение отмечено в ' + t);
+  updateTripUI();
+}
+function updateTripUI() {
+  var data = tripData[tripKey()] || {};
+  var startBtn = document.getElementById('btnStart');
+  var endBtn = document.getElementById('btnEnd');
+  var statusEl = document.getElementById('tripStatus');
+  if (startBtn) startBtn.classList.toggle('active', !!data.start);
+  if (endBtn) endBtn.classList.toggle('done-all', !!data.end);
+  var txt = '';
+  if (data.start) txt += '&#9654; выехал ' + data.start;
+  if (data.end) txt += ' &nbsp; &#9632; вернулся ' + data.end;
+  if (statusEl) statusEl.innerHTML = txt;
+}
+
+// PHOTO
+function triggerPhoto(rowId) {
+  activeUploadRowId = rowId;
+  document.getElementById('photoInput').value = '';
+  document.getElementById('photoInput').click();
+}
+document.getElementById('photoInput').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (!file || !activeUploadRowId) return;
+  var rowId = activeUploadRowId;
+  var ext = file.name.split('.').pop() || 'jpg';
+  var path = 'photos/' + rowId + '/' + Date.now() + '.' + ext;
+  showToast('Загружаем фото...');
+  storage.ref(path).put(file).then(function(snap) {
+    return snap.ref.getDownloadURL();
+  }).then(function(url) {
+    var r = rows.find(function(x) { return x.id === rowId; });
+    var photos = (r && r.photos) ? [].concat(r.photos) : [];
+    photos.push(url);
+    db.ref('rows/' + rowId + '/photos').set(photos);
+    showToast('Фото добавлено &#10003;');
+  }).catch(function(err) {
+    showToast('Ошибка: ' + err.message);
+  });
+});
+
+function markDone(id, val) {
+  db.ref('rows/' + id).update({done: val});
+  if (val && navigator.vibrate) navigator.vibrate([60,30,60]);
+  showToast(val ? 'Выполнено &#10003;' : 'Отменено');
+}
+
+function openLightbox(url) {
+  document.getElementById('lbImg').src = url;
+  document.getElementById('lb').style.display = 'flex';
+}
+document.getElementById('lbClose').addEventListener('click', function() {
+  document.getElementById('lb').style.display = 'none';
+  document.getElementById('lbImg').src = '';
+});
+document.getElementById('lb').addEventListener('click', function(e) {
+  if (e.target === this) { this.style.display = 'none'; document.getElementById('lbImg').src = ''; }
+});
+
+function renderRow(r, num) {
+  var mapsUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(cleanAddr(r.addr) + ', ' + r.city + ', Germany') + '&travelmode=driving';
+  var invs = (r.invs||[]).map(function(i){ return i.trim(); }).filter(Boolean);
+  var photos = r.photos || [];
+  var isDone = !!r.done;
+  var hasPhoto = photos.length > 0;
+  var h = '';
+  h += '<div class="card' + (isDone ? ' dn' : '') + '">';
+  h += '<div class="cb">';
+  h += '<div class="num' + (isDone ? ' dn' : '') + '">' + num + '</div>';
+  h += '<div class="info">';
+  h += '<a class="adr" href="' + mapsUrl + '" target="_blank">' + xe(r.addr) + '</a>';
+  h += '<div style="font-size:11px;color:#888;margin-bottom:2px">&#128205; ' + xe(r.city) + '</div>';
+  if (r.timeSlot) h += '<div class="ttag">&#9201; до ' + xe(r.timeSlot) + '</div>';
+  if (invs.length) {
+    h += '<div class="invs">';
+    invs.forEach(function(i) { h += '<span class="inv">' + xe(i) + '</span>'; });
+    h += '</div>';
+  }
+  h += stTag(r.status||'');
+  if (r.comment && r.comment.trim()) h += '<div class="cmt">' + xe(r.comment) + '</div>';
+  if (isDone) h += '<div style="color:#1856a0;font-size:11px;margin-top:3px">&#10003; выполнено</div>';
+  h += '</div>';
+  var doneDisabled = (!isDone && !hasPhoto) ? ' disabled' : '';
+  var doneStyle = (!isDone && !hasPhoto) ? ' style="opacity:.35;cursor:not-allowed"' : '';
+  h += '<button class="dbtn' + (isDone ? ' dn' : '') + '"' + doneDisabled + doneStyle;
+  h += ' data-id="' + r.id + '" data-done="' + (isDone?'1':'0') + '">';
+  h += isDone ? '&#10003;' : '&#9675;';
+  h += '</button>';
+  h += '</div>';
+  h += '<a class="mln" href="' + mapsUrl + '" target="_blank">&#128247; Открыть в картах</a>';
+  h += '<div class="photo-section">';
+  if (!isDone && !hasPhoto) {
+    h += '<div class="photo-hint"><span>&#9888;</span> Сделайте фото для подтверждения</div>';
+  }
+  h += '<div class="photo-row">';
+  photos.forEach(function(url) {
+    h += '<img class="photo-thumb" src="' + xe(url) + '" data-url="' + xe(url) + '">';
+  });
+  h += '<button class="photo-add" data-upload="' + r.id + '">&#128247;</button>';
+  h += '</div>';
+  if (photos.length > 0) h += '<div class="photo-count">' + photos.length + ' фото</div>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function render() {
+  document.getElementById('dl').textContent = fmt(curD);
+  var dr = rows.filter(function(r) {
+    return r.date === curD && r.drv === DRV && r.addr && r.addr.trim() && r.inRoute !== false;
+  });
+  var tot = dr.length, dn = dr.filter(function(r) { return r.done; }).length;
+  var prg = document.getElementById('prg');
+  if (tot > 0) {
+    prg.style.display = 'flex';
+    document.getElementById('pf').style.width = Math.round(dn/tot*100) + '%';
+    document.getElementById('pt').textContent = dn + '/' + tot;
+  } else prg.style.display = 'none';
+
+  var wrap = document.getElementById('wrap');
+  if (!tot) {
+    wrap.innerHTML = '<div class="empty"><div style="font-size:48px;margin-bottom:12px">&#128666;</div><p>Нет доставок на этот день</p></div>';
+    return;
+  }
+
+  var withTime = dr.filter(function(r) { return r.timeSlot && r.timeSlot.trim(); });
+  var noTime   = dr.filter(function(r) { return !r.timeSlot || !r.timeSlot.trim(); });
+  withTime.sort(function(a,b) { return a.timeSlot < b.timeSlot ? -1 : a.timeSlot > b.timeSlot ? 1 : 0; });
+
+  var html = '', n = 1;
+  withTime.forEach(function(r) { html += renderRow(r, n++); });
+  if (noTime.length > 0) {
+    var byCity = {};
+    noTime.forEach(function(r) { if (!byCity[r.city]) byCity[r.city] = []; byCity[r.city].push(r); });
+    Object.keys(byCity).forEach(function(city) {
+      html += '<div class="city">&#128205; ' + xe(city) + '</div>';
+      byCity[city].forEach(function(r) { html += renderRow(r, n++); });
+    });
+  }
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('.dbtn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (this.disabled) return;
+      var id = this.getAttribute('data-id');
+      var isDone = this.getAttribute('data-done') === '1';
+      markDone(id, !isDone);
+    });
+  });
+  wrap.querySelectorAll('.photo-add').forEach(function(btn) {
+    btn.addEventListener('click', function() { triggerPhoto(this.getAttribute('data-upload')); });
+  });
+  wrap.querySelectorAll('.photo-thumb').forEach(function(img) {
+    img.addEventListener('click', function() { openLightbox(this.getAttribute('data-url')); });
+  });
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.innerHTML = msg; t.classList.add('on');
+  setTimeout(function() { t.classList.remove('on'); }, 2500);
+}
+
+document.getElementById('prev').addEventListener('click', function() { sh(-1); });
+document.getElementById('next').addEventListener('click', function() { sh(1); });
+
+db.ref('rows').on('value', function(snap) {
+  rows = snap.val() ? Object.values(snap.val()) : [];
+  render();
+  document.getElementById('sync').className = 'sync ok';
+}, function() { document.getElementById('sync').className = 'sync'; });
+
+db.ref('cfg').on('value', function(snap) {
+  if (snap.val()) {
+    cfg = snap.val();
+    document.getElementById('dn').innerHTML = driverName() + ' <span class="sync ok" id="sync"></span>';
+  }
+});
+
+db.ref('trips').on('value', function(snap) {
+  tripData = snap.val() || {};
+  updateTripUI();
+});
+
+curD = isoD(0);
+render();
+</script>
+</body>
+</html>
