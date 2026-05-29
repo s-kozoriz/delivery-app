@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>LK Bauservice — Вход</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',sans-serif}
+body{background:#1a1a2e;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.wrap{background:#fff;border-radius:20px;padding:32px 28px;width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.logo{font-size:28px;font-weight:800;color:#854F0B;margin-bottom:4px;letter-spacing:.02em}
+.sub{font-size:13px;color:#888;margin-bottom:28px}
+.dots{display:flex;gap:12px;justify-content:center;margin-bottom:24px}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid #c4c0b4;background:transparent;transition:.15s}
+.dot.filled{background:#854F0B;border-color:#854F0B}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.key{padding:16px;border:1px solid #e0ddd4;border-radius:12px;font-size:20px;font-weight:600;background:#fff;cursor:pointer;color:#141816;transition:.1s;user-select:none}
+.key:active{background:#f0efe9;transform:scale(.96)}
+.key.del{font-size:15px;color:#888}
+.key.empty{background:none;border:none;cursor:default}
+.err{color:#E24B4A;font-size:13px;min-height:20px;margin-bottom:8px}
+.hint{font-size:11px;color:#bbb;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">LK Bauservice</div>
+  <div class="sub">Введите PIN-код для входа</div>
+  <div class="dots">
+    <div class="dot" id="d0"></div>
+    <div class="dot" id="d1"></div>
+    <div class="dot" id="d2"></div>
+    <div class="dot" id="d3"></div>
+  </div>
+  <div class="err" id="err"></div>
+  <div class="grid">
+    <button class="key" onclick="kp('1')">1</button>
+    <button class="key" onclick="kp('2')">2</button>
+    <button class="key" onclick="kp('3')">3</button>
+    <button class="key" onclick="kp('4')">4</button>
+    <button class="key" onclick="kp('5')">5</button>
+    <button class="key" onclick="kp('6')">6</button>
+    <button class="key" onclick="kp('7')">7</button>
+    <button class="key" onclick="kp('8')">8</button>
+    <button class="key" onclick="kp('9')">9</button>
+    <button class="key empty"></button>
+    <button class="key" onclick="kp('0')">0</button>
+    <button class="key del" onclick="kp('X')">⌫</button>
+  </div>
+  <div class="hint">Один PIN — один интерфейс</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
+  databaseURL:'https://lk-bauservice-bb872-default-rtdb.europe-west1.firebasedatabase.app',
+  storageBucket:'lk-bauservice-bb872.firebasestorage.app',
+  projectId:'lk-bauservice-bb872',
+  appId:'1:704709078597:web:1e336d874a8cf524583d2c'
+});
+var db = firebase.database();
+var buf = '';
+var cfg = {};
+
+// Load config from Firebase
+var cfgLoaded = false;
+db.ref('cfg').once('value', function(s){
+  cfg = s.val() || {};
+  cfgLoaded = true;
+  // If user already entered PIN while cfg was loading - check now
+  if(buf.length === 4) check();
+});
+
+function upd(){
+  [0,1,2,3].forEach(function(i){
+    var el = document.getElementById('d'+i);
+    el.className = 'dot' + (i < buf.length ? ' filled' : '');
+  });
+}
+
+function kp(k){
+  document.getElementById('err').textContent = '';
+  if(k === 'X'){ buf = buf.slice(0,-1); upd(); return; }
+  if(buf.length >= 4) return;
+  buf += k;
+  upd();
+  if(buf.length === 4) check();
+}
+
+function check(){
+  if(!cfgLoaded){
+    document.getElementById('err').textContent = 'Загрузка...';
+    return;
+  }
+  var p = buf;
+  var pd = cfg.pinD || {L:'3333',R:'4444',C:'5555',V:'1100'};
+
+  // Dispatcher roles
+  if(p === (cfg.pin || '1234')){ go('index.html', {role:'zentrum'}); return; }
+  if(p === (cfg.pin2 || '2222')){ go('index.html', {role:'norden'}); return; }
+  if(p === (cfg.pinView || '0000')){ go('index.html', {role:'lager'}); return; }
+
+  // Drivers
+  if(p === (pd.L || '3333')){ go('lesha-app.html', {}); return; }
+  if(p === (pd.R || '4444')){ go('roma-app.html', {}); return; }
+  if(p === (pd.C || '5555')){ go('driver3-app.html', {}); return; }
+  if(p === (pd.V || '1100')){ go('valentyn-app.html', {}); return; }
+
+  // Techs
+  var techs = cfg.techs || {};
+  var techIds = Object.keys(techs);
+  for(var i=0; i<techIds.length; i++){
+    if(techs[techIds[i]].pin === p){
+      sessionStorage.setItem('login_from','login');
+      sessionStorage.setItem('login_techId',techIds[i]);
+      window.location.href='tech-app.html';
+      return;
+    }
+  }
+
+  // Wrong PIN
+  document.getElementById('err').textContent = 'Неверный PIN';
+  buf = ''; upd();
+}
+
+function go(page, params){
+  // Store params in sessionStorage for the target page
+  sessionStorage.setItem('login_from', 'login');
+  Object.keys(params).forEach(function(k){
+    sessionStorage.setItem('login_' + k, params[k]);
+  });
+  window.location.href = page;
+}
+
+// Keyboard support
+document.addEventListener('keydown', function(e){
+  if(e.key >= '0' && e.key <= '9') kp(e.key);
+  else if(e.key === 'Backspace') kp('X');
+});
+</script>
+</body>
+</html>

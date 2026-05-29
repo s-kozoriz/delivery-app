@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#854F0B">
+<title>LK Техник</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f0efe9;color:#141816;font-family:'Segoe UI',sans-serif;font-size:15px;padding-bottom:40px}
+.pin-wrap{position:fixed;inset:0;background:#854F0B;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:1000;padding:20px}
+.pin-logo{width:64px;height:64px;background:rgba(255,255,255,.2);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#fff;margin-bottom:4px}
+.pin-name{color:#fff;font-size:18px;font-weight:700}
+.pin-sub{color:rgba(255,255,255,.6);font-size:13px}
+.pin-dots{display:flex;gap:12px}
+.pdot{width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:transparent;transition:.15s}
+.pdot.on{background:#fff;border-color:#fff}
+.pin-err{color:#ffaaaa;font-size:13px;height:18px;text-align:center}
+.pad{display:grid;grid-template-columns:repeat(3,72px);gap:10px}
+.pb{height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff;font-size:26px;font-weight:400;cursor:pointer}
+.pb:active{background:rgba(255,255,255,.25)}
+.hdr{background:#854F0B;padding:16px 20px;position:sticky;top:0;z-index:10}
+.hdr h1{color:#fff;font-size:17px;font-weight:700;margin-bottom:2px}
+.hdr p{color:rgba(255,255,255,.65);font-size:12px}
+.wrap{padding:12px}
+.card{background:#fff;border-radius:12px;border:1px solid #e0ddd4;margin-bottom:12px;overflow:hidden}
+.card-hdr{padding:11px 14px;border-bottom:1px solid #e0ddd4;font-size:13px;font-weight:600;color:#141816}
+.card-body{padding:14px}
+.fl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#888;margin-bottom:5px}
+.fi{width:100%;border:1px solid #c4c0b4;border-radius:8px;padding:9px 12px;font-size:14px;background:#fff;color:#141816;-webkit-appearance:none}
+.fi:focus{outline:2px solid #854F0B;outline-offset:1px}
+.fi-gap{margin-bottom:12px}
+.date-row{display:flex;gap:8px;margin-bottom:10px}
+.date-btn{flex:1;padding:8px 4px;border-radius:8px;border:1px solid #c4c0b4;background:#fff;font-size:12px;font-weight:600;color:#854F0B;cursor:pointer;text-align:center}
+.date-btn.active{background:#854F0B;color:#fff;border-color:#854F0B}
+.date-display{background:#fff3da;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;color:#854F0B;text-align:center}
+.photo-zone{border:2px dashed #c4c0b4;border-radius:10px;padding:18px;text-align:center;cursor:pointer;transition:.15s}
+.photo-zone.has{border-style:solid;border-color:#9fe0be;background:#f0faf4}
+.photo-zone:active{background:#f5f4f0}
+.photo-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.photo-thumb{width:60px;height:60px;border-radius:8px;object-fit:cover;border:1px solid #d8ede2}
+.photo-hint{font-size:11px;margin-top:6px}
+.hint-ok{color:#1a7a40;display:flex;align-items:center;justify-content:center;gap:4px}
+.hint-warn{color:#e07000;display:flex;align-items:center;justify-content:center;gap:4px}
+.save-btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:.15s}
+.save-btn.locked{background:#ccc;color:#fff;cursor:not-allowed}
+.save-btn.ready{background:#854F0B;color:#fff}
+.save-btn.ready:active{background:#633806}
+.section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888;margin:16px 0 8px 2px}
+.req-card{background:#fff;border-radius:10px;border:1px solid #e0ddd4;padding:11px 13px;margin-bottom:8px}
+.req-addr{font-size:13px;font-weight:600;color:#141816}
+.req-meta{font-size:11px;color:#888;margin-top:3px}
+.req-assigned{font-size:11px;color:#1856a0;font-weight:600;margin-top:3px}
+.req-pending{font-size:11px;color:#e07000;margin-top:3px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2a1e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:998;opacity:0;transition:.22s;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.rec-btn{width:60px;height:60px;border-radius:50%;border:none;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;margin:0 auto 8px}
+.rec-btn.idle{background:#fff3da;color:#854F0B}
+.rec-btn.recording{background:#E24B4A;color:#fff;animation:recpulse 1s infinite}
+.rec-btn.processing{background:#1856a0;color:#fff;cursor:not-allowed}
+@keyframes recpulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+.rec-status{text-align:center;font-size:11px;color:#888;min-height:16px;margin-bottom:8px}
+.rec-timer{text-align:center;font-size:20px;font-weight:700;color:#E24B4A;margin-bottom:4px;display:none}
+.vmsg-item{padding:9px 13px;border-bottom:0.5px solid #e0ddd4}
+.vmsg-item:last-child{border-bottom:none}
+.vmsg-meta{display:flex;justify-content:space-between;margin-bottom:3px}
+.vmsg-to-lbl{font-size:11px;font-weight:600;color:#1856a0}
+.vmsg-date-lbl{font-size:10px;color:#888}
+.vmsg-addr-lbl{font-size:10px;color:#888;margin-bottom:4px}
+.vmsg-text-lbl{font-size:12px;color:#141816;line-height:1.5;margin-bottom:5px}
+.vmsg-st{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.vmsg-st.new{background:#e8f0fe;color:#1856a0}
+.vmsg-st.working{background:#fff3da;color:#854F0B}
+.vmsg-st.clarify{background:#fce8e6;color:#c62828}
+.vmsg-st.done{background:#e6f4ea;color:#1a7a40}
+
+.bnav{display:flex;background:#fff;border-top:1px solid #e0ddd4;position:sticky;bottom:0;z-index:10}
+.bnav-btn{flex:1;padding:8px 4px 10px;text-align:center;font-size:9px;font-weight:600;color:#888;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;letter-spacing:.02em;text-transform:uppercase}
+.bnav-btn.on{color:#854F0B}
+.bnav-icon{font-size:20px;line-height:1.2}
+.tab-panel{display:none}
+.tab-panel.on{display:block}
+.dlv-card{background:#fff;border-radius:10px;border:1px solid #e0ddd4;margin-bottom:8px;overflow:hidden}
+.dlv-hdr{display:flex;justify-content:space-between;align-items:center;padding:7px 12px;background:#f0f5ff;border-bottom:1px solid #e0ddd4}
+.dlv-drv{font-size:11px;font-weight:700;color:#1856a0}
+.dlv-date-lbl{font-size:10px;color:#888}
+.dlv-body{padding:8px 12px}
+.dlv-city{font-size:10px;color:#888;margin-bottom:2px}
+.dlv-addr{font-size:13px;font-weight:600;color:#141816}
+.dlv-cmt{font-size:11px;color:#854F0B;margin-top:3px}
+.dlv-invs{font-size:11px;color:#1856a0;margin-top:3px}
+.ac-wrap{position:relative}
+.ac-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #c4c0b4;border-radius:0 0 8px 8px;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:100;max-height:150px;overflow-y:auto;display:none}
+.ac-list.show{display:block}
+.ac-item{padding:10px 12px;font-size:13px;color:#141816;border-bottom:1px solid #f0efe9;cursor:pointer}
+.ac-item:last-child{border-bottom:none}
+.ac-item:active{background:#f0f5ff}
+.ac-match{color:#854F0B;font-weight:700}
+.route-item{background:#fff;border-radius:10px;border:1px solid #e0ddd4;margin-bottom:8px;overflow:hidden}
+.route-item-hdr{padding:8px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0efe9}
+.route-item-body{padding:8px 12px}
+.route-status-done{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:#e6f4ea;color:#1a7a40}
+.route-status-pending{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:#fff3da;color:#854F0B}
+.route-status-trash{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:#fce8e6;color:#c62828}
+.route-photos{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.route-photo{width:60px;height:60px;object-fit:cover;border-radius:7px;border:1px solid #e0ddd4;cursor:pointer}
+
+/* AI Estimate UI */
+.ai-weight-box{background:#f0faf4;border-radius:12px;padding:18px;text-align:center;margin-bottom:14px}
+.ai-weight-big{font-size:36px;font-weight:700;color:#141816;line-height:1}
+.ai-weight-big .unit{font-size:16px;color:#888;font-weight:400}
+.ai-volume-sub{font-size:12px;color:#888;margin-top:4px}
+.ai-edited-tag{font-size:10px;color:#1a7a40;margin-top:5px;font-weight:700}
+.ai-detail-tbl{background:#fff;border:1px solid #e0ddd4;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+.ai-detail-row{display:flex;justify-content:space-between;padding:3px 0}
+.ai-detail-row+.ai-detail-row{border-top:1px solid #f0efe9;padding-top:6px;margin-top:3px}
+.ai-confidence-line{text-align:center;font-size:11px;color:#888;margin-bottom:14px}
+.ai-error{background:#fff3da;border-radius:8px;padding:10px;font-size:12px;color:#854F0B;margin-bottom:12px;text-align:center}
+.btn-secondary{width:100%;padding:11px;border:1px solid #854F0B;background:transparent;color:#854F0B;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px}
+.btn-secondary:active{background:#fff3da}
+.btn-link{width:100%;padding:8px;background:transparent;color:#888;border:none;font-size:12px;cursor:pointer;margin-top:6px}
+</style>
+</head>
+<body>
+
+<div class="pin-wrap" id="pinWrap">
+  <div class="pin-logo">LK</div>
+  <div class="pin-name">LK Техник</div>
+  <div class="pin-sub" id="pinSub">Введите PIN-код</div>
+  <div class="pin-dots">
+    <div class="pdot" id="pd0"></div><div class="pdot" id="pd1"></div>
+    <div class="pdot" id="pd2"></div><div class="pdot" id="pd3"></div>
+  </div>
+  <div class="pin-err" id="pinErr"></div>
+  <div class="pad">
+    <button class="pb" onclick="pp('1')">1</button><button class="pb" onclick="pp('2')">2</button><button class="pb" onclick="pp('3')">3</button>
+    <button class="pb" onclick="pp('4')">4</button><button class="pb" onclick="pp('5')">5</button><button class="pb" onclick="pp('6')">6</button>
+    <button class="pb" onclick="pp('7')">7</button><button class="pb" onclick="pp('8')">8</button><button class="pb" onclick="pp('9')">9</button>
+    <button class="pb" onclick="pp('X')" style="font-size:16px">&#9003;</button><button class="pb" onclick="pp('0')">0</button>
+    <button class="pb" style="opacity:0" disabled></button>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="hdr">
+    <h1 id="techName">LK Техник</h1>
+    <p id="techCity">Загрузка...</p>
+  </div>
+  <div class="wrap" style="padding-bottom:0">
+
+  <!-- TAB: Мусор (форма + заявки) -->
+  <div class="tab-panel on" id="tab-trash">
+    <div class="card" id="trash-form-card">
+      <div class="card-hdr">🗑 Новая заявка на вывоз мусора</div>
+      <div class="card-body">
+        <div class="fl">Желаемая дата вывоза</div>
+        <div class="date-row">
+          <button class="date-btn active" id="dBtn1" onclick="setDateOffset(1)">Завтра</button>
+          <button class="date-btn" id="dBtn2" onclick="setDateOffset(2)">+2 дня</button>
+          <button class="date-btn" id="dBtn3" onclick="setDateOffset(3)">+3 дня</button>
+          <button class="date-btn" id="dBtnC" onclick="showCustomDate()">Выбрать</button>
+        </div>
+        <input type="date" id="customDate" style="display:none;margin-bottom:8px" class="fi" onchange="pickCustomDate()">
+        <div class="date-display" id="dateDisplay">—</div>
+
+        <div style="height:12px"></div>
+        <div class="fl fi-gap">Город</div>
+        <select class="fi fi-gap" id="citySelect"><option value="">— выберите город —</option></select>
+
+        <div class="fl fi-gap" style="margin-top:12px">Адрес объекта</div>
+        <div class="ac-wrap"><input class="fi fi-gap" id="addrInput" placeholder="Улица, номер дома..." autocomplete="off" oninput="acSearch(this.value)" onfocus="acSearch(this.value)" type="text">
+
+        <div class="fl fi-gap" style="margin-top:12px">Комментарий (необязательно)</div>
+        <input class="fi fi-gap" id="commentInput" placeholder="Контейнер во дворе, этаж..."><div class="ac-list" id="acList"></div></div>
+
+        <div class="fl" style="margin-top:12px">Фото мусора (минимум 2)</div>
+        <div class="photo-zone" id="photoZone" onclick="triggerPhoto()">
+          <div class="photo-grid" id="photoGrid"></div>
+          <div id="photoHint">
+            <div style="font-size:28px;margin-bottom:6px">📷</div>
+            <div style="font-size:13px;color:#888">Нажмите чтобы сделать фото</div>
+          </div>
+        </div>
+        <div class="photo-hint" id="photoStatus">
+          <div class="hint-warn">⚠ Сделайте минимум 2 фото</div>
+        </div>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" multiple>
+
+        <div style="height:14px"></div>
+        <button class="save-btn locked" id="saveBtn" onclick="saveRequest()">Сохранить заявку</button>
+      </div>
+    </div>
+
+    <!-- AI оценка веса — показывается после Save -->
+    <div class="card" id="ai-estimate-card" style="display:none">
+      <div class="card-hdr">🤖 Оценка веса от AI</div>
+      <div class="card-body">
+        <div class="ai-error" id="ai-error-block" style="display:none">
+          AI-оценка недоступна. Можно сохранить заявку без неё или ввести вес вручную.
+        </div>
+        <div id="ai-data-block">
+          <div class="ai-weight-box">
+            <div style="font-size:11px;color:#888;margin-bottom:4px">Оценка веса</div>
+            <div class="ai-weight-big"><span id="ai-weight-big">—</span><span class="unit"> кг</span></div>
+            <div class="ai-volume-sub">≈ <span id="ai-volume-small">—</span> м³</div>
+            <div class="ai-edited-tag" id="ai-edited-tag" style="display:none">✓ Скорректировано вручную</div>
+          </div>
+          <div class="ai-detail-tbl">
+            <div class="ai-detail-row"><span style="color:#888">Калфасы</span><span id="ai-detail-kalfas">—</span></div>
+            <div class="ai-detail-row"><span style="color:#888">Мешки</span><span id="ai-detail-bags">—</span></div>
+          </div>
+          <div class="ai-confidence-line">ℹ <span id="ai-confidence">—</span></div>
+        </div>
+        <button id="confirmBtn" onclick="confirmEstimate()" class="save-btn ready">Подтвердить</button>
+        <button class="btn-secondary" onclick="showEditEstimate()">Изменить вручную</button>
+        <button class="btn-link" onclick="backToForm()">← Вернуться к форме</button>
+      </div>
+    </div>
+
+    <!-- Ручная корректировка -->
+    <div class="card" id="ai-edit-card" style="display:none">
+      <div class="card-hdr">✏ Ручная корректировка</div>
+      <div class="card-body">
+        <div class="fl">Вес (кг)</div>
+        <input type="number" class="fi fi-gap" id="edit-weight-input" min="0" step="1">
+        <div class="fl" style="margin-top:8px">Объём (м³)</div>
+        <input type="number" class="fi fi-gap" id="edit-volume-input" min="0" step="0.01">
+        <div style="height:10px"></div>
+        <button onclick="applyEdit()" class="save-btn ready">Применить</button>
+        <button class="btn-link" onclick="cancelEdit()">← Отмена</button>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:16px">Мои заявки на вывоз</div>
+    
+    <div id="myRequests"><div style="text-align:center;color:#888;font-size:13px;padding:20px">Загрузка...</div></div>
+  </div>
+
+  <!-- TAB: Маршрут -->
+  <div class="tab-panel" id="tab-route">
+    <!-- Date navigation -->
+    <div style="display:flex;align-items:center;gap:6px;padding:10px 12px;background:#fff;border-bottom:1px solid #e0ddd4;position:sticky;top:0;z-index:5">
+      <button onclick="routeChangeDay(-1)" style="width:32px;height:32px;border-radius:50%;border:1px solid #e0ddd4;background:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">‹</button>
+      <div style="flex:1;text-align:center;font-size:13px;font-weight:600;color:#141816" id="routeDateLabel">Сегодня</div>
+      <button onclick="routeChangeDay(1)" style="width:32px;height:32px;border-radius:50%;border:1px solid #e0ddd4;background:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">›</button>
+    </div>
+    <div id="routeList"><div style="text-align:center;color:#888;font-size:13px;padding:20px">Загрузка...</div></div>
+  </div>
+
+  <!-- TAB: Сообщения -->
+  <div class="tab-panel" id="tab-voice">
+    <!-- Voice Messages -->
+    <div class="section-title">🎙 Голосовое сообщение</div>
+    <div class="card">
+      <div class="card-body">
+        <div class="fl">Кому</div>
+        <select class="fi" id="vmsg-to" style="margin-bottom:10px">
+          <option value="">— выберите адресата —</option>
+          <option value="dispatcher">Диспетчер</option>
+          <option value="buyer">Закупщик</option>
+          <option value="manager">Технический руководитель</option>
+        </select>
+        <div class="fl">Город</div>
+        <select class="fi" id="vmsg-city" style="margin-bottom:8px">
+          <option value="">— выберите город —</option>
+        </select>
+        <div class="fl">Адрес объекта</div>
+        <input class="fi" id="vmsg-addr" placeholder="Улица, дом, квартира..." style="margin-bottom:12px">
+        <div class="rec-timer" id="rec-timer">0:00</div>
+        <button class="rec-btn idle" id="rec-btn" onclick="toggleRec()">🎙</button>
+        <div class="rec-status" id="rec-status">Нажмите для записи</div>
+        <button id="vmsg-send" onclick="sendVoiceMsg()" style="display:none;width:100%;padding:10px;background:#854F0B;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">▶ Отправить</button>
+      </div>
+    </div>
+
+    <div class="section-title">📨 Мои сообщения</div>
+    <div id="vmsgList" class="card"><div style="text-align:center;color:#888;font-size:12px;padding:16px">Загрузка...</div></div>
+  </div>
+
+  <!-- Bottom nav -->
+  <div class="bnav">
+    <button class="bnav-btn on" id="bnav-trash" onclick="swTab('trash')">
+      <span class="bnav-icon">🗑</span>Мусор
+    </button>
+    <button class="bnav-btn" id="bnav-route" onclick="swTab('route')">
+      <span class="bnav-icon">📦</span>Маршрут
+    </button>
+    <button class="bnav-btn" id="bnav-voice" onclick="swTab('voice')">
+      <span class="bnav-icon">🎙</span>Сообщения
+    </button>
+  </div>
+
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
+  databaseURL:'https://lk-bauservice-bb872-default-rtdb.europe-west1.firebasedatabase.app',
+  storageBucket:'lk-bauservice-bb872.firebasestorage.app',
+  projectId:'lk-bauservice-bb872',
+  appId:'1:704709078597:web:1e336d874a8cf524583d2c'
+});
+var db=firebase.database();
+var storage=firebase.storage();
+
+var currentTechId=null,currentTech=null,cfg={},pinBuf='',photos=[],selectedDate='',dateOffset=1;
+var _reqPhotos={};
+
+function isoD(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function fmt(iso){var d=new Date(iso+'T12:00:00');var dn=['вс','пн','вт','ср','чт','пт','сб'];var mn=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];return dn[d.getDay()]+', '+d.getDate()+' '+mn[d.getMonth()]+' '+d.getFullYear();}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function dname(k){return cfg&&cfg.drivers&&cfg.drivers[k]?cfg.drivers[k].name:k;}
+function xe(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+
+// PIN
+function pp(d){
+  if(d==='X'){pinBuf=pinBuf.slice(0,-1);}else if(pinBuf.length<4){pinBuf+=d;}
+  [0,1,2,3].forEach(function(i){var el=document.getElementById('pd'+i);if(el){el.style.background=i<pinBuf.length?'#fff':'transparent';el.style.borderColor=i<pinBuf.length?'#fff':'rgba(255,255,255,.4)';}});
+  if(pinBuf.length===4){
+    // Check against all techs
+    db.ref('cfg/techs').once('value',function(s){
+      var techs=s.val()||{};
+      var found=null,foundId=null;
+      Object.keys(techs).forEach(function(id){
+        if(techs[id].pin===pinBuf){found=techs[id];foundId=id;}
+      });
+      if(found){
+        currentTechId=foundId;currentTech=found;
+        document.getElementById('pinWrap').style.display='none';
+        document.getElementById('app').style.display='';
+        sessionStorage.setItem('techId',foundId);
+        sessionStorage.setItem('techPin',pinBuf);
+        initApp();
+      } else {
+        document.getElementById('pinErr').textContent='Неверный PIN';
+        pinBuf='';
+        [0,1,2,3].forEach(function(i){var el=document.getElementById('pd'+i);if(el){el.style.background='transparent';el.style.borderColor='rgba(255,255,255,.4)';}});
+        setTimeout(function(){document.getElementById('pinErr').textContent='';},1500);
+      }
+    });
+  }
+}
+
+// Session restore
+(function(){
+  // Coming from login.html
+  if(sessionStorage.getItem('login_from')==='login'){
+    var tid=sessionStorage.getItem('login_techId')||'';
+    sessionStorage.removeItem('login_from');
+    sessionStorage.removeItem('login_techId');
+    if(tid){
+      currentTechId=tid;
+      db.ref('cfg/techs/'+tid).once('value',function(s){
+        currentTech=s.val();
+        sessionStorage.setItem('techId',tid);
+        sessionStorage.setItem('techPin',currentTech?currentTech.pin:'');
+        document.getElementById('pinWrap').style.display='none';
+        document.getElementById('app').style.display='';
+        initApp();
+      });
+    }
+    return;
+  }
+  // Regular session restore
+  var tid=sessionStorage.getItem('techId'),tpin=sessionStorage.getItem('techPin');
+  if(tid&&tpin){
+    db.ref('cfg/techs/'+tid).once('value',function(s){
+      if(s.val()&&s.val().pin===tpin){
+        currentTechId=tid;currentTech=s.val();
+        document.getElementById('pinWrap').style.display='none';
+        document.getElementById('app').style.display='';
+        initApp();
+      }
+    });
+  }
+})();
+
+function initApp(){
+  db.ref('cfg').on('value',function(s){
+    if(s.val())cfg=s.val();
+    // Refresh tech data
+    if(cfg.techs&&cfg.techs[currentTechId])currentTech=cfg.techs[currentTechId];
+    document.getElementById('techName').textContent=currentTech.name||'Техник';
+    // Build city list
+    var cities=(currentTech.cities||[]);
+    document.getElementById('techCity').textContent=cities.length?cities.join(', '):'Нет городов';
+    var sel=document.getElementById('citySelect');
+    sel.innerHTML='<option value="">— выберите город —</option>';
+    cities.forEach(function(c){sel.innerHTML+='<option value="'+xe(c)+'">'+xe(c)+'</option>';});
+  });
+  // Load requests
+  initVmsgCities();
+  loadVoiceMsgs();
+  var _rowListeners={};
+  var _techReqs={};
+
+  db.ref('techRequests').on('value',function(s){
+    _techReqs=s.val()||{};
+    var mine=Object.values(_techReqs).filter(function(r){return r.techId===currentTechId;});
+
+    // Set up real-time listeners for each row
+    mine.forEach(function(r){
+      if(r.rowId && !_rowListeners[r.rowId]){
+        _rowListeners[r.rowId]=true;
+        db.ref('rows/'+r.rowId).on('value',function(ds){
+          var row=ds.val()||{};
+          // Update techReqs cache with live row data
+          Object.values(_techReqs).forEach(function(req){
+            if(req.rowId===r.rowId){
+              req.done=row.done||false;
+              req.rowPhotos=row.photos||[];
+              req.techPhotoCount=row.techPhotoCount||0;
+            }
+          });
+          _reqPhotos[r.rowId]=row.photos||[];
+          renderRequests(_techReqs);
+        });
+      }
+    });
+
+    renderRequests(_techReqs);
+  });
+  setDateOffset(1);
+}
+
+// Date
+function setDateOffset(n){
+  dateOffset=n;selectedDate=isoD(n);
+  ['dBtn1','dBtn2','dBtn3','dBtnC'].forEach(function(id){
+    var b=document.getElementById(id);if(b)b.classList.remove('active');
+  });
+  var map={1:'dBtn1',2:'dBtn2',3:'dBtn3'};
+  if(map[n])document.getElementById(map[n]).classList.add('active');
+  document.getElementById('customDate').style.display='none';
+  document.getElementById('dateDisplay').textContent=fmt(selectedDate);
+  checkSave();
+}
+function showCustomDate(){
+  ['dBtn1','dBtn2','dBtn3','dBtnC'].forEach(function(id){
+    var b=document.getElementById(id);if(b)b.classList.remove('active');
+  });
+  document.getElementById('dBtnC').classList.add('active');
+  var cd=document.getElementById('customDate');
+  cd.style.display='';
+  cd.min=isoD(1);
+  cd.focus();
+}
+function pickCustomDate(){
+  selectedDate=document.getElementById('customDate').value;
+  if(selectedDate)document.getElementById('dateDisplay').textContent=fmt(selectedDate);
+  checkSave();
+}
+
+// Photos
+function triggerPhoto(){document.getElementById('photoInput').click();}
+document.getElementById('photoInput').addEventListener('change',function(e){
+  var files=Array.from(e.target.files);
+  files.forEach(function(file){
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      photos.push({file:file,url:ev.target.result});
+      renderPhotos();checkSave();
+    };
+    reader.readAsDataURL(file);
+  });
+  this.value='';
+});
+function renderPhotos(){
+  var grid=document.getElementById('photoGrid');
+  var hint=document.getElementById('photoHint');
+  var status=document.getElementById('photoStatus');
+  var zone=document.getElementById('photoZone');
+  grid.innerHTML='';
+  photos.forEach(function(p,i){
+    var img=document.createElement('img');
+    img.className='photo-thumb';img.src=p.url;
+    grid.appendChild(img);
+  });
+  if(photos.length>0){
+    hint.style.display='none';
+    zone.classList.add('has');
+    if(photos.length>=2){
+      status.innerHTML='<div class="hint-ok">✓ '+photos.length+' фото добавлено</div>';
+    } else {
+      status.innerHTML='<div class="hint-warn">⚠ Нужно ещё '+(2-photos.length)+' фото</div>';
+    }
+  } else {
+    hint.style.display='';
+    zone.classList.remove('has');
+    status.innerHTML='<div class="hint-warn">⚠ Сделайте минимум 2 фото</div>';
+  }
+}
+function checkSave(){
+  var addr=document.getElementById('addrInput').value.trim();
+  var city=document.getElementById('citySelect').value;
+  var ready=photos.length>=2&&addr&&city&&selectedDate;
+  var btn=document.getElementById('saveBtn');
+  btn.className='save-btn '+(ready?'ready':'locked');
+}
+document.getElementById('addrInput').addEventListener('input',checkSave);
+document.getElementById('citySelect').addEventListener('change',checkSave);
+
+// Save
+function saveRequest(){
+  var addr=document.getElementById('addrInput').value.trim();
+  var city=document.getElementById('citySelect').value;
+  if(photos.length<2||!addr||!city||!selectedDate)return;
+  var btn=document.getElementById('saveBtn');
+  btn.textContent='Сохраняем...';btn.className='save-btn locked';
+
+  var reqId=uid();
+  var uploadPromises=photos.map(function(p,i){
+    var path='tech-photos/'+reqId+'/'+i+'_'+Date.now()+'.jpg';
+    return storage.ref(path).put(p.file).then(function(snap){return snap.ref.getDownloadURL();});
+  });
+
+  Promise.all(uploadPromises).then(function(urls){
+    var req={
+      id:reqId,
+      techId:currentTechId,
+      techName:currentTech.name||'Техник',
+      desiredDate:selectedDate,
+      city:city,
+      addr:addr,
+      comment:document.getElementById('commentInput').value.trim(),
+      photos:urls,
+      status:'new',
+      assignedDrv:null,
+      assignedDate:null,
+      createdAt:Date.now()
+    };
+    // Save tech request
+    return db.ref('techRequests/'+reqId).set(req).then(function(){
+      // Also create row in main rows table
+      var rowId=uid();
+      var row={
+        id:rowId,
+        date:selectedDate,
+        drv:'',
+        city:city,
+        addr:addr,
+        invs:[''],
+        status:'вывоз мусора',
+        comment:req.comment,
+        inRoute:true,
+        done:false,
+        photos:urls,
+        photoTs:urls.map(function(){return Date.now();}),
+        techPhotoCount:urls.length,
+        fromTech:true,
+        techReqId:reqId,
+        techName:currentTech.name||'Техник',
+        desiredDate:selectedDate,
+        createdAt:Date.now(),
+        weight:(typeof _finalWeight!=='undefined'&&_finalWeight)?_finalWeight:null,
+        volume_m3:(typeof _finalVolume!=='undefined'&&_finalVolume)?_finalVolume:null,
+        ai_estimate_ref:reqId
+      };
+      return db.ref('rows/'+rowId).set(row).then(function(){
+        return db.ref('techRequests/'+reqId+'/rowId').set(rowId);
+      });
+    });
+  }).then(function(){
+    showToast('Заявка сохранена ✓');
+    // Reset form
+    photos=[];selectedDate='';
+    document.getElementById('addrInput').value='';
+    document.getElementById('citySelect').value='';
+    document.getElementById('commentInput').value='';
+    renderPhotos();setDateOffset(1);
+    btn.textContent='Сохранить заявку';
+    checkSave();
+  }).catch(function(err){
+    showToast('Ошибка: '+err.message);
+    btn.textContent='Сохранить заявку';
+    checkSave();
+  });
+}
+
+// My requests
+function renderRequests(all){
+  var el=document.getElementById('myRequests');
+  var mine=Object.values(all).filter(function(r){return r.techId===currentTechId;});
+  mine.sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  if(!mine.length){el.innerHTML='<div style="text-align:center;color:#888;font-size:13px;padding:20px">Заявок пока нет</div>';return;}
+  el.innerHTML=mine.map(function(r){
+    var assigned=r.assignedDrv&&r.assignedDate;
+    var isDone=!!r.done;
+    var statusHtml='';
+    if(isDone){
+      statusHtml='<div style="margin-top:4px;color:#1a7a40;font-size:12px;font-weight:700;background:#e6f4ea;border-radius:4px;padding:3px 8px;display:inline-flex;align-items:center;gap:4px">&#10003; Выполнено</div>';
+    } else if(assigned){
+      statusHtml='<div class="req-assigned">&#10003; Назначено: '+xe(r.assignedDrv)+', '+fmt(r.assignedDate)+'</div>';
+    } else {
+      statusHtml='<div class="req-pending">&#9203; Ожидает назначения</div>';
+    }
+    // Driver photos - show when done
+    var driverPhotosHtml='';
+    var allPhotos=r.rowPhotos||_reqPhotos[r.rowId]||[];
+    var techCount=r.techPhotoCount||0;
+    var driverPh=allPhotos.slice(techCount).filter(function(u){return u&&!u.startsWith('pending:');});
+    if(driverPh.length>0){
+      driverPhotosHtml='<div style="margin-top:6px"><div style="font-size:10px;font-weight:700;color:#1a7a40;margin-bottom:4px">📷 Фото водителя после вывоза</div><div style="display:flex;gap:5px;flex-wrap:wrap">';
+      driverPh.forEach(function(url){
+        driverPhotosHtml+='<img src="'+xe(url)+'" onclick="window.open(this.src)" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:2px solid #9fe0be;cursor:pointer">';
+      });
+      driverPhotosHtml+='</div></div>';
+    }
+    return '<div class="req-card" style="'+(isDone?'opacity:.85':'')+'">'
+      +'<div class="req-addr">'+xe(r.addr)+'</div>'
+      +'<div class="req-meta">'+xe(r.city)+' · Желаемая: '+fmt(r.desiredDate)+'</div>'
+      +statusHtml+driverPhotosHtml
+      +(r.comment?'<div style="font-size:11px;color:#888;margin-top:2px">'+xe(r.comment)+'</div>':'')
+      +'</div>';
+
+  }).join('');
+}
+
+function showToast(m){
+  var t=document.getElementById('toast');t.innerHTML=m;t.classList.add('on');
+  setTimeout(function(){t.classList.remove('on');},2500);
+}
+// ── VOICE MESSAGES ──────────────────────────────────────
+var _rec = null, _chunks = [], _recBlob = null, _recInt = null, _recSec = 0;
+var PROXY = 'https://lk-proxy.s-kozorizz.workers.dev';
+
+function toggleRec(){
+  if(!_rec || _rec.state==='inactive') startRec();
+  else stopRec();
+}
+function startRec(){
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    _chunks=[]; _recBlob=null;
+    document.getElementById('vmsg-send').style.display='none';
+    _rec = new MediaRecorder(stream);
+    _rec.ondataavailable = function(e){_chunks.push(e.data);};
+    _rec.onstop = function(){
+      stream.getTracks().forEach(function(t){t.stop();});
+      _recBlob = new Blob(_chunks,{type:'audio/webm'});
+      var btn=document.getElementById('rec-btn');
+      btn.className='rec-btn idle'; btn.textContent='🎙';
+      document.getElementById('rec-status').textContent='Записано '+fmtSec(_recSec)+' — готово к отправке';
+      document.getElementById('rec-timer').style.display='none';
+      document.getElementById('vmsg-send').style.display='';
+      clearInterval(_recInt);
+    };
+    _rec.start();
+    _recSec=0;
+    var btn=document.getElementById('rec-btn');
+    btn.className='rec-btn recording'; btn.textContent='⏹';
+    document.getElementById('rec-status').textContent='Идёт запись...';
+    document.getElementById('rec-timer').style.display='';
+    _recInt=setInterval(function(){
+      _recSec++;
+      document.getElementById('rec-timer').textContent=fmtSec(_recSec);
+      if(_recSec>=120) stopRec();
+    },1000);
+  }).catch(function(){showToast('Нет доступа к микрофону');});
+}
+function stopRec(){
+  if(_rec && _rec.state!=='inactive') _rec.stop();
+  clearInterval(_recInt);
+}
+function fmtSec(s){return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+
+function sendVoiceMsg(){
+  var to=document.getElementById('vmsg-to').value;
+  var addr=document.getElementById('vmsg-addr').value.trim();
+  var city=document.getElementById('vmsg-city').value;
+  if(!to){showToast('Выберите адресата');return;}
+  if(!addr){showToast('Укажите адрес');return;}
+  if(!_recBlob){showToast('Сначала запишите сообщение');return;}
+  var btn=document.getElementById('rec-btn');
+  btn.className='rec-btn processing'; btn.textContent='⏳';
+  document.getElementById('rec-status').textContent='Отправляем...';
+  document.getElementById('vmsg-send').style.display='none';
+  var toLabels={dispatcher:'Диспетчер',buyer:'Закупщик',manager:'Технический руководитель'};
+  var msgId=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  var ts=Date.now();
+  // Upload audio first
+  var audioPath='voice-messages/'+msgId+'.webm';
+  storage.ref(audioPath).put(_recBlob).then(function(snap){
+    return snap.ref.getDownloadURL();
+  }).then(function(audioUrl){
+    // Transcribe + translate via proxy
+    return new Promise(function(resolve){
+      var reader=new FileReader();
+      reader.onload=function(e){
+        var b64=e.target.result.split(',')[1];
+        fetch(PROXY,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            model:'claude-sonnet-4-20250514',
+            max_tokens:500,
+            messages:[{role:'user',content:[
+              {type:'text',text:'Технік надіслав голосове повідомлення. Адреса: '+addr+', '+city+'. Адресат: '+toLabels[to]+'. Поверни JSON: {"transcription":"[аудіо отримано]","translation":"Сообщение от техника '+( currentTech?currentTech.name:'')+' щодо адреси '+addr+', '+city+'","detected_lang":"uk"}. Тільки JSON без markdown.'}
+            ]}]
+          })
+        }).then(function(r){return r.json();})
+        .then(function(data){
+          var txt=(data.content||[]).map(function(b){return b.text||'';}).join('');
+          var parsed=JSON.parse(txt.replace(/```json|```/g,'').trim());
+          resolve({audioUrl:audioUrl, parsed:parsed});
+        }).catch(function(){
+          resolve({audioUrl:audioUrl, parsed:{transcription:'[аудіо]',translation:'Повідомлення від '+( currentTech?currentTech.name:'техніка'),detected_lang:'uk'}});
+        });
+      };
+      reader.readAsDataURL(_recBlob);
+    });
+  }).then(function(res){
+    var msg={
+      id:msgId, techId:currentTechId,
+      techName:currentTech?currentTech.name:'',
+      to:to, addr:addr, city:city,
+      transcription:res.parsed.transcription||'',
+      translation:res.parsed.translation||'',
+      detectedLang:res.parsed.detected_lang||'',
+      audioUrl:res.audioUrl, status:'new', createdAt:ts
+    };
+    return db.ref('voiceMessages/'+msgId).set(msg);
+  }).then(function(){
+    showToast('Сообщение отправлено ✓');
+    _recBlob=null;
+    var btn=document.getElementById('rec-btn');
+    btn.className='rec-btn idle'; btn.textContent='🎙';
+    document.getElementById('rec-status').textContent='Нажмите для записи';
+    document.getElementById('vmsg-addr').value='';
+    document.getElementById('vmsg-to').value='';
+  }).catch(function(err){
+    showToast('Ошибка: '+err.message);
+    var btn=document.getElementById('rec-btn');
+    btn.className='rec-btn idle'; btn.textContent='🎙';
+    document.getElementById('rec-status').textContent='Ошибка — спробуйте ще раз';
+  });
+}
+
+function initVmsgCities(){
+  var sel=document.getElementById('vmsg-city');
+  if(!sel||!currentTech) return;
+  var cities=currentTech.cities||[];
+  sel.innerHTML='<option value="">— выберите город —</option>';
+  cities.forEach(function(c2){sel.innerHTML+='<option value="'+xe(c2)+'">'+xe(c2)+'</option>';});
+}
+
+function loadVoiceMsgs(){
+  db.ref('voiceMessages').orderByChild('techId').equalTo(currentTechId).on('value',function(s){
+    var msgs=s.val()||{};
+    var list=Object.values(msgs).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+    var el=document.getElementById('vmsgList');
+    if(!el) return;
+    var stLabel={new:'Отримано',working:'В роботі',clarify:'Потребує уточнення',done:'Вирішено'};
+    var toLabel={dispatcher:'→ Диспетчер',buyer:'→ Закупщик',manager:'→ Тех. керівник'};
+    if(!list.length){el.innerHTML='<div style="padding:12px;text-align:center;color:#888;font-size:12px">Сообщений нет</div>';return;}
+    el.innerHTML=list.map(function(m){
+      var st=m.status||'new';
+      return '<div class="vmsg-item">'
+        +'<div class="vmsg-meta"><span class="vmsg-to-lbl">'+(toLabel[m.to]||m.to)+'</span><span class="vmsg-date-lbl">'+new Date(m.createdAt).toLocaleDateString('uk')+'</span></div>'
+        +'<div class="vmsg-addr-lbl">'+xe(m.city||'')+' · '+xe(m.addr||'')+'</div>'
+        +(m.translation?'<div class="vmsg-text-lbl">'+xe(m.translation)+'</div>':'')
+        +(m.audioUrl?'<audio controls preload="none" style="width:100%;height:36px;margin-bottom:5px"><source src="'+xe(m.audioUrl)+'" type="audio/webm"><source src="'+xe(m.audioUrl)+'" type="audio/mp4"><a href="'+xe(m.audioUrl)+'" target="_blank" style="font-size:12px;color:#1856a0">▶ Прослухати</a></audio>':'')
+        +'<span class="vmsg-st '+st+'">'+(stLabel[st]||st)+'</span>'
+        +'</div>';
+    }).join('');
+  });
+}
+// ── END VOICE MESSAGES ──────────────────────────────────
+
+// ── TAB NAVIGATION ─────────────────────────────────────────
+function swTab(name){
+  ['trash','route','voice'].forEach(function(t){
+    var p=document.getElementById('tab-'+t);
+    var b=document.getElementById('bnav-'+t);
+    if(p)p.className='tab-panel'+(t===name?' on':'');
+    if(b)b.className='bnav-btn'+(t===name?' on':'');
+  });
+  if(name==='route'){_routeOffset=0;loadRoute();}
+}
+
+// ── ROUTE (deliveries for tech cities) ──────────────────────
+var _routeRows=[];
+var _routeListener=false;
+function initRoute(){
+  if(_routeListener)return;
+  _routeListener=true;
+  db.ref('rows').on('value',function(s){
+    _routeRows=s.val()?Object.values(s.val()):[];
+    var rp=document.getElementById('tab-route');
+    if(rp&&rp.className.indexOf('on')!==-1)loadRoute();
+  });
+}
+var _routeOffset = 0;
+
+function routeChangeDay(delta){
+  _routeOffset += delta;
+  loadRoute();
+}
+
+function loadRoute(){
+  initRoute();
+  var el=document.getElementById('routeList');
+  var lbl=document.getElementById('routeDateLabel');
+  if(!el||!currentTech)return;
+
+  var cities=currentTech.cities||[];
+  var d=new Date();
+  d.setDate(d.getDate()+_routeOffset);
+  var dateStr=d.toISOString().slice(0,10);
+
+  // Date label
+  var diff=_routeOffset;
+  var dayLabel=diff===0?'Сегодня, ':diff===-1?'Вчера, ':diff===1?'Завтра, ':diff===-2?'Позавчера, ':diff===2?'Послезавтра, ':'';
+  if(lbl)lbl.textContent=dayLabel+fmtShort(dateStr);
+
+  var dr=_routeRows.filter(function(r){
+    return r.date===dateStr && r.addr && r.addr.trim() && cities.indexOf(r.city)!==-1;
+  });
+  dr.sort(function(a,b){
+    var ad=a.done?1:0,bd=b.done?1:0;
+    if(ad!==bd)return ad-bd;
+    return (a.city||'').localeCompare(b.city||'');
+  });
+
+  if(!dr.length){
+    el.innerHTML='<div style="text-align:center;color:#888;font-size:13px;padding:32px 16px">Нет данных за эту дату</div>';
+    return;
+  }
+
+  var html='';
+  var lastCity='';
+  dr.forEach(function(r){
+    if(r.city!==lastCity){
+      lastCity=r.city;
+      html+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888;padding:8px 2px 4px">📍 '+xe(r.city)+'</div>';
+    }
+    var isTrash=r.fromTech||r.status==='вывоз мусора';
+    var photos=r.photos||[];
+    var invs=(r.invs||[]).filter(function(v){return v&&v.trim();});
+    var drvName=r.drv?xe(dname(r.drv)||r.drv):'—';
+
+    var statusHtml='';
+    if(r.done){
+      statusHtml='<span class="route-status-done">✓ Выполнено</span>';
+    } else if(isTrash){
+      statusHtml='<span class="route-status-trash">🗑 Вывоз мусора</span>';
+    } else {
+      statusHtml='<span class="route-status-pending">⏳ В плане</span>';
+    }
+
+    html+='<div class="route-item">';
+    html+='<div class="route-item-hdr">';
+    html+='<span style="font-size:11px;font-weight:700;color:#1856a0">🚛 '+drvName+'</span>';
+    html+=statusHtml;
+    html+='</div>';
+    html+='<div class="route-item-body">';
+    html+='<div style="font-size:13px;font-weight:600;margin-bottom:3px">'+xe(r.addr)+'</div>';
+    if(r.comment)html+='<div style="font-size:11px;color:#854F0B;margin-bottom:3px">'+xe(r.comment)+'</div>';
+    if(invs.length)html+='<div style="font-size:11px;color:#1856a0;margin-bottom:4px">📄 '+xe(invs.join(', '))+'</div>';
+    if(photos.length){
+      var realPhotos=photos.filter(function(u){return u&&!u.startsWith('pending:');});
+      if(realPhotos.length){
+        html+='<div class="route-photos">';
+        realPhotos.forEach(function(url){
+          html+='<img class="route-photo" src="'+xe(url)+'" onclick="window.open(this.src)">';
+        });
+        html+='</div>';
+      }
+    }
+    html+='</div></div>';
+  });
+
+  var done=dr.filter(function(r){return r.done;}).length;
+  html+='<div style="font-size:11px;color:#888;text-align:center;padding:8px">Всего: '+dr.length+' · Выполнено: '+done+' · Осталось: '+(dr.length-done)+'</div>';
+
+  el.innerHTML=html;
+}
+
+function fmtShort(iso){
+  var d=new Date(iso+'T12:00:00');
+  var mn=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  return d.getDate()+' '+mn[d.getMonth()];
+}
+
+// ── AUTOCOMPLETE ADDRESS ────────────────────────────────────
+var _acCache=[];
+function acSearch(val){
+  var list=document.getElementById('acList');
+  if(!list)return;
+  val=(val||'').trim();
+  if(val.length<1){list.className='ac-list';return;}
+  var city=document.getElementById('citySelect')?document.getElementById('citySelect').value:'';
+  var seen={},matches=[];
+  _routeRows.forEach(function(r){
+    if(!r.addr||!r.addr.trim())return;
+    if(city&&r.city!==city)return;
+    var addr=r.addr.trim();
+    if(seen[addr])return;
+    if(addr.toLowerCase().indexOf(val.toLowerCase())!==-1){seen[addr]=true;matches.push(addr);}
+  });
+  matches=matches.slice(0,8);
+  if(!matches.length){list.className='ac-list';return;}
+  list.innerHTML=matches.map(function(a){
+    var hl=a.replace(new RegExp('('+val.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<span class="ac-match">$1</span>');
+    return '<div class="ac-item" onclick="acSelect(this.getAttribute(\'data-v\'))" data-v="'+xe(a)+'">'+hl+'</div>';
+  }).join('');
+  list.className='ac-list show';
+  initRoute();
+}
+function acSelect(addr){
+  var inp=document.getElementById('addrInput');
+  if(inp)inp.value=addr;
+  var list=document.getElementById('acList');
+  if(list)list.className='ac-list';
+}
+document.addEventListener('click',function(e){
+  if(!e.target.closest||!e.target.closest('.ac-wrap')){
+    var list=document.getElementById('acList');
+    if(list)list.className='ac-list';
+  }
+});
+
+
+// ═══════════════════════════════════════════════════════════
+// AI ESTIMATE INTEGRATION
+// Додано в кінці — гарантовано перемагає всі попередні дублі
+// ═══════════════════════════════════════════════════════════
+
+var ESTIMATE_URL = 'https://lk-proxy.s-kozorizz.workers.dev/estimate';
+var _aiPromise = null;
+var _aiResult = null;
+var _aiError = null;
+var _finalWeight = null;
+var _finalVolume = null;
+var _wasCorrected = false;
+var _draftReqId = null;
+
+function _getDraftReqId(){
+  if(!_draftReqId) _draftReqId = uid();
+  return _draftReqId;
+}
+
+// Перехоплюємо photoInput — фонове завантаження + AI запит
+(function rewirePhotoInput(){
+  var oldInput = document.getElementById('photoInput');
+  if(!oldInput) return;
+  var newInput = oldInput.cloneNode(true);
+  oldInput.parentNode.replaceChild(newInput, oldInput);
+
+  newInput.addEventListener('change', function(e){
+    var files = Array.from(e.target.files);
+    files.forEach(function(file){
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        var photoObj = {
+          file: file,
+          url: ev.target.result,
+          downloadUrl: null,
+          uploadPromise: null,
+          uploadError: null
+        };
+        var idx = photos.length;
+        photos.push(photoObj);
+
+        // Фонове завантаження в Storage
+        var reqId = _getDraftReqId();
+        var path = 'tech-photos/' + reqId + '/' + idx + '_' + Date.now() + '.jpg';
+        photoObj.uploadPromise = storage.ref(path).put(file).then(function(snap){
+          return snap.ref.getDownloadURL();
+        }).then(function(url){
+          photoObj.downloadUrl = url;
+          _scheduleAiEstimate();
+          return url;
+        }).catch(function(err){
+          photoObj.uploadError = err.message;
+          console.error('Photo upload failed:', err);
+          return null;
+        });
+
+        renderPhotos();
+        checkSave();
+      };
+      reader.readAsDataURL(file);
+    });
+    this.value = '';
+  });
+})();
+
+// Як тільки всі фото залились — запускаємо AI оцінку у фоні
+function _scheduleAiEstimate(){
+  var allUploaded = photos.length >= 2 && photos.every(function(p){ return p.downloadUrl; });
+  if(!allUploaded) return;
+
+  _aiResult = null;
+  _aiError = null;
+  var urls = photos.map(function(p){ return p.downloadUrl; });
+  var caption = (document.getElementById('commentInput') || {}).value || '';
+
+  _aiPromise = fetch(ESTIMATE_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ photoUrls: urls, caption: caption.trim() })
+  }).then(function(r){ return r.json(); }).then(function(data){
+    if(data && data.error){
+      _aiError = data.error;
+      return null;
+    }
+    _aiResult = data;
+    return data;
+  }).catch(function(err){
+    _aiError = err.message;
+    return null;
+  });
+}
+
+// Перевизначаємо saveRequest — тепер показує екран підтвердження замість прямого збереження
+window.saveRequest = function(){
+  var addr = document.getElementById('addrInput').value.trim();
+  var city = document.getElementById('citySelect').value;
+  if(photos.length < 2 || !addr || !city || !selectedDate) return;
+
+  var btn = document.getElementById('saveBtn');
+  btn.textContent = 'Загружаем фото...';
+  btn.className = 'save-btn locked';
+
+  Promise.all(photos.map(function(p){ return p.uploadPromise; })).then(function(){
+    btn.textContent = 'Оцениваем вес...';
+    if(!_aiPromise) _scheduleAiEstimate();
+    return _aiPromise || Promise.resolve(null);
+  }).then(function(){
+    btn.textContent = 'Сохранить заявку';
+    _showAiEstimateCard();
+  }).catch(function(err){
+    btn.textContent = 'Сохранить заявку';
+    showToast('Ошибка: ' + err.message);
+    checkSave();
+  });
+};
+
+function _showAiEstimateCard(){
+  var formCard = document.getElementById('trash-form-card');
+  if(formCard) formCard.style.display = 'none';
+  document.getElementById('ai-estimate-card').style.display = '';
+  _fillEstimateUI();
+  window.scrollTo(0, 0);
+}
+
+function _fillEstimateUI(){
+  var errBlock = document.getElementById('ai-error-block');
+  var dataBlock = document.getElementById('ai-data-block');
+  var editedTag = document.getElementById('ai-edited-tag');
+  if(editedTag) editedTag.style.display = 'none';
+
+  if(!_aiResult){
+    errBlock.style.display = '';
+    dataBlock.style.display = 'none';
+    _finalWeight = 0;
+    _finalVolume = 0;
+    var confirmBtn0 = document.getElementById('confirmBtn');
+    if(confirmBtn0) confirmBtn0.style.display = 'none';
+    return;
+  }
+
+  errBlock.style.display = 'none';
+  dataBlock.style.display = '';
+  var confirmBtn1 = document.getElementById('confirmBtn');
+  if(confirmBtn1) confirmBtn1.style.display = '';
+
+  var avgWeight = Math.round((_aiResult.weight_kg.min + _aiResult.weight_kg.max) / 2);
+  var avgVolume = Math.round((_aiResult.volume_m3.min + _aiResult.volume_m3.max) / 2 * 100) / 100;
+  _finalWeight = avgWeight;
+  _finalVolume = avgVolume;
+  _wasCorrected = false;
+
+  document.getElementById('ai-weight-big').textContent = avgWeight;
+  document.getElementById('ai-volume-small').textContent = avgVolume;
+  document.getElementById('ai-detail-kalfas').textContent = _aiResult.kalfas.min + '–' + _aiResult.kalfas.max + ' шт';
+  document.getElementById('ai-detail-bags').textContent = _aiResult.bags.min + '–' + _aiResult.bags.max + ' шт';
+  var confLabels = {HIGH:'высокая', MEDIUM:'средняя', LOW:'низкая'};
+  document.getElementById('ai-confidence').textContent = 'уверенность ' + (confLabels[_aiResult.confidence] || _aiResult.confidence);
+}
+
+function confirmEstimate(){
+  _doSaveRequest();
+}
+
+function showEditEstimate(){
+  document.getElementById('ai-estimate-card').style.display = 'none';
+  document.getElementById('ai-edit-card').style.display = '';
+  document.getElementById('edit-weight-input').value = _finalWeight || '';
+  document.getElementById('edit-volume-input').value = _finalVolume || '';
+}
+
+function applyEdit(){
+  var w = parseFloat(document.getElementById('edit-weight-input').value);
+  var v = parseFloat(document.getElementById('edit-volume-input').value);
+  if(isNaN(w) || w <= 0){ showToast('Введите корректный вес'); return; }
+  if(isNaN(v) || v <= 0){ showToast('Введите корректный объём'); return; }
+  _finalWeight = w;
+  _finalVolume = v;
+  _wasCorrected = true;
+
+  document.getElementById('ai-edit-card').style.display = 'none';
+  document.getElementById('ai-estimate-card').style.display = '';
+  // Якщо AI не дав даних — показуємо блок даних
+  document.getElementById('ai-error-block').style.display = 'none';
+  document.getElementById('ai-data-block').style.display = '';
+  document.getElementById('ai-weight-big').textContent = Math.round(w);
+  document.getElementById('ai-volume-small').textContent = v;
+  document.getElementById('ai-edited-tag').style.display = '';
+  var confirmBtn2 = document.getElementById('confirmBtn');
+  if(confirmBtn2) confirmBtn2.style.display = '';
+}
+
+function cancelEdit(){
+  document.getElementById('ai-edit-card').style.display = 'none';
+  document.getElementById('ai-estimate-card').style.display = '';
+}
+
+function backToForm(){
+  document.getElementById('ai-estimate-card').style.display = 'none';
+  document.getElementById('ai-edit-card').style.display = 'none';
+  var formCard = document.getElementById('trash-form-card');
+  if(formCard) formCard.style.display = '';
+}
+
+function _doSaveRequest(){
+  var addr = document.getElementById('addrInput').value.trim();
+  var city = document.getElementById('citySelect').value;
+  var comment = document.getElementById('commentInput').value.trim();
+
+  var btn = document.getElementById('confirmBtn');
+  if(btn){ btn.textContent = 'Сохраняем...'; btn.disabled = true; }
+
+  var urls = photos.map(function(p){ return p.downloadUrl; }).filter(function(u){ return !!u; });
+  var reqId = _getDraftReqId();
+
+  var req = {
+    id: reqId,
+    techId: currentTechId,
+    techName: currentTech.name || 'Техник',
+    desiredDate: selectedDate,
+    city: city,
+    addr: addr,
+    comment: comment,
+    photos: urls,
+    status: 'new',
+    assignedDrv: null,
+    assignedDate: null,
+    createdAt: Date.now(),
+    final_weight_kg: _finalWeight || 0,
+    final_volume_m3: _finalVolume || 0,
+    was_corrected: _wasCorrected
+  };
+  if(_aiResult){
+    req.ai_estimate = _aiResult;
+  }
+
+  db.ref('techRequests/' + reqId).set(req).then(function(){
+    var rowId = uid();
+    var row = {
+      id: rowId,
+      date: selectedDate,
+      drv: '',
+      city: city,
+      addr: addr,
+      invs: [''],
+      status: 'вывоз мусора',
+      comment: comment,
+      inRoute: true,
+      done: false,
+      photos: urls,
+      photoTs: urls.map(function(){ return Date.now(); }),
+      techPhotoCount: urls.length,
+      fromTech: true,
+      techReqId: reqId,
+      techName: currentTech.name || 'Техник',
+      desiredDate: selectedDate,
+      createdAt: Date.now(),
+      weight: (_finalWeight && _finalWeight > 0) ? _finalWeight : null,
+      volume_m3: (_finalVolume && _finalVolume > 0) ? _finalVolume : null,
+      ai_estimate_ref: reqId
+    };
+    return db.ref('rows/' + rowId).set(row).then(function(){
+      return db.ref('techRequests/' + reqId + '/rowId').set(rowId);
+    });
+  }).then(function(){
+    showToast('Заявка сохранена ✓');
+    _resetTrashFormAfterSave();
+  }).catch(function(err){
+    showToast('Ошибка: ' + err.message);
+    if(btn){ btn.textContent = 'Подтвердить'; btn.disabled = false; }
+  });
+}
+
+function _resetTrashFormAfterSave(){
+  photos = [];
+  selectedDate = '';
+  _aiResult = null;
+  _aiError = null;
+  _aiPromise = null;
+  _finalWeight = null;
+  _finalVolume = null;
+  _wasCorrected = false;
+  _draftReqId = null;
+
+  document.getElementById('addrInput').value = '';
+  document.getElementById('citySelect').value = '';
+  document.getElementById('commentInput').value = '';
+  renderPhotos();
+  setDateOffset(1);
+
+  document.getElementById('ai-estimate-card').style.display = 'none';
+  document.getElementById('ai-edit-card').style.display = 'none';
+  var formCard = document.getElementById('trash-form-card');
+  if(formCard) formCard.style.display = '';
+
+  var saveBtn = document.getElementById('saveBtn');
+  if(saveBtn){
+    saveBtn.textContent = 'Сохранить заявку';
+    saveBtn.className = 'save-btn locked';
+  }
+  var confirmBtn = document.getElementById('confirmBtn');
+  if(confirmBtn){
+    confirmBtn.textContent = 'Подтвердить';
+    confirmBtn.disabled = false;
+  }
+  checkSave();
+}
+
+</script>
+</body>
+</html>

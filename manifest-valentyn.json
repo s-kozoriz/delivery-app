@@ -1,0 +1,12 @@
+{
+  "name": "LK Валентин",
+  "short_name": "LK Валентин",
+  "start_url": "/delivery-app/valentyn-app.html",
+  "display": "standalone",
+  "background_color": "#6a1a7a",
+  "theme_color": "#6a1a7a",
+  "icons": [
+    {"src": "/delivery-app/icon-192.png","sizes": "192x192","type": "image/png"},
+    {"src": "/delivery-app/icon-512.png","sizes": "512x512","type": "image/png"}
+  ]
+}

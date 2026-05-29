@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Маршрут Лёша">
+<meta name="theme-color" content="#1a7a40">
+<link rel="manifest" href="/delivery-app/manifest-lesha.json">
+<link rel="apple-touch-icon" href="/delivery-app/lesha-192.png">
+<title>Маршрут — Лёша</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-size:15px;padding-bottom:100px}
+.hdr{background:#1a7a40;padding:16px 20px;position:sticky;top:0;z-index:10}
+.hdr h1{color:#fff;font-size:18px;font-weight:700;margin-bottom:10px}
+.nav{display:flex;align-items:center;gap:8px}
+.nav button{border:none;background:rgba(255,255,255,.2);color:#fff;border-radius:10px;width:36px;height:36px;font-size:20px;cursor:pointer}
+.nav button:active{background:rgba(255,255,255,.35)}
+.lbl{flex:1;text-align:center;color:#fff;font-size:14px;font-weight:600;background:rgba(255,255,255,.15);border-radius:10px;padding:8px}
+.prg{display:flex;align-items:center;gap:8px;margin-top:10px}
+.pb{flex:1;height:5px;background:rgba(255,255,255,.25);border-radius:3px;overflow:hidden}
+.pf{height:100%;background:#fff;border-radius:3px;transition:width .3s}
+.pt{color:rgba(255,255,255,.9);font-size:12px;min-width:36px;text-align:right}
+.sync{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.4);display:inline-block;margin-left:8px;vertical-align:middle}
+.sync.ok{background:#fff}
+/* TRIP BUTTONS */
+.trip-bar{display:flex;gap:8px;margin-top:10px}
+.trip-btn{flex:1;border:none;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s}
+.trip-btn:active{background:rgba(255,255,255,.35);transform:scale(.97)}
+.trip-btn.active{background:rgba(255,255,255,.9);color:#1a7a40}
+.trip-btn.done-all{background:rgba(255,255,255,.9);color:#1a7a40}
+.trip-status{margin-top:8px;font-size:12px;color:rgba(255,255,255,.85);text-align:center;min-height:18px}
+.wrap{padding:12px}
+.city{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#1a7a40;margin:12px 0 6px 4px}
+.card{background:#fff;border-radius:14px;border:2px solid #d8ede2;margin-bottom:10px;overflow:hidden}
+.card.dn{opacity:.7}
+.cb{display:flex;align-items:flex-start;gap:10px;padding:13px 14px}
+.num{width:26px;height:26px;border-radius:50%;background:#1a7a40;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.num.dn{background:rgba(0,0,0,.15)}
+.info{flex:1;min-width:0}
+.adr{font-size:15px;font-weight:600;color:#141a16;text-decoration:none;display:block;margin-bottom:3px}
+.ttag{display:inline-flex;align-items:center;gap:3px;background:#fff3da;color:#7a4a00;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;margin-bottom:4px}
+.invs{font-size:12px;color:#5a7060;margin-top:3px}
+.inv{display:inline-block;background:#eef3fb;color:#1856a0;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500;margin:1px}
+.stag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:500;margin-top:4px}
+.str{background:#fff3da;color:#7a4a00}
+.ssv{background:#e6f5ec;color:#1a7a40}
+.sur{background:#fff0f2;color:#b00020}
+.cmt{font-size:12px;color:#5a7060;margin-top:3px;font-style:italic}
+.dbtn{flex-shrink:0;width:44px;height:44px;border-radius:50%;border:2px solid #d8ede2;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;color:#ccc;margin-top:1px;transition:.15s}
+.dbtn.dn{background:#1a7a40;border-color:#1a7a40;color:#fff}
+.dbtn:active{transform:scale(.92)}
+.dbtn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.mln{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:2px solid #d8ede2;background:rgba(0,0,0,.02);color:#1a7a40;font-size:13px;font-weight:500;text-decoration:none}
+.photo-section{padding:10px 14px;border-top:2px solid #d8ede2;background:#fafaf8}
+.photo-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.photo-thumb{width:56px;height:56px;border-radius:8px;object-fit:cover;cursor:pointer;border:2px solid #d8ede2;transition:.15s}
+.photo-thumb:active{transform:scale(.95)}
+.photo-add{width:56px;height:56px;border-radius:8px;border:2px dashed #d8ede2;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;color:#aaa;flex-shrink:0}
+.photo-hint{font-size:11px;color:#e07000;margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.photo-count{font-size:11px;color:#5a7060;margin-top:4px}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.lb img{max-width:96vw;max-height:80vh;border-radius:8px;object-fit:contain}
+.lb-close{color:#fff;font-size:28px;cursor:pointer;padding:8px 16px;background:rgba(255,255,255,.15);border-radius:20px;border:none}
+.empty{text-align:center;padding:60px 20px;color:#5a7060}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2a1e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:998;opacity:0;transition:.22s;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* FAB Add Task */
+.fab-add{position:fixed;right:18px;bottom:24px;width:60px;height:60px;border-radius:50%;background:#1a7a40;color:#fff;border:none;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer;font-size:30px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:50;transition:.15s}
+.fab-add:active{transform:scale(.92)}
+/* Modal sheet for add task */
+.add-sheet{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center}
+.add-sheet.on{display:flex}
+.add-sheet-inner{background:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:8px 0 28px;animation:slideUp .22s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.add-sheet-handle{width:38px;height:4px;background:#d8ede2;border-radius:2px;margin:6px auto 8px}
+.add-sheet-title{text-align:center;font-size:15px;font-weight:600;color:#141a16;padding:10px 16px 14px;border-bottom:1px solid #f0f0f0}
+.add-type-btn{display:flex;align-items:center;gap:14px;width:100%;padding:16px 20px;border:none;background:#fff;cursor:pointer;border-bottom:1px solid #f0f0f0;text-align:left}
+.add-type-btn:active{background:#f5f5f5}
+.add-type-btn:last-of-type{border-bottom:none}
+.add-type-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.add-type-icon.delivery{background:#e6eef9;color:#1856a0}
+.add-type-icon.trash{background:#fff3da;color:#854F0B}
+.add-type-text{flex:1}
+.add-type-text-main{font-size:15px;font-weight:600;color:#141a16;margin-bottom:2px}
+.add-type-text-sub{font-size:12px;color:#80786e}
+.add-cancel{display:block;width:calc(100% - 32px);margin:14px 16px 0;padding:13px;border:none;background:#f5f5f5;color:#80786e;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer}
+
+/* Add task form (full screen) */
+.add-form{position:fixed;inset:0;z-index:210;background:#f0f8f4;display:none;flex-direction:column;overflow-y:auto;padding-bottom:30px}
+.add-form.on{display:flex}
+.add-form-hdr{background:#1a7a40;padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
+.add-form-back{border:none;background:rgba(255,255,255,.2);color:#fff;width:36px;height:36px;border-radius:10px;font-size:20px;cursor:pointer;flex-shrink:0}
+.add-form-title{color:#fff;font-size:15px;font-weight:600;flex:1}
+.add-form-body{padding:16px;flex:1}
+.add-form-hint{font-size:13px;color:#5a7060;margin-bottom:14px;line-height:1.5}
+.add-photo-zone{border:2px dashed #d8ede2;border-radius:12px;padding:30px 20px;text-align:center;background:#fff;cursor:pointer;margin-bottom:14px}
+.add-photo-zone:active{background:#f5f5f5}
+.add-photo-zone-icon{font-size:40px;color:#1a7a40;margin-bottom:8px}
+.add-photo-zone-text{font-size:14px;font-weight:600;color:#141a16}
+.add-photo-zone-sub{font-size:11px;color:#80786e;margin-top:4px}
+.add-photo-preview{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-bottom:14px}
+.add-photo-preview-item{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:2px solid #d8ede2}
+.add-photo-preview-item img{width:100%;height:100%;object-fit:cover}
+.add-photo-preview-item .rm{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;padding:0}
+.add-form-label{font-size:12px;color:#5a7060;font-weight:500;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+.add-form-input{width:100%;border:1px solid #d8ede2;border-radius:10px;padding:11px 12px;font-size:14px;background:#fff;color:#141a16;margin-bottom:14px;font-family:inherit}
+.add-form-input:focus{outline:2px solid #1a7a40;outline-offset:-1px}
+.add-form-send{width:100%;background:#1a7a40;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px}
+.add-form-send:active{transform:scale(.98)}
+.add-form-send:disabled{background:#aac4b3;cursor:not-allowed}
+
+/* Driver-added card visual marker */
+.card.driver-added{border-color:#1856a0;border-width:2px;background:linear-gradient(to right,#e6eef9 0,#e6eef9 4px,#fff 4px)}
+.card.driver-added .num{background:#1856a0}
+.card.driver-added .by-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:#1856a0;background:#e6eef9;padding:2px 7px;border-radius:6px;margin-top:4px}
+
+
+
+.pin-wrap{position:fixed;inset:0;background:#1a7a40;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999}
+.pdot{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.5);background:transparent;transition:.15s}
+.pdot.on{background:#fff;border-color:#fff}
+.ppb{height:72px;border-radius:14px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:24px;font-weight:500;cursor:pointer}
+.ppb:active{background:rgba(255,255,255,.3)}
+</style>
+</head>
+<body>
+<div class="pin-wrap" id="pinWrap">
+  <div style="color:#fff;font-size:20px;font-weight:700;margin-bottom:4px" id="driverPinName">Маршрут</div>
+  <p style="color:rgba(255,255,255,.7);font-size:13px;margin-bottom:16px">Введите PIN-код</p>
+  <div style="display:flex;gap:12px;margin-bottom:8px" id="pinDots">
+    <div class="pdot" id="pd0"></div><div class="pdot" id="pd1"></div>
+    <div class="pdot" id="pd2"></div><div class="pdot" id="pd3"></div>
+  </div>
+  <div style="color:#ffaaaa;font-size:13px;height:18px;margin-bottom:8px" id="pinErr"></div>
+  <div style="display:grid;grid-template-columns:repeat(3,72px);gap:10px">
+    <button class="ppb" onclick="dpp('1')">1</button><button class="ppb" onclick="dpp('2')">2</button><button class="ppb" onclick="dpp('3')">3</button>
+    <button class="ppb" onclick="dpp('4')">4</button><button class="ppb" onclick="dpp('5')">5</button><button class="ppb" onclick="dpp('6')">6</button>
+    <button class="ppb" onclick="dpp('7')">7</button><button class="ppb" onclick="dpp('8')">8</button><button class="ppb" onclick="dpp('9')">9</button>
+    <button class="ppb" onclick="dpp('X')" style="font-size:16px">&#9003;</button><button class="ppb" onclick="dpp('0')">0</button>
+    <button class="ppb" style="opacity:0" disabled></button>
+  </div>
+</div>
+<div id="driverApp" style="display:none">
+<div class="hdr">
+  <h1 id="dn">Лёша <span class="sync" id="sync"></span></h1>
+  <div class="nav">
+    <button id="prev">&#8249;</button>
+    <div class="lbl" id="dl">загрузка...</div>
+    <button id="next">&#8250;</button>
+  </div>
+  <div class="prg" id="prg" style="display:none">
+    <div class="pb"><div class="pf" id="pf"></div></div>
+    <div class="pt" id="pt"></div>
+  </div>
+  <div class="trip-bar">
+    <button class="trip-btn" id="btnStart" onclick="tripStart()">&#9654; Маршрут начат</button>
+    <button class="trip-btn" id="btnEnd" onclick="tripEnd()">&#9632; Вернулся на склад</button>
+  </div>
+  <div class="trip-status" id="tripStatus"></div>
+</div>
+<div class="wrap" id="wrap"></div>
+<div class="lb" id="lb" style="display:none">
+  <button class="lb-close" id="lbClose">&#215;</button>
+  <img id="lbImg" src="" alt="">
+</div>
+
+<!-- iOS photo action sheet -->
+<div id="photoSheet" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.5)" onclick="closePhotoSheet()">
+  <div style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;padding:8px 0 32px" onclick="event.stopPropagation()">
+    <div style="text-align:center;padding:12px;font-size:13px;color:#888;border-bottom:1px solid #eee">Добавить фото</div>
+    <button onclick="triggerCamera()" style="display:block;width:100%;padding:16px;border:none;background:none;font-size:16px;color:#007AFF;border-bottom:1px solid #eee;cursor:pointer">📷 Камера</button>
+    <button onclick="triggerGallery()" style="display:block;width:100%;padding:16px;border:none;background:none;font-size:16px;color:#007AFF;cursor:pointer">🖼 Выбрать из галереи</button>
+    <button onclick="closePhotoSheet()" style="display:block;width:100%;padding:16px;border:none;background:none;font-size:16px;color:#FF3B30;margin-top:8px;cursor:pointer">Отмена</button>
+  </div>
+</div>
+<input type="file" id="photoInputCamera" accept="image/*" capture="environment" style="display:none">
+<input type="file" id="photoInputGallery" accept="image/*" style="display:none">
+
+<div class="toast" id="toast"></div>
+<!-- FAB Add Task -->
+<button class="fab-add" id="fabAddTask" onclick="openAddSheet()" title="Добавить задание">+</button>
+
+<!-- Add task sheet (type selection) -->
+<div class="add-sheet" id="addSheet" onclick="closeAddSheet(event)">
+  <div class="add-sheet-inner" onclick="event.stopPropagation()">
+    <div class="add-sheet-handle"></div>
+    <div class="add-sheet-title">Что добавить?</div>
+    <button class="add-type-btn" onclick="openAddForm('delivery')">
+      <div class="add-type-icon delivery">📦</div>
+      <div class="add-type-text">
+        <div class="add-type-text-main">Доставка материала</div>
+        <div class="add-type-text-sub">Фото накладной</div>
+      </div>
+    </button>
+    <button class="add-type-btn" onclick="openAddForm('trash')">
+      <div class="add-type-icon trash">🗑</div>
+      <div class="add-type-text">
+        <div class="add-type-text-main">Вывоз мусора</div>
+        <div class="add-type-text-sub">Фото места загрузки</div>
+      </div>
+    </button>
+    <button class="add-cancel" onclick="closeAddSheet()">Отмена</button>
+  </div>
+</div>
+
+<!-- Add task form -->
+<div class="add-form" id="addForm">
+  <div class="add-form-hdr">
+    <button class="add-form-back" onclick="closeAddForm()">&#8249;</button>
+    <div class="add-form-title" id="addFormTitle">Новое задание</div>
+  </div>
+  <div class="add-form-body">
+    <div class="add-form-hint" id="addFormHint"></div>
+    <div class="add-photo-zone" id="addPhotoZone" onclick="addFormPickPhoto()">
+      <div class="add-photo-zone-icon">📷</div>
+      <div class="add-photo-zone-text">Сделать фото</div>
+      <div class="add-photo-zone-sub">Можно несколько</div>
+    </div>
+    <div class="add-photo-preview" id="addPhotoPreview"></div>
+    <div class="add-form-label">Комментарий (необязательно)</div>
+    <input type="text" class="add-form-input" id="addFormComment" placeholder="Напр. адрес, № накладной, заметка">
+    <button class="add-form-send" id="addFormSend" onclick="submitAddTask()" disabled>Отправить ✓</button>
+  </div>
+</div>
+<input type="file" id="addPhotoInput" accept="image/*" capture="environment" style="display:none">
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script>
+var DRV = 'L';
+var TODAY_KEY = '';
+firebase.initializeApp({
+  apiKey: 'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
+  databaseURL: 'https://lk-bauservice-bb872-default-rtdb.europe-west1.firebasedatabase.app',
+  storageBucket: 'lk-bauservice-bb872.firebasestorage.app',
+  projectId: 'lk-bauservice-bb872',
+  appId: '1:704709078597:web:1e336d874a8cf524583d2c'
+});
+var db = firebase.database();
+var storage = firebase.storage();
+var rows = [], cfg = {drivers:{}}, curD = '', tripData = {};
+var activeUploadRowId = null;
+
+function isoD(n) {
+  var d = new Date(); d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function nowTime() {
+  var d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function fmt(iso) {
+  var d = new Date(iso + 'T12:00:00');
+  var dn = ['вс','пн','вт','ср','чт','пт','сб'];
+  var mn = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  return dn[d.getDay()] + ', ' + d.getDate() + ' ' + mn[d.getMonth()] + ' ' + d.getFullYear();
+}
+function sh(n) {
+  var d = new Date(curD + 'T12:00:00'); d.setDate(d.getDate() + n);
+  curD = d.toISOString().slice(0, 10); updateTripUI(); render();
+}
+function xe(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function cleanAddr(a) {
+  var s = (a||'').trim();
+  s = s.replace(/\s+\d*[A-Za-z]*_[A-Za-z]+$/, '');
+  s = s.replace(/\s+(EG|DG|OG|\d+OG)$/i, '');
+  return s.trim();
+}
+function stTag(s) {
+  if (s==='вывоз мусора') return '<span class="stag str">&#128465; вывоз мусора</span>';
+  if (s==='самовывоз')    return '<span class="stag ssv">&#128666; самовывоз</span>';
+  if (s==='срочно')       return '<span class="stag sur">&#9888; срочно</span>';
+  if (s==='забрать товар') return '<span class="stag str">&#128722; забрать товар</span>';
+  if (s==='перенесено')   return '<span class="stag sur">&#8594; перенесено</span>';
+  return '';
+}
+function driverName() {
+  if (cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].name) return cfg.drivers[DRV].name;
+  return DRV==='L'?'Лёша':DRV==='R'?'Рома':'Водитель 3';
+}
+function needsPhoto(r) {
+  // Photo required for all statuses (deliveries, trash pickup, store pickup)
+  return true;
+}
+
+// TRIP
+function tripKey() { return curD + '_' + DRV; }
+function tripStart() {
+  var t = nowTime();
+  var data = tripData[tripKey()] || {};
+  if (data.start) { showToast('Маршрут уже начат в ' + data.start); return; }
+  data.start = t;
+  db.ref('trips/' + tripKey()).set(data);
+  if (navigator.vibrate) navigator.vibrate(100);
+  showToast('Маршрут начат в ' + t);
+  updateTripUI();
+}
+function tripEnd() {
+  var t = nowTime();
+  var data = tripData[tripKey()] || {};
+  if (!data.start) { showToast('Сначала нажмите «Маршрут начат»'); return; }
+  if (data.end) { showToast('Уже отмечено в ' + data.end); return; }
+  data.end = t;
+  db.ref('trips/' + tripKey()).set(data);
+  if (navigator.vibrate) navigator.vibrate([100,50,100]);
+  showToast('Возвращение отмечено в ' + t);
+  updateTripUI();
+}
+function updateTripUI() {
+  var data = tripData[tripKey()] || {};
+  var startBtn = document.getElementById('btnStart');
+  var endBtn = document.getElementById('btnEnd');
+  var statusEl = document.getElementById('tripStatus');
+  if (startBtn) startBtn.classList.toggle('active', !!data.start);
+  if (endBtn) endBtn.classList.toggle('done-all', !!data.end);
+  var txt = '';
+  if (data.start) txt += '&#9654; выехал ' + data.start;
+  if (data.end) txt += ' &nbsp; &#9632; вернулся ' + data.end;
+  if (statusEl) statusEl.innerHTML = txt;
+}
+
+// PHOTO
+function triggerPhoto(rowId) {
+  activeUploadRowId = rowId;
+  // iOS Safari: show action sheet for camera/gallery choice
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (isIOS) {
+    document.getElementById('photoSheet').style.display = '';
+  } else {
+    document.getElementById('photoInputCamera').value = '';
+    document.getElementById('photoInputCamera').click();
+  }
+}
+function triggerCamera() {
+  closePhotoSheet();
+  setTimeout(function(){
+    document.getElementById('photoInputCamera').value = '';
+    document.getElementById('photoInputCamera').click();
+  }, 100);
+}
+function triggerGallery() {
+  closePhotoSheet();
+  setTimeout(function(){
+    document.getElementById('photoInputGallery').value = '';
+    document.getElementById('photoInputGallery').click();
+  }, 100);
+}
+function closePhotoSheet() {
+  document.getElementById('photoSheet').style.display = 'none';
+}
+function handlePhotoFile(e) {
+  var file = e.target.files[0];
+  if (!file || !activeUploadRowId) return;
+  var rowId = activeUploadRowId;
+  uploadPhotoWithQueue(file, rowId);
+  e.target.value = '';
+}
+document.getElementById('photoInputCamera').addEventListener('change', handlePhotoFile);
+document.getElementById('photoInputGallery').addEventListener('change', handlePhotoFile);
+
+
+// ── OFFLINE PHOTO QUEUE ──────────────────────────────────────
+var offlineQueue = JSON.parse(localStorage.getItem('photoQueue_'+DRV) || '[]');
+
+function saveQueue() {
+  localStorage.setItem('photoQueue_'+DRV, JSON.stringify(offlineQueue));
+}
+
+function processQueue() {
+  if (!offlineQueue.length) return;
+  var item = offlineQueue[0];
+  if (item._processing) return;
+  item._processing = true;
+
+  // Convert base64 back to blob
+  var byteStr = atob(item.b64.split(',')[1]);
+  var mime = item.b64.split(';')[0].split(':')[1];
+  var ab = new ArrayBuffer(byteStr.length);
+  var ia = new Uint8Array(ab);
+  for (var i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+  var blob = new Blob([ab], {type: mime});
+
+  storage.ref(item.path).put(blob).then(function(snap) {
+    return snap.ref.getDownloadURL();
+  }).then(function(url) {
+    var r = rows.find(function(x) { return x.id === item.rowId; });
+    var photos = (r && r.photos) ? [].concat(r.photos) : [];
+    var photoTs = (r && r.photoTs) ? [].concat(r.photoTs) : [];
+    // Remove pending placeholder if exists
+    var pendingIdx = photos.indexOf('pending:'+item.localId);
+    if (pendingIdx !== -1) {
+      photos[pendingIdx] = url;
+      photoTs[pendingIdx] = item.ts;
+    } else {
+      photos.push(url);
+      photoTs.push(item.ts);
+    }
+    return db.ref('rows/' + item.rowId).update({photos: photos, photoTs: photoTs});
+  }).then(function() {
+    offlineQueue.shift();
+    saveQueue();
+    showToast('Фото загружено ✓');
+    setTimeout(processQueue, 1000);
+  }).catch(function() {
+    item._processing = false;
+    setTimeout(processQueue, 15000);
+  });
+}
+
+window.addEventListener('online', function() {
+  setTimeout(processQueue, 2000);
+});
+setTimeout(processQueue, 3000);
+
+function uploadPhotoWithQueue(file, rowId) {
+  var ext = (file.name || 'jpg').split('.').pop().toLowerCase() || 'jpg';
+  var path = 'photos/' + rowId + '/' + Date.now() + '.' + ext;
+  var localId = Date.now().toString(36);
+  var ts = Date.now();
+
+  if (navigator.onLine) {
+    // Online: upload directly without localStorage
+    showToast('Загружаем фото...');
+    storage.ref(path).put(file).then(function(snap) {
+      return snap.ref.getDownloadURL();
+    }).then(function(url) {
+      var r = rows.find(function(x) { return x.id === rowId; });
+      var photos = (r && r.photos) ? [].concat(r.photos) : [];
+      var photoTs = (r && r.photoTs) ? [].concat(r.photoTs) : [];
+      photos.push(url);
+      photoTs.push(ts);
+      if(r){ r.photos = photos; r.photoTs = photoTs; }
+      return db.ref('rows/' + rowId).update({photos: photos, photoTs: photoTs});
+    }).then(function() {
+      showToast('Фото добавлено ✓');
+      render();
+    }).catch(function(err) {
+      showToast('Ошибка загрузки: ' + (err.message||err));
+    });
+  } else {
+    // Offline: save to localStorage queue
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var b64 = e.target.result;
+      var r = rows.find(function(x) { return x.id === rowId; });
+      var photos = (r && r.photos) ? [].concat(r.photos) : [];
+      var photoTs = (r && r.photoTs) ? [].concat(r.photoTs) : [];
+      photos.push('pending:' + localId);
+      photoTs.push(ts);
+      if(r){ r.photos = photos; r.photoTs = photoTs; }
+      render();
+      try {
+        offlineQueue.push({rowId: rowId, path: path, b64: b64, localId: localId, ts: ts});
+        saveQueue();
+        showToast('Нет сети — фото сохранено, загрузится позже');
+      } catch(e) {
+        showToast('Нет сети и нет места для хранения фото');
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// ── END OFFLINE QUEUE ────────────────────────────────────────
+
+function markDone(id, val) {
+  db.ref('rows/' + id).update({done: val});
+  if (val && navigator.vibrate) navigator.vibrate([60,30,60]);
+  showToast(val ? 'Выполнено &#10003;' : 'Отменено');
+}
+
+function openLightbox(url) {
+  document.getElementById('lbImg').src = url;
+  document.getElementById('lb').style.display = 'flex';
+}
+document.getElementById('lbClose').addEventListener('click', function() {
+  document.getElementById('lb').style.display = 'none';
+  document.getElementById('lbImg').src = '';
+});
+document.getElementById('lb').addEventListener('click', function(e) {
+  if (e.target === this) { this.style.display = 'none'; document.getElementById('lbImg').src = ''; }
+});
+
+function renderRow(r, num) {
+  // Driver-added task: simpler layout, no address/maps
+  if (r.fromDriver) {
+    var photos = r.photos || [];
+    var taskLabel = r.taskType === 'delivery' ? '&#128230; Доставка материала' : '&#128465; Вывоз мусора';
+    var taskBg = r.taskType === 'delivery' ? '#1856a0' : '#854F0B';
+    var h = '';
+    h += '<div class="card driver-added dn">';
+    h += '<div class="cb">';
+    h += '<div class="num">'+num+'</div>';
+    h += '<div class="info">';
+    h += '<div class="adr" style="color:'+taskBg+'">'+taskLabel+'</div>';
+    h += '<div class="by-badge">&#128666; Добавлено мной</div>';
+    if (r.comment && r.comment.trim()) h += '<div class="cmt">'+xe(r.comment)+'</div>';
+    h += '<div style="color:#1a7a40;font-size:11px;margin-top:5px">&#10003; отправлено диспетчеру</div>';
+    h += '</div>';
+    h += '<button class="dbtn dn" data-id="'+r.id+'" data-done="1" style="opacity:.6">&#10003;</button>';
+    h += '</div>';
+    if (photos.length > 0) {
+      h += '<div class="photo-section">';
+      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1856a0;margin-bottom:5px">&#128247; Фото</div>';
+      h += '<div class="photo-row">';
+      photos.forEach(function(url) {
+        if (url && !url.startsWith('pending:')) {
+          h += '<img class="photo-thumb" src="'+xe(url)+'" data-url="'+xe(url)+'" style="border-color:#aec6ef">';
+        }
+      });
+      h += '</div></div>';
+    }
+    h += '</div>';
+    return h;
+  }
+  var mapsUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(cleanAddr(r.addr) + ', ' + r.city + ', Germany') + '&travelmode=driving';
+  var invs = (r.invs||[]).map(function(i){ return i.trim(); }).filter(Boolean);
+  var photos = r.photos || [];
+  var isDone = !!r.done;
+  var techPhotoCount = r.techPhotoCount || 0;
+  var techPhotos = photos.slice(0, techPhotoCount);
+  var driverPhotos = photos.slice(techPhotoCount).filter(function(p){ return p && !p.startsWith('pending:'); });
+  var pendingPhotos = photos.slice(techPhotoCount).filter(function(p){ return p && p.startsWith('pending:'); });
+  var hasPhoto = driverPhotos.length > 0 || pendingPhotos.length > 0;
+  var isTechTask = !!r.fromTech;
+  var h = '';
+  h += '<div class="card' + (isDone ? ' dn' : '') + '">';
+  h += '<div class="cb">';
+  h += '<div class="num' + (isDone ? ' dn' : '') + '">' + num + '</div>';
+  h += '<div class="info">';
+  h += '<a class="adr" href="' + mapsUrl + '" target="_blank">' + xe(r.addr) + '</a>';
+  h += '<div style="font-size:11px;color:#888;margin-bottom:2px">&#128205; ' + xe(r.city) + '</div>';
+  if (r.timeSlot) h += '<div class="ttag">&#9201; до ' + xe(r.timeSlot) + '</div>';
+  if (invs.length) {
+    h += '<div class="invs">';
+    invs.forEach(function(i) { h += '<span class="inv">' + xe(i) + '</span>'; });
+    h += '</div>';
+  }
+  h += stTag(r.status||'');
+  if (r.comment && r.comment.trim()) h += '<div class="cmt">' + xe(r.comment) + '</div>';
+  if (isDone) h += '<div style="color:#1a7a40;font-size:11px;margin-top:3px">&#10003; выполнено</div>';
+  h += '</div>';
+  var doneDisabled = (!isDone && !hasPhoto) ? ' disabled' : '';
+  var doneStyle = (!isDone && !hasPhoto) ? ' style="opacity:.35;cursor:not-allowed"' : '';
+  h += '<button class="dbtn' + (isDone ? ' dn' : '') + '"' + doneDisabled + doneStyle;
+  h += ' data-id="' + r.id + '" data-done="' + (isDone?'1':'0') + '">';
+  h += isDone ? '&#10003;' : '&#9675;';
+  h += '</button>';
+  h += '</div>';
+  h += '<a class="mln" href="' + mapsUrl + '" target="_blank">&#128247; Открыть в картах</a>';
+  h += '<div class="photo-section">';
+  if (isTechTask) {
+    // Tech photos block
+    if (techPhotos.length > 0) {
+      h += '<div style="padding:6px 10px 4px;background:#FFF8EE;border-top:1px solid #f5e0b0">';
+      h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#854F0B;margin-bottom:5px">&#128247; Фото от техника</div>';
+      h += '<div class="photo-row">';
+      techPhotos.forEach(function(url) {
+        h += '<img class="photo-thumb" src="' + xe(url) + '" data-url="' + xe(url) + '" style="border:2px solid #f5c875">';
+      });
+      h += '</div></div>';
+    }
+    // Driver photos block
+    h += '<div style="padding:6px 10px 4px;background:#f5fbf7;border-top:1px solid #c8e6c9">';
+    h += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1a7a40;margin-bottom:5px">&#128247; Моё фото подтверждения</div>';
+    h += '<div class="photo-row">';
+    driverPhotos.forEach(function(url) {
+      h += '<img class="photo-thumb" src="' + xe(url) + '" data-url="' + xe(url) + '" style="border:2px solid #9fe0be">';
+    });
+    pendingPhotos.forEach(function() {
+      h += '<div style="width:56px;height:56px;border-radius:8px;background:#e8f5e9;border:2px dashed #9fe0be;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#1a7a40;text-align:center">⏳</div>';
+    });
+    h += '<button class="photo-add" data-upload="' + r.id + '">&#128247;</button>';
+    h += '</div>';
+    if (!isDone && !hasPhoto) {
+      h += '<div style="font-size:10px;color:#e07000;margin-top:4px">⚠ Сделайте фото после вывоза</div>';
+    } else if (pendingPhotos.length > 0) {
+      h += '<div style="font-size:10px;color:#1856a0;margin-top:4px">⏳ ' + pendingPhotos.length + ' фото ожидает загрузки</div>';
+    } else if (hasPhoto) {
+      h += '<div style="font-size:10px;color:#1a7a40;margin-top:4px">✓ Фото добавлено</div>';
+    }
+    h += '</div>';
+  } else {
+    // Regular task
+    if (!isDone && !hasPhoto) {
+      h += '<div class="photo-hint"><span>&#9888;</span> Сделайте фото для подтверждения</div>';
+    }
+    h += '<div class="photo-row">';
+    photos.forEach(function(url) {
+      if (url && url.startsWith('pending:')) {
+        h += '<div style="width:56px;height:56px;border-radius:8px;background:#e8f0fe;border:2px dashed #aec6ef;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#1856a0;text-align:center">⏳</div>';
+      } else {
+        h += '<img class="photo-thumb" src="' + xe(url) + '" data-url="' + xe(url) + '">';
+      }
+    });
+    h += '<button class="photo-add" data-upload="' + r.id + '">&#128247;</button>';
+    h += '</div>';
+    if (pendingPhotos.length > 0) {
+      h += '<div class="photo-count">⏳ ' + pendingPhotos.length + ' фото ожидает загрузки</div>';
+    } else if (photos.length > 0) {
+      h += '<div class="photo-count">' + photos.length + ' фото</div>';
+    }
+  }
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function render() {
+  document.getElementById('dl').textContent = fmt(curD);
+  var dr = rows.filter(function(r) {
+    return r.date === curD && r.drv === DRV && r.inRoute !== false && ((r.addr && r.addr.trim()) || r.fromDriver);
+  });
+  var tot = dr.length, dn = dr.filter(function(r) { return r.done; }).length;
+  var prg = document.getElementById('prg');
+  if (tot > 0) {
+    prg.style.display = 'flex';
+    document.getElementById('pf').style.width = Math.round(dn/tot*100) + '%';
+    document.getElementById('pt').textContent = dn + '/' + tot;
+  } else prg.style.display = 'none';
+
+  var wrap = document.getElementById('wrap');
+  if (!tot) {
+    wrap.innerHTML = '<div class="empty"><div style="font-size:48px;margin-bottom:12px">&#128666;</div><p>Нет доставок на этот день</p></div>';
+    return;
+  }
+
+  var hasOrder = dr.some(function(r) { return r.order != null; });
+  var html = '', n = 1;
+  if (hasOrder) {
+    var ordered = dr.slice().sort(function(a,b) {
+      var ao = a.order != null ? a.order : 99999;
+      var bo = b.order != null ? b.order : 99999;
+      if (ao !== bo) return ao - bo;
+      return (a.createdAt||0) - (b.createdAt||0);
+    });
+    ordered.forEach(function(r) { html += renderRow(r, n++); });
+  } else {
+    var sorted2 = dr.slice().sort(function(a,b) {
+      if (a.city < b.city) return -1;
+      if (a.city > b.city) return 1;
+      return (a.createdAt||0) - (b.createdAt||0);
+    });
+    sorted2.forEach(function(r) { html += renderRow(r, n++); });
+  }
+    wrap.innerHTML = html;
+
+  wrap.querySelectorAll('.dbtn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (this.disabled) return;
+      var id = this.getAttribute('data-id');
+      var isDone = this.getAttribute('data-done') === '1';
+      markDone(id, !isDone);
+    });
+  });
+  wrap.querySelectorAll('.photo-add').forEach(function(btn) {
+    btn.addEventListener('click', function() { triggerPhoto(this.getAttribute('data-upload')); });
+  });
+  wrap.querySelectorAll('.photo-thumb').forEach(function(img) {
+    img.addEventListener('click', function() { openLightbox(this.getAttribute('data-url')); });
+  });
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.innerHTML = msg; t.classList.add('on');
+  setTimeout(function() { t.classList.remove('on'); }, 2500);
+}
+
+document.getElementById('prev').addEventListener('click', function() { sh(-1); });
+document.getElementById('next').addEventListener('click', function() { sh(1); });
+
+db.ref('rows').on('value', function(snap) {
+  rows = snap.val() ? Object.values(snap.val()) : [];
+  render();
+  document.getElementById('sync').className = 'sync ok';
+}, function() { document.getElementById('sync').className = 'sync'; });
+
+db.ref('cfg').on('value', function(snap) {
+  if (snap.val()) {
+    cfg = snap.val();
+    document.getElementById('dn').innerHTML = driverName() + ' <span class="sync ok" id="sync"></span>';
+    if(document.getElementById('driverPinName'))document.getElementById('driverPinName').textContent='Маршрут — '+driverName();
+  }
+});
+
+db.ref('trips').on('value', function(snap) {
+  tripData = snap.val() || {};
+  updateTripUI();
+});
+
+curD = isoD(0);
+render();
+
+var _pinBuf = '';
+var _defaultPin = '3333';
+function dpp(d) {
+  if(d==='X'){_pinBuf=_pinBuf.slice(0,-1);}
+  else if(_pinBuf.length<4){_pinBuf+=d;}
+  [0,1,2,3].forEach(function(i){document.getElementById('pd'+i).className='pdot'+(_pinBuf.length>i?' on':'');  });
+  if(_pinBuf.length===4){
+    var correct=(cfg.pinD&&cfg.pinD['L'])||_defaultPin;
+    if(_pinBuf===correct){
+      document.getElementById('pinWrap').style.display='none';
+      document.getElementById('driverApp').style.display='';
+      sessionStorage.setItem('dpin_L','1');
+    } else {
+      document.getElementById('pinErr').textContent='Неверный PIN';
+      _pinBuf='';
+      [0,1,2,3].forEach(function(i){document.getElementById('pd'+i).className='pdot';});
+      setTimeout(function(){document.getElementById('pinErr').textContent='';},1500);
+    }
+  }
+}
+// Check session
+if(sessionStorage.getItem('login_from')==='login'){
+  sessionStorage.removeItem('login_from');
+  sessionStorage.setItem('dpin_L','1');
+  document.getElementById('pinWrap').style.display='none';
+  document.getElementById('driverApp').style.display='';
+} else if(sessionStorage.getItem('dpin_L')==='1'){
+  document.getElementById('pinWrap').style.display='none';
+  document.getElementById('driverApp').style.display='';
+}
+// Update PIN name when cfg loads
+var _origCfgListener = null;
+
+// ─── ADD TASK (driver-initiated) ─────────────────────────────────────
+var _addType = null;
+var _addPhotos = []; // array of {file, b64, ts}
+
+function openAddSheet(){
+  document.getElementById('addSheet').classList.add('on');
+}
+function closeAddSheet(e){
+  if(e && e.target.closest && e.target.closest('.add-sheet-inner') && !e.target.closest('.add-cancel'))return;
+  document.getElementById('addSheet').classList.remove('on');
+}
+function openAddForm(type){
+  _addType = type;
+  _addPhotos = [];
+  document.getElementById('addSheet').classList.remove('on');
+  var title = type==='delivery' ? '📦 Доставка материала' : '🗑 Вывоз мусора';
+  var hint = type==='delivery'
+    ? 'Сфотографируйте накладную (можно несколько фото). Диспетчер дозаполнит адрес и номер.'
+    : 'Сфотографируйте место загрузки. Диспетчер дозаполнит адрес.';
+  document.getElementById('addFormTitle').textContent = title;
+  document.getElementById('addFormHint').textContent = hint;
+  document.getElementById('addFormComment').value = '';
+  document.getElementById('addPhotoPreview').innerHTML = '';
+  document.getElementById('addFormSend').disabled = true;
+  document.getElementById('addForm').classList.add('on');
+}
+function closeAddForm(){
+  document.getElementById('addForm').classList.remove('on');
+  _addType = null;
+  _addPhotos = [];
+}
+function addFormPickPhoto(){
+  document.getElementById('addPhotoInput').click();
+}
+document.getElementById('addPhotoInput').addEventListener('change', function(e){
+  var file = e.target.files && e.target.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    _addPhotos.push({file: file, b64: ev.target.result, ts: Date.now()});
+    renderAddPhotos();
+    e.target.value = '';
+  };
+  reader.readAsDataURL(file);
+});
+function renderAddPhotos(){
+  var box = document.getElementById('addPhotoPreview');
+  var html = '';
+  _addPhotos.forEach(function(p, i){
+    html += '<div class="add-photo-preview-item"><img src="'+p.b64+'" alt=""><button class="rm" onclick="rmAddPhoto('+i+')">&#215;</button></div>';
+  });
+  box.innerHTML = html;
+  document.getElementById('addFormSend').disabled = _addPhotos.length === 0;
+}
+function rmAddPhoto(i){
+  _addPhotos.splice(i,1);
+  renderAddPhotos();
+}
+function submitAddTask(){
+  if(_addPhotos.length === 0){ showToast('Добавьте хотя бы одно фото'); return; }
+  var btn = document.getElementById('addFormSend');
+  btn.disabled = true;
+  btn.textContent = 'Отправка...';
+  var rowId = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+  var comment = (document.getElementById('addFormComment').value || '').trim();
+  var status = _addType === 'delivery' ? 'доставка материала' : 'вывоз мусора';
+
+  var maxOrder = 0;
+  rows.forEach(function(r){
+    if(r.date === curD && r.drv === DRV && r.order != null && r.order > maxOrder) maxOrder = r.order;
+  });
+
+  var uploadPromises = _addPhotos.map(function(p, idx){
+    var path = 'photos/' + rowId + '/' + p.ts + '_' + idx + '.jpg';
+    return storage.ref(path).put(p.file).then(function(snap){
+      return snap.ref.getDownloadURL();
+    });
+  });
+
+  Promise.all(uploadPromises).then(function(urls){
+    var now = Date.now();
+    var row = {
+      id: rowId,
+      date: curD,
+      drv: DRV,
+      city: '',
+      addr: '',
+      invs: [''],
+      status: status,
+      comment: comment,
+      weight: null,
+      volume_m3: null,
+      inRoute: true,
+      done: true,
+      doneTs: now,
+      photos: urls,
+      photoTs: urls.map(function(){ return now; }),
+      fromDriver: true,
+      taskType: _addType,
+      addedByDriver: driverName(),
+      createdAt: now,
+      order: maxOrder + 10
+    };
+    return db.ref('rows/' + rowId).set(row);
+  }).then(function(){
+    showToast('Задание добавлено ✓');
+    if(navigator.vibrate) navigator.vibrate([60,30,60]);
+    closeAddForm();
+    btn.textContent = 'Отправить ✓';
+    btn.disabled = false;
+  }).catch(function(err){
+    showToast('Ошибка: ' + (err.message || err));
+    btn.textContent = 'Отправить ✓';
+    btn.disabled = false;
+  });
+}
+// ─── END ADD TASK ────────────────────────────────────────────────────
+
+
+
+</script>
+</body>
+</html>
