@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Маршрут Валентин">
@@ -470,8 +470,26 @@ function uploadPhotoWithQueue(file, rowId) {
 
 // ── END OFFLINE QUEUE ────────────────────────────────────────
 
+// Очередь отметок «выполнено»: ставится локально сразу (работает офлайн),
+// синхронизируется с диспетчером в фоне, когда появится сеть. Водитель сеть не ловит.
+var doneQueue = JSON.parse(localStorage.getItem('doneQueue_' + DRV) || '{}');
+function saveDoneQueue() { localStorage.setItem('doneQueue_' + DRV, JSON.stringify(doneQueue)); }
+function flushDoneQueue() {
+  Object.keys(doneQueue).forEach(function(id) {
+    var val = doneQueue[id];
+    db.ref('rows/' + id).update({done: val}).then(function() {
+      if (doneQueue[id] === val) { delete doneQueue[id]; saveDoneQueue(); }
+    }).catch(function() {});
+  });
+}
+window.addEventListener('online', function() { setTimeout(flushDoneQueue, 2000); });
+setTimeout(flushDoneQueue, 3500);
+
 function markDone(id, val) {
-  db.ref('rows/' + id).update({done: val});
+  doneQueue[id] = val; saveDoneQueue();
+  db.ref('rows/' + id).update({done: val}).then(function() {
+    if (doneQueue[id] === val) { delete doneQueue[id]; saveDoneQueue(); }
+  }).catch(function() {});
   if (val && navigator.vibrate) navigator.vibrate([60,30,60]);
   showToast(val ? 'Выполнено &#10003;' : 'Отменено');
 }
@@ -634,21 +652,23 @@ function render() {
 
   var hasOrder = dr.some(function(r) { return r.order != null; });
   var html = '', n = 1;
-  if (hasOrder) {
-    var ordered = dr.slice().sort(function(a,b) {
+  function _routeCmp(a,b) {
+    if (hasOrder) {
       var ao = a.order != null ? a.order : 99999;
       var bo = b.order != null ? b.order : 99999;
       if (ao !== bo) return ao - bo;
       return (a.createdAt||0) - (b.createdAt||0);
-    });
-    ordered.forEach(function(r) { html += renderRow(r, n++); });
-  } else {
-    var sorted2 = dr.slice().sort(function(a,b) {
-      if (a.city < b.city) return -1;
-      if (a.city > b.city) return 1;
-      return (a.createdAt||0) - (b.createdAt||0);
-    });
-    sorted2.forEach(function(r) { html += renderRow(r, n++); });
+    }
+    if (a.city < b.city) return -1;
+    if (a.city > b.city) return 1;
+    return (a.createdAt||0) - (b.createdAt||0);
+  }
+  var _pending = dr.filter(function(r) { return !r.done; }).sort(_routeCmp);
+  var _doneRows = dr.filter(function(r) { return r.done; }).sort(_routeCmp);
+  _pending.forEach(function(r) { html += renderRow(r, n++); });
+  if (_doneRows.length) {
+    html += '<div style="display:flex;align-items:center;gap:8px;margin:16px 4px 8px;color:#9a9a9a;font-size:12px;font-weight:600"><span style="flex:1;height:1px;background:#e0ddd4"></span>&#10003; Выполнено (' + _doneRows.length + ')<span style="flex:1;height:1px;background:#e0ddd4"></span></div>';
+    _doneRows.forEach(function(r) { html += renderRow(r, n++); });
   }
     wrap.innerHTML = html;
 

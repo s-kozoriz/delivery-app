@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Диспетчер">
@@ -267,7 +267,20 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 </div>
 
 <div id="th" style="display:none">
-  <div class="card"><div class="ch"><h2>История</h2></div><div id="hl" class="hlist"></div></div>
+  <div class="card">
+    <div class="ch"><h2>История</h2></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--bd);flex-wrap:wrap">
+      <div class="dnav">
+        <button onclick="hShiftDay(-1)">&#8249;</button>
+        <div class="dd" id="hDateLabel" style="min-width:180px">Выберите дату</div>
+        <button onclick="hShiftDay(1)">&#8250;</button>
+      </div>
+      <input type="date" id="hDatePicker" onchange="hPickDay()" style="border:1px solid var(--bd2);border-radius:6px;padding:4px 9px;font-size:13px;background:var(--card);color:var(--tx)">
+      <button class="btn btn-sm" onclick="hShowList()">Все дни</button>
+    </div>
+    <div id="hPicked" style="display:none"></div>
+    <div id="hl" class="hlist"></div>
+  </div>
 </div>
 
 <div id="timp" style="display:none">
@@ -1011,38 +1024,34 @@ function bm(d){
 function bp(d){
   var name=dname(d);var dr=drows(d);if(!dr.length)return'';
   var hasOrder=dr.some(function(r){return r.order!=null;});
-  if(hasOrder){
-    dr=dr.slice().sort(function(a,b){
-      var ao=a.order!=null?a.order:Infinity;
-      var bo=b.order!=null?b.order:Infinity;
-      if(ao!==bo)return ao-bo;
-      return (a.createdAt||0)-(b.createdAt||0);
-    });
-  } else {
-    dr=dr.slice().sort(function(a,b){
-      if(a.city<b.city)return -1;if(a.city>b.city)return 1;
-      return (a.createdAt||0)-(b.createdAt||0);
-    });
-  }
+  function _byOrder(a,b){var ao=a.order!=null?a.order:Infinity;var bo=b.order!=null?b.order:Infinity;if(ao!==bo)return ao-bo;return (a.createdAt||0)-(b.createdAt||0);}
   var ds=curD?fmt(curD):'?';
   var h='<div style="font-size:13px;line-height:1.75"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-weight:700">'+xe(cfg.hdr.replace('{date}',ds).replace('{driver}',name))+'</span><button onclick="calcRouteTime(\''+d+'\',\''+curD+'\')" style="border:1px solid #aec6ef;border-radius:5px;padding:2px 7px;font-size:11px;background:#e8f0fe;color:#1856a0;cursor:pointer">🗺</button></div>';
   h+='<div style="font-size:11px;color:var(--mu);margin-bottom:4px"><span id="routeStats_'+d+'"></span></div>';
-  var n=1;
-  if(hasOrder){
-    var lastCity='';
-    dr.forEach(function(r){
-      if(r.city!==lastCity){
-        lastCity=r.city;
-        h+='<div style="font-weight:600;color:var(--acc);margin:8px 0 3px">&#128205; '+xe(r.city)+'</div>';
-      }
-      h+=bpRow(r,d,n);n++;
-    });
-  } else {
-    var bc={};dr.forEach(function(r){if(!bc[r.city])bc[r.city]=[];bc[r.city].push(r);});
-    Object.keys(bc).sort().forEach(function(city){
-      h+='<div style="font-weight:600;color:var(--acc);margin:8px 0 3px">&#128205; '+xe(city)+'</div>';
-      bc[city].forEach(function(r){h+=bpRow(r,d,n);n++;});
-    });
+  var _nc={v:1};
+  function _renderGroup(list){
+    var out='';
+    if(hasOrder){
+      var srt=list.slice().sort(_byOrder);var lastCity='';
+      srt.forEach(function(r){
+        if(r.city!==lastCity){lastCity=r.city;out+='<div style="font-weight:600;color:var(--acc);margin:8px 0 3px">&#128205; '+xe(r.city)+'</div>';}
+        out+=bpRow(r,d,_nc.v);_nc.v++;
+      });
+    } else {
+      var bc={};list.forEach(function(r){if(!bc[r.city])bc[r.city]=[];bc[r.city].push(r);});
+      Object.keys(bc).sort().forEach(function(city){
+        out+='<div style="font-weight:600;color:var(--acc);margin:8px 0 3px">&#128205; '+xe(city)+'</div>';
+        bc[city].forEach(function(r){out+=bpRow(r,d,_nc.v);_nc.v++;});
+      });
+    }
+    return out;
+  }
+  var _pending=dr.filter(function(r){return !r.done;});
+  var _done=dr.filter(function(r){return r.done;});
+  h+=_renderGroup(_pending);
+  if(_done.length){
+    h+='<div style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;color:#9a9a9a;font-size:11px;font-weight:600"><span style="flex:1;height:1px;background:#e0ddd4"></span>&#10003; Выполнено ('+_done.length+')<span style="flex:1;height:1px;background:#e0ddd4"></span></div>';
+    h+=_renderGroup(_done);
   }
   h+='<div style="margin-top:8px;color:var(--mu);font-size:12px">Всего: '+dr.length+' адресов</div></div>';
   return h;
@@ -1050,10 +1059,12 @@ function bp(d){
 function bpRow(r,d,n){
   var mu='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(cleanAddr(r.addr)+', '+r.city+', Germany');
   var h='<div style="display:flex;align-items:flex-start;gap:4px;margin-left:4px">';
+  if(!r.done){
   h+='<div style="display:flex;flex-direction:column;gap:0;flex-shrink:0;margin-top:1px">';
   h+='<button onclick="panelMoveRow(\''+r.id+'\',\''+d+'\',\'up\')" style="border:none;background:none;cursor:pointer;color:#bbb;font-size:11px;line-height:1;padding:1px 3px">&#8593;</button>';
   h+='<button onclick="panelMoveRow(\''+r.id+'\',\''+d+'\',\'down\')" style="border:none;background:none;cursor:pointer;color:#bbb;font-size:11px;line-height:1;padding:1px 3px">&#8595;</button>';
   h+='</div>';
+  }
   h+='<div style="flex:1"><span style="color:var(--mu)">'+n+'.</span> '+(r.status==='забрать товар'?'&#128722; ':'');
   h+='<a href="'+mu+'" target="_blank" style="color:var(--acc);font-weight:500;text-decoration:none">'+xe(r.addr)+'</a>';
   if(r.timeSlot)h+=' <span style="color:var(--mu);font-size:11px">до '+r.timeSlot+'</span>';
@@ -1231,8 +1242,8 @@ function toggleHistDay(el){
     arr.style.transform='';
   }
 }
-function renderHistDetail(iso, el){
-  var dayRows=rows.filter(function(r){return r.date===iso&&r.addr&&r.addr.trim();});
+function renderHistDetail(iso, el, dayRowsOverride){
+  var dayRows=(dayRowsOverride||rows).filter(function(r){return r.date===iso&&r.addr&&r.addr.trim();});
   if(!dayRows.length){el.innerHTML='<div style="padding:8px 16px;color:var(--mu);font-size:13px">Нет данных</div>';return;}
   var html='<div style="padding:8px 14px 12px;border-top:1px solid var(--bd);background:#fafaf8">';
   DRV_KEYS.forEach(function(k){
@@ -1270,6 +1281,39 @@ function renderHistDetail(iso, el){
     img.addEventListener('click',function(){
       openDispLb(this.getAttribute('data-url'),this.getAttribute('data-addr'),this.getAttribute('data-rowid'));
     });
+  });
+}
+
+// Выбор даты в Истории: грузим конкретный день напрямую из Firebase (не зависит от окна ±7 дней)
+function hPickDay(){
+  var iso=document.getElementById('hDatePicker').value;
+  if(iso)hLoadDay(iso);
+}
+function hShiftDay(n){
+  var cur=document.getElementById('hDatePicker').value||isoD(0);
+  var d=new Date(cur+'T12:00:00');d.setDate(d.getDate()+n);
+  var iso=d.toISOString().slice(0,10);
+  document.getElementById('hDatePicker').value=iso;
+  hLoadDay(iso);
+}
+function hShowList(){
+  document.getElementById('hPicked').style.display='none';
+  document.getElementById('hl').style.display='';
+  document.getElementById('hDatePicker').value='';
+  document.getElementById('hDateLabel').textContent='Выберите дату';
+  rh();
+}
+function hLoadDay(iso){
+  document.getElementById('hDateLabel').textContent=fmt(iso);
+  document.getElementById('hl').style.display='none';
+  var picked=document.getElementById('hPicked');
+  picked.style.display='';
+  picked.innerHTML='<div style="padding:10px 14px;color:var(--mu);font-size:13px">Загрузка…</div>';
+  db.ref('rows').orderByChild('date').equalTo(iso).once('value',function(s){
+    var dayRows=s.val()?Object.values(s.val()):[];
+    renderHistDetail(iso,picked,dayRows);
+  },function(){
+    picked.innerHTML='<div style="padding:10px 14px;color:#c62828;font-size:13px">Ошибка загрузки</div>';
   });
 }
 
@@ -1582,7 +1626,7 @@ function sw(n){
   document.querySelectorAll('.tab').forEach(function(b){
     b.classList.toggle('on',b.textContent.trim()===(nameMap[n]||''));
   });
-  if(n==='hist')rh();
+  if(n==='hist')hShowList();
   if(n==='cfg')lcfg();
   if(n==='warehouse')renderWarehouse();
   if(n==='stat'){statOffset=0;renderStat();}
