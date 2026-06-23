@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>LK Bauservice — Вход</title>
@@ -53,8 +53,10 @@ body{background:#1a1a2e;min-height:100vh;display:flex;align-items:center;justify
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
+// Варіант A: PIN звіряється на Worker, який повертає Firebase custom-token з роллю.
+// PINи в коді/базі більше не зберігаються. Верстка PIN-пада не змінилась.
 firebase.initializeApp({
   apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
   databaseURL:'https://lk-bauservice-bb872-default-rtdb.europe-west1.firebasedatabase.app',
@@ -62,18 +64,10 @@ firebase.initializeApp({
   projectId:'lk-bauservice-bb872',
   appId:'1:704709078597:web:1e336d874a8cf524583d2c'
 });
-var db = firebase.database();
-var buf = '';
-var cfg = {};
 
-// Load config from Firebase
-var cfgLoaded = false;
-db.ref('cfg').once('value', function(s){
-  cfg = s.val() || {};
-  cfgLoaded = true;
-  // If user already entered PIN while cfg was loading - check now
-  if(buf.length === 4) check();
-});
+var AUTH_URL = 'https://lk-auth.s-kozorizz.workers.dev/auth';
+var buf = '';
+var busy = false;
 
 function upd(){
   [0,1,2,3].forEach(function(i){
@@ -83,6 +77,7 @@ function upd(){
 }
 
 function kp(k){
+  if(busy) return;
   document.getElementById('err').textContent = '';
   if(k === 'X'){ buf = buf.slice(0,-1); upd(); return; }
   if(buf.length >= 4) return;
@@ -92,51 +87,33 @@ function kp(k){
 }
 
 function check(){
-  if(!cfgLoaded){
-    document.getElementById('err').textContent = 'Загрузка...';
-    return;
-  }
-  var p = buf;
-  var pd = cfg.pinD || {L:'3333',R:'4444',C:'5555',V:'1100'};
-
-  // Dispatcher roles
-  if(p === (cfg.pin || '1234')){ go('index.html', {role:'zentrum'}); return; }
-  if(p === (cfg.pin2 || '2222')){ go('index.html', {role:'norden'}); return; }
-  if(p === (cfg.pinView || '0000')){ go('index.html', {role:'lager'}); return; }
-
-  // Drivers
-  if(p === (pd.L || '3333')){ go('lesha-app.html', {}); return; }
-  if(p === (pd.R || '4444')){ go('roma-app.html', {}); return; }
-  if(p === (pd.C || '5555')){ go('driver3-app.html', {}); return; }
-  if(p === (pd.V || '1100')){ go('valentyn-app.html', {}); return; }
-
-  // Techs
-  var techs = cfg.techs || {};
-  var techIds = Object.keys(techs);
-  for(var i=0; i<techIds.length; i++){
-    if(techs[techIds[i]].pin === p){
+  busy = true;
+  document.getElementById('err').textContent = 'Проверка...';
+  fetch(AUTH_URL, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({pin: buf})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(res){
+    if(!res || !res.ok || !res.token){ throw new Error('bad pin'); }
+    return firebase.auth().signInWithCustomToken(res.token).then(function(){
       sessionStorage.setItem('login_from','login');
-      sessionStorage.setItem('login_techId',techIds[i]);
-      window.location.href='tech-app.html';
-      return;
-    }
-  }
-
-  // Wrong PIN
-  document.getElementById('err').textContent = 'Неверный PIN';
-  buf = ''; upd();
-}
-
-function go(page, params){
-  // Store params in sessionStorage for the target page
-  sessionStorage.setItem('login_from', 'login');
-  Object.keys(params).forEach(function(k){
-    sessionStorage.setItem('login_' + k, params[k]);
+      if(res.role==='zentrum' || res.role==='norden' || res.role==='lager'){
+        sessionStorage.setItem('login_role', res.role);
+      }
+      if(res.techId){ sessionStorage.setItem('login_techId', res.techId); }
+      window.location.href = res.page || 'index.html';
+    });
+  })
+  .catch(function(){
+    busy = false;
+    document.getElementById('err').textContent = 'Неверный PIN';
+    buf = '';
+    upd();
   });
-  window.location.href = page;
 }
 
-// Keyboard support
 document.addEventListener('keydown', function(e){
   if(e.key >= '0' && e.key <= '9') kp(e.key);
   else if(e.key === 'Backspace') kp('X');

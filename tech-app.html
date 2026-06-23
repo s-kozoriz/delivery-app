@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#854F0B">
@@ -301,6 +301,7 @@ body{background:#f0efe9;color:#141816;font-family:'Segoe UI',sans-serif;font-siz
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
 firebase.initializeApp({
   apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
@@ -350,39 +351,19 @@ function pp(d){
   }
 }
 
-// Session restore
-(function(){
-  // Coming from login.html
-  if(sessionStorage.getItem('login_from')==='login'){
-    var tid=sessionStorage.getItem('login_techId')||'';
-    sessionStorage.removeItem('login_from');
-    sessionStorage.removeItem('login_techId');
-    if(tid){
-      currentTechId=tid;
-      db.ref('cfg/techs/'+tid).once('value',function(s){
-        currentTech=s.val();
-        sessionStorage.setItem('techId',tid);
-        sessionStorage.setItem('techPin',currentTech?currentTech.pin:'');
-        document.getElementById('pinWrap').style.display='none';
-        document.getElementById('app').style.display='';
-        initApp();
-      });
-    }
-    return;
-  }
-  // Regular session restore
-  var tid=sessionStorage.getItem('techId'),tpin=sessionStorage.getItem('techPin');
-  if(tid&&tpin){
-    db.ref('cfg/techs/'+tid).once('value',function(s){
-      if(s.val()&&s.val().pin===tpin){
-        currentTechId=tid;currentTech=s.val();
-        document.getElementById('pinWrap').style.display='none';
-        document.getElementById('app').style.display='';
-        initApp();
-      }
-    });
-  }
-})();
+// Auth gate (Варіант A): techId береться з custom-token claim
+firebase.auth().onAuthStateChanged(function(user){
+  if(!user){ location.replace('login.html'); return; }
+  sessionStorage.removeItem('login_from');
+  user.getIdTokenResult().then(function(res){
+    currentTechId=(res.claims&&res.claims.techId)||sessionStorage.getItem('login_techId')||sessionStorage.getItem('techId');
+    sessionStorage.setItem('techId',currentTechId||'');
+    if(!currentTech)currentTech={name:''};
+    document.getElementById('pinWrap').style.display='none';
+    document.getElementById('app').style.display='';
+    initApp();
+  });
+});
 
 function initApp(){
   db.ref('cfg').on('value',function(s){

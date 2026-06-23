@@ -233,6 +233,7 @@ body{background:#fdf2ee;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
 var DRV = 'R';
 var TODAY_KEY = '';
@@ -697,6 +698,7 @@ function showToast(msg) {
 document.getElementById('prev').addEventListener('click', function() { sh(-1); });
 document.getElementById('next').addEventListener('click', function() { sh(1); });
 
+function __startDB(){
 db.ref('rows').on('value', function(snap) {
   rows = snap.val() ? Object.values(snap.val()) : [];
   render();
@@ -718,7 +720,7 @@ db.ref('trips').on('value', function(snap) {
 
 curD = isoD(0);
 render();
-
+}
 var _pinBuf = '';
 var _defaultPin = '4444';
 function dpp(d) {
@@ -739,16 +741,14 @@ function dpp(d) {
     }
   }
 }
-// Check session
-if(sessionStorage.getItem('login_from')==='login'){
+// Auth gate (Варіант A): доступ лише з валідною Firebase-сесією
+firebase.auth().onAuthStateChanged(function(user){
+  if(!user){ location.replace('login.html'); return; }
   sessionStorage.removeItem('login_from');
-  sessionStorage.setItem('dpin_R','1');
-  document.getElementById('pinWrap').style.display='none';
+  var __pw=document.getElementById('pinWrap'); if(__pw) __pw.style.display='none';
   document.getElementById('driverApp').style.display='';
-} else if(sessionStorage.getItem('dpin_R')==='1'){
-  document.getElementById('pinWrap').style.display='none';
-  document.getElementById('driverApp').style.display='';
-}
+  __startDB();
+});
 // Update PIN name when cfg loads
 var _origCfgListener = null;
 

@@ -496,6 +496,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
 var STATS=['—','вывоз мусора','самовывоз','перенесено','срочно','забрать товар'];
 var COORDS={Salzgitter:{a:52.094,o:10.370},Wolfsburg:{a:52.423,o:10.787},Braunschweig:{a:52.268,o:10.527},Hannover:{a:52.374,o:9.739},'Göttingen':{a:51.534,o:9.932},Aurich:{a:53.470,o:7.483},Wilhelmshaven:{a:53.529,o:8.104}};
@@ -524,6 +525,7 @@ var storage=firebase.storage();
 var _rf=new Date(),_d1=new Date(_rf),_d2=new Date(_rf);
 _d1.setDate(_d1.getDate()-7);_d2.setDate(_d2.getDate()+7);
 var _fromD=_d1.toISOString().slice(0,10),_toD=_d2.toISOString().slice(0,10);
+function __startDB(){
 db.ref('rows').orderByChild('date').startAt(_fromD).endAt(_toD).on('value',function(s){
   rows=s.val()?Object.values(s.val()):[];
   if(Date.now()-_lastEdit>1500){rtbl();}
@@ -545,6 +547,9 @@ db.ref('sent').on('value',function(s){sent=s.val()||{};gm();rh();});
 db.ref('trips').on('value',function(s){tripStatus=s.val()||{};gm();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
 db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
+__startTechsListener();
+__startVoiceListener();
+}
 
 function setMode(mode){
   pinMode=mode;
@@ -641,18 +646,18 @@ function lockNonCRows(){
     }
   });
 }
-(function(){
-  var role=sessionStorage.getItem('login_role');
-  if(role){
-    sessionStorage.removeItem('login_role');
-    if(role==='zentrum'){disp2Mode=false;enter(false);}
-    else if(role==='norden'){disp2Mode=true;enter(false);}
+// Auth gate (Варіант A): роль береться з custom-token claim
+firebase.auth().onAuthStateChanged(function(user){
+  if(!user){ location.replace('login.html'); return; }
+  sessionStorage.removeItem('login_role');
+  user.getIdTokenResult().then(function(res){
+    var role=(res.claims&&res.claims.role)||'zentrum';
+    if(role==='norden'){disp2Mode=true;enter(false);}
     else if(role==='lager'){disp2Mode=false;enter(true);}
-    return;
-  }
-  var ok=sessionStorage.getItem('ok'),vo=sessionStorage.getItem('vo'),d2=sessionStorage.getItem('d2');
-  if(ok==='1'){disp2Mode=d2==='1';enter(vo==='1');}
-})();
+    else{disp2Mode=false;enter(false);}
+    __startDB();
+  });
+});
 
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function isoD(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
@@ -1325,15 +1330,7 @@ function scfg(){
   if(document.getElementById('cNV'))cfg.drivers.V={name:document.getElementById('cNV').value.trim(),phone:(document.getElementById('cPV')?document.getElementById('cPV').value.trim():'')};
   cfg.hdr=document.getElementById('cHdr').value||'Маршрут на {date}';
   cfg.ftr=document.getElementById('cFtr').value||'Удачной дороги!';
-  var p=document.getElementById('cPin').value;if(p.length===4&&/^\d{4}$/.test(p))cfg.pin=p;
-  var pv=document.getElementById('cPinV').value;if(pv.length===4&&/^\d{4}$/.test(pv))cfg.pinView=pv;
-  var p2el=document.getElementById('cPin2');var p2=p2el?p2el.value:'';if(p2.length===4&&/^\d{4}$/.test(p2))cfg.pin2=p2;
-  if(!cfg.pinD)cfg.pinD={L:'3333',R:'4444',C:'5555',V:'1100'};
-  if(!cfg.pinD.V)cfg.pinD.V='1100';
-  var pdL=document.getElementById('cPinDL');if(pdL&&pdL.value.length===4&&/^\d{4}$/.test(pdL.value))cfg.pinD.L=pdL.value;
-  var pdR=document.getElementById('cPinDR');if(pdR&&pdR.value.length===4&&/^\d{4}$/.test(pdR.value))cfg.pinD.R=pdR.value;
-  var pdC=document.getElementById('cPinDC');if(pdC&&pdC.value.length===4&&/^\d{4}$/.test(pdC.value))cfg.pinD.C=pdC.value;
-  var pdV=document.getElementById('cPinDV');if(pdV&&pdV.value.length===4&&/^\d{4}$/.test(pdV.value))cfg.pinD.V=pdV.value;
+  // PINи перенесені в секрет Worker (Варіант A) — у cfg більше НЕ записуються.
   db.ref('cfg').set(cfg);
   toast('Настройки сохранены ✓');
   gm();rtbl();lcfg();
@@ -1393,14 +1390,11 @@ function lcfg(){
   if(clC)clC.innerHTML=citiesC2.map(function(city){
     return'<span style="display:inline-flex;align-items:center;gap:4px;background:#e6eef9;border:1px solid #aec6ef;border-radius:6px;padding:4px 10px;font-size:13px;color:#1856a0">'+xe(city)+'<button onclick="removeCityC(\''+xe(city)+'\')" style="border:none;background:none;cursor:pointer;color:#c00;font-size:14px;padding:0 0 0 4px">&#215;</button></span>';
   }).join('');
-  if(document.getElementById('cPin'))document.getElementById('cPin').value=cfg.pin||PIN_DEFAULT;
-  if(document.getElementById('cPinV'))document.getElementById('cPinV').value=cfg.pinView||'0000';
-  if(document.getElementById('cPin2'))document.getElementById('cPin2').value=cfg.pin2||'2222';
-  var pd2=cfg.pinD||{L:'3333',R:'4444',C:'5555'};
-  if(document.getElementById('cPinDL'))document.getElementById('cPinDL').value=pd2.L||'3333';
-  if(document.getElementById('cPinDR'))document.getElementById('cPinDR').value=pd2.R||'4444';
-  if(document.getElementById('cPinDC'))document.getElementById('cPinDC').value=pd2.C||'5555';
-  if(document.getElementById('cPinDV'))document.getElementById('cPinDV').value=pd2.V||'1100';
+  // PINи в секреті Worker (Варіант A) — поля показуємо вимкненими.
+  ['cPin','cPinV','cPin2','cPinDL','cPinDR','cPinDC','cPinDV'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el){el.value='';el.placeholder='PIN на сервере';el.disabled=true;}
+  });
 }
 
 function copyAppLink(){
@@ -1726,7 +1720,9 @@ rtbl=function(){
 sd(0);
 
 var techs={};
+function __startTechsListener(){
 db.ref('cfg/techs').on('value',function(s){techs=s.val()||{};if(document.getElementById('techList'))renderTechList();});
+}
 
 function renderTechList(){
   var el=document.getElementById('techList');
@@ -2005,10 +2001,12 @@ function renderRouteStats(drv, date, totalMin, totalWeight, driveMin, unloadMin,
 }
 
 var vFilter='all', allVoiceMsgs={};
+function __startVoiceListener(){
 db.ref('voiceMessages').on('value', function(s){
   allVoiceMsgs = s.val() || {};
   if(document.getElementById('disp-vmsg-list')) renderDispVoiceMsgs();
 });
+}
 function setVFilter(f){
   vFilter = f;
   ['all','new','working','done'].forEach(function(x){
