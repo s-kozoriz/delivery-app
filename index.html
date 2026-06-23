@@ -1167,7 +1167,7 @@ function gm(){
       if(tdEl){tdEl.textContent=stats.driveMin?'🚗 '+fmtMin3(stats.driveMin):'';tdEl.style.display=stats.driveMin?'':'none';}
       if(tuEl){tuEl.textContent=stats.unloadMin?'📦 '+fmtMin3(stats.unloadMin):'';tuEl.style.display=stats.unloadMin?'':'none';}
       if(rsEl){
-        rsEl.textContent=stats.min?'⏱ '+fmtMin3(stats.min):'';
+        rsEl.textContent=stats.min?((stats.source==='approx'?'⏱≈ ':'⏱ ')+fmtMin3(stats.min)):'';
         rsEl.style.display=stats.min?'':'none';
         if(stats.detail){rsEl.title=stats.detail;rsEl.style.cursor='help';}
       }
@@ -1889,6 +1889,32 @@ function renderStat(){
 }
 
 var MAPS_KEY = 'AIzaSyC-B53Kk4QF9Sjf9dJr7lFQk8PhXLuHHBs';
+function _unloadMin(w){ if(!w||w<=20)return 15; if(w<=50)return 20; if(w<=100)return 25; if(w<=200)return 30; return 45; }
+function _fmtM(m){var h=Math.floor(m/60),mn=m%60;return h>0?(h+'ч '+(mn?mn+'мин':'')):mn+'мин';}
+var _geoCache={};try{_geoCache=JSON.parse(localStorage.getItem('geoCache')||'{}');}catch(e){}
+function _geoSave(){try{localStorage.setItem('geoCache',JSON.stringify(_geoCache));}catch(e){}}
+function _geocode(q){
+  if(_geoCache[q])return Promise.resolve(_geoCache[q]);
+  return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q))
+    .then(function(r){return r.json();})
+    .then(function(a){var c=(a&&a[0])?{lat:parseFloat(a[0].lat),lon:parseFloat(a[0].lon)}:null;if(c){_geoCache[q]=c;_geoSave();}return c;})
+    .catch(function(){return null;});
+}
+function _haversine(a,b){
+  if(!a||!b)return null;
+  var R=6371,toR=Math.PI/180;
+  var dLat=(b.lat-a.lat)*toR,dLon=(b.lon-a.lon)*toR,la1=a.lat*toR,la2=b.lat*toR;
+  var x=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+function _geocodeSeq(list){
+  return list.reduce(function(p,q){
+    return p.then(function(acc){
+      if(_geoCache[q]){acc.push(_geoCache[q]);return acc;}
+      return new Promise(function(res){setTimeout(res,1100);}).then(function(){return _geocode(q);}).then(function(c){acc.push(c);return acc;});
+    });
+  }, Promise.resolve([]));
+}
 function calcRouteTime(drv, date){
   var dr = rows.filter(function(r){
     return r.date===date && r.drv===drv && r.addr && r.addr.trim() && r.inRoute!==false;
@@ -1900,61 +1926,56 @@ function calcRouteTime(drv, date){
   });
   if(!dr.length){toast('Нет адресов для расчёта');return;}
   var startCity = (cfg.drivers&&cfg.drivers[drv]&&cfg.drivers[drv].startCity)||'Salzgitter, Germany';
-  var waypoints = dr.map(function(r){
-    return encodeURIComponent(r.addr+', '+r.city+', Germany');
-  });
-  var origin = encodeURIComponent(startCity);
-  // Маршрут з поверненням на базу: всі адреси як waypoints, кінцева = startCity
-  var destination = origin;
-  var wps = waypoints.join('|');
-  var url = 'https://maps.googleapis.com/maps/api/directions/json?origin='+origin
-    +'&destination='+destination
-    +'&waypoints=optimize:false|'+wps
-    +'&key='+MAPS_KEY+'&language=de';
+  // Розвантаження по вазі — ТОЧНЕ, рахується локально (карти не потрібні)
+  var unloadSecs=0, totalWeight=0;
+  dr.forEach(function(r){ var w=r.weight||0; totalWeight+=w; unloadSecs+=_unloadMin(w)*60; });
+  var unloadMin=Math.round(unloadSecs/60);
+  function showResult(source, driveMin, partial, legMinArr){
+    var ap=(source!=='google');
+    var totalMin=driveMin+unloadMin;
+    var lines=[];
+    dr.forEach(function(r,idx){
+      var w=r.weight||0;
+      var lm=(legMinArr&&legMinArr[idx]!=null)?(legMinArr[idx]+'мин → '):'';
+      lines.push((idx+1)+'. '+lm+(r.addr||'')+' ('+(w||'без веса')+(w?'кг':'')+', выгрузка '+_unloadMin(w)+'мин)');
+    });
+    var head = ap
+      ? '🚛 '+dname(drv)+': ≈'+_fmtM(totalMin)+'  ⚠ ПРИБЛИЗНО (Google недоступен'+(partial?', часть адресов не найдена':'')+')'
+      : '🚛 '+dname(drv)+': '+_fmtM(totalMin)+'  ✓ точно (Google)';
+    var detail = head+'\n'
+      + (ap?'Дорога ≈ ':'Дорога: ')+_fmtM(driveMin)+' · Выгрузка: '+_fmtM(unloadMin)+(totalWeight?' · '+totalWeight+'кг':'')+'\n\n'
+      + lines.join('\n')
+      + (ap?'\n\nℹ Дорога посчитана приблизно (по прямой ×1.4, OSM-геокодинг), т.к. Google не ответил. Выгрузка — точно по весу.':'');
+    toast('🚛 '+dname(drv)+': '+(ap?'≈':'')+_fmtM(totalMin)+' ('+(ap?'≈':'')+_fmtM(driveMin)+' дорога + '+_fmtM(unloadMin)+' выгрузка)'+(totalWeight?' · '+totalWeight+'кг':'')+(ap?'  ⚠ приблизно':''));
+    renderRouteStats(drv, date, totalMin, totalWeight, driveMin, unloadMin, detail, source);
+  }
+  function fallback(){
+    toast('Google недоступен — считаю дорогу приблизно…');
+    var pts=[startCity].concat(dr.map(function(r){return r.addr+', '+r.city+', Germany';})).concat([startCity]);
+    _geocodeSeq(pts).then(function(coords){
+      var km=0, missing=0;
+      for(var i=0;i<coords.length-1;i++){ var d=_haversine(coords[i],coords[i+1]); if(d==null){missing++;continue;} km+=d; }
+      var driveMin = km>0 ? Math.round(km*1.4/65*60) : 0;
+      showResult('approx', driveMin, missing>0 || km===0, null);
+    });
+  }
   toast('Считаем маршрут...');
+  var waypoints = dr.map(function(r){ return encodeURIComponent(r.addr+', '+r.city+', Germany'); });
+  var origin = encodeURIComponent(startCity);
+  var url = 'https://maps.googleapis.com/maps/api/directions/json?origin='+origin+'&destination='+origin+'&waypoints=optimize:false|'+waypoints.join('|')+'&key='+MAPS_KEY+'&language=de';
   fetch('https://lk-proxy.s-kozorizz.workers.dev/maps?url='+encodeURIComponent(url))
     .then(function(r){return r.json();})
     .then(function(data){
-      if(data.status!=='OK'){toast('Ошибка Maps: '+data.status);return;}
+      if(data.status!=='OK'){ fallback(); return; }
       var legs=data.routes[0].legs;
-      var driveSecs=0;
+      var driveSecs=0, legMinArr=[];
       legs.forEach(function(leg){driveSecs+=leg.duration.value;});
-      // Нові нормативи часу вивантаження по вазі
-      function unloadMinByWeight(w){
-        if(!w||w<=20)return 15;
-        if(w<=50)return 20;
-        if(w<=100)return 25;
-        if(w<=200)return 30;
-        return 45;
-      }
-      var unloadSecs=0;
-      var detailLines=[];
-      dr.forEach(function(r,idx){
-        var w=r.weight||0;
-        var unload=unloadMinByWeight(w);
-        unloadSecs+=unload*60;
-        // legs[idx] — дорога ВІД попередньої точки ДО r
-        var legMin=legs[idx]?Math.round(legs[idx].duration.value/60):0;
-        detailLines.push((idx+1)+'. '+legMin+'мин → '+(r.addr||'')+' ('+(w||'без веса')+(w?'кг':'')+', выгрузка '+unload+'мин)');
-      });
-      // legs[N] — повернення на базу
-      var returnLegMin=legs[legs.length-1]?Math.round(legs[legs.length-1].duration.value/60):0;
-      detailLines.push('↩ '+returnLegMin+'мин — возврат в '+(startCity.split(',')[0]));
-      var totalSecs=driveSecs+unloadSecs;
-      var totalMin=Math.round(totalSecs/60);
-      var driveMin=Math.round(driveSecs/60);
-      var unloadMin=Math.round(unloadSecs/60);
-      function fmtMin(m){var h=Math.floor(m/60),mn=m%60;return h>0?(h+'ч '+(mn?mn+'мин':'')):mn+'мин';}
-      var totalWeight=dr.reduce(function(s,r){return s+(r.weight||0);},0);
-      var detailText='🚛 '+dname(drv)+': '+fmtMin(totalMin)+'\n'
-        +'Дорога: '+fmtMin(driveMin)+' · Выгрузка: '+fmtMin(unloadMin)+(totalWeight?' · '+totalWeight+'кг':'')+'\n\n'
-        +detailLines.join('\n');
-      toast('🚛 '+dname(drv)+': '+fmtMin(totalMin)+' ('+fmtMin(driveMin)+' дорога + '+fmtMin(unloadMin)+' выгрузка)'+(totalWeight?' · '+totalWeight+'кг':''));
-      renderRouteStats(drv, date, totalMin, totalWeight, driveMin, unloadMin, detailText);
+      dr.forEach(function(r,idx){ legMinArr[idx]=legs[idx]?Math.round(legs[idx].duration.value/60):0; });
+      showResult('google', Math.round(driveSecs/60), false, legMinArr);
     })
-    .catch(function(err){toast('Ошибка: '+err.message);});
+    .catch(function(){ fallback(); });
 }
-function renderRouteStats(drv, date, totalMin, totalWeight, driveMin, unloadMin, detailText){
+function renderRouteStats(drv, date, totalMin, totalWeight, driveMin, unloadMin, detailText, source){
   function fmtMin2(m){var h=Math.floor(m/60),mn=m%60;return h>0?(h+'ч '+(mn?mn+'мин':'')):mn+'мин';}
   var timeStr=fmtMin2(totalMin);
   var wsEl=document.getElementById('ws_'+drv);
@@ -1971,7 +1992,7 @@ function renderRouteStats(drv, date, totalMin, totalWeight, driveMin, unloadMin,
     tuEl.style.display=unloadMin?'':'none';
   }
   if(rsEl){
-    rsEl.textContent=totalMin?'⏱ '+timeStr:'';
+    rsEl.textContent=totalMin?((source==='approx'?'⏱≈ ':'⏱ ')+timeStr):'';
     rsEl.style.display=totalMin?'':'none';
     if(detailText){
       rsEl.title=detailText;
@@ -1980,7 +2001,7 @@ function renderRouteStats(drv, date, totalMin, totalWeight, driveMin, unloadMin,
       rsEl.title='🚛 Всего: '+timeStr+'\nДорога: '+fmtMin2(driveMin)+'\nВыгрузка: '+fmtMin2(unloadMin);
     }
   }
-  db.ref('trips/stats_'+drv).set({min:totalMin,kg:totalWeight,date:date,ts:Date.now(),driveMin:driveMin||0,unloadMin:unloadMin||0,detail:detailText||''});
+  db.ref('trips/stats_'+drv).set({min:totalMin,kg:totalWeight,date:date,ts:Date.now(),driveMin:driveMin||0,unloadMin:unloadMin||0,detail:detailText||'',source:source||'google'});
 }
 
 var vFilter='all', allVoiceMsgs={};
