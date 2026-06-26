@@ -144,6 +144,9 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .wt-two .wt-main{width:auto;flex:1;font-size:15px;padding:14px 8px}
 .wt-main.pause{background:#e8902e}
 .wt-seglist{font-size:13px;color:#5a7060;margin:-6px 0 14px;line-height:1.7}
+.hdr-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.exit-btn{border:none;background:rgba(255,255,255,.16);color:#fff;border-radius:10px;padding:0 12px;height:36px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0}
+.exit-btn:active{background:rgba(255,255,255,.3)}
 .wt-panel{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:20px}
 .wt-panel.on{display:flex}
 .wt-panel-inner{background:#fff;width:100%;max-width:340px;border-radius:18px;padding:22px 20px;text-align:center;animation:wtPop .2s ease}
@@ -188,7 +191,10 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 <div class="hdr">
   <div class="hdr-top">
     <h1 id="dn">Лёша <span class="sync" id="sync"></span></h1>
-    <button class="wt-btn idle" id="wtBtn" onclick="openWtPanel()"><span class="wt-dot"></span>Смена</button>
+    <div class="hdr-actions">
+      <button class="wt-btn idle" id="wtBtn" onclick="openWtPanel()"><span class="wt-dot"></span>Смена</button>
+      <button class="exit-btn" onclick="wtLogout()">Выход</button>
+    </div>
   </div>
   <div class="nav">
     <button id="prev">&#8249;</button>
@@ -478,6 +484,7 @@ function renderWtPanel() {
       '<div class="wt-done-note">Правки — у диспетчера.</div>';
   }
 }
+function wtLogout() { if (confirm('Выйти и сменить вход?')) { firebase.auth().signOut().then(function () { location.replace('login.html'); }); } }
 function flushWtQueue() {
   Object.keys(wtQueue).forEach(function (date) {
     var val = wtQueue[date];
