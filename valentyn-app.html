@@ -126,15 +126,18 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .ppb{height:72px;border-radius:14px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:24px;font-weight:500;cursor:pointer}
 .ppb:active{background:rgba(255,255,255,.3)}
 /* WORKTIME (рабочее время) */
-.hdr-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.hdr-top h1{margin-bottom:0}
-.wt-btn{border:none;border-radius:12px;padding:8px 13px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;color:#fff;background:#e0922b;white-space:nowrap;flex-shrink:0;line-height:1.1}
-.wt-btn:active{transform:scale(.95)}
-.wt-btn.idle{background:#e0922b;animation:wtAttn 2.2s ease-in-out infinite}
-.wt-btn.run{background:#16a34a;animation:wtPulse 1.7s ease-in-out infinite}
-.wt-btn.done{background:rgba(255,255,255,.22);color:#fff;animation:none}
-@keyframes wtAttn{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(224,146,43,.55)}50%{transform:scale(1.05);box-shadow:0 0 0 7px rgba(224,146,43,0)}}
-@keyframes wtPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}70%{box-shadow:0 0 0 13px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hdr-top h1{margin-bottom:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wt-btn{border:none;border-radius:999px;padding:9px 15px;font-size:13.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px;color:#fff;white-space:nowrap;flex-shrink:0;line-height:1;background:rgba(255,255,255,.16);transition:background .2s}
+.wt-btn:active{transform:scale(.96)}
+.wt-dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex-shrink:0}
+.wt-btn.idle{background:#e8902e}
+.wt-btn.idle .wt-dot{animation:wtBlink 1.6s ease-in-out infinite}
+.wt-btn.run{background:#15a34a}
+.wt-btn.run .wt-dot{animation:wtBeat 1.4s ease-in-out infinite}
+.wt-btn.done{background:rgba(255,255,255,.2)}
+@keyframes wtBlink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes wtBeat{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.55);opacity:.6}}
 .wt-panel{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:20px}
 .wt-panel.on{display:flex}
 .wt-panel-inner{background:#fff;width:100%;max-width:340px;border-radius:18px;padding:22px 20px;text-align:center;animation:wtPop .2s ease}
@@ -179,7 +182,7 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 <div class="hdr">
   <div class="hdr-top">
     <h1 id="dn">Лёша <span class="sync" id="sync"></span></h1>
-    <button class="wt-btn idle" id="wtBtn" onclick="openWtPanel()">&#128336; Смена</button>
+    <button class="wt-btn idle" id="wtBtn" onclick="openWtPanel()"><span class="wt-dot"></span>Смена</button>
   </div>
   <div class="nav">
     <button id="prev">&#8249;</button>
@@ -381,13 +384,23 @@ function wtHours(rec) { if (!rec || !rec.start || !rec.end) return null; var d =
 function wtElapsed(rec) { if (!rec || !rec.start) return '0:00'; var n = new Date(); var d = (n.getHours() * 60 + n.getMinutes()) - hm(rec.start); if (d < 0) d += 1440; return Math.floor(d / 60) + ':' + String(d % 60).padStart(2, '0'); }
 function wtSet(patch) {
   var date = wtDate();
+  var prev = Object.assign({}, wtData[date]);
   var cur = Object.assign({}, wtData[date], wtQueue[date], patch);
   wtQueue[date] = cur; saveWtQueue();
   wtData[date] = Object.assign({}, wtData[date], patch);
   renderWtBtn();
   db.ref('worktime/' + DRV + '/' + date).update(patch).then(function () {
     if (wtQueue[date] && JSON.stringify(wtQueue[date]) === JSON.stringify(cur)) { delete wtQueue[date]; saveWtQueue(); }
-  }).catch(function () {});
+  }).catch(function () {
+    if (navigator.onLine) {
+      delete wtQueue[date]; saveWtQueue();
+      if (Object.keys(prev).length) wtData[date] = prev; else delete wtData[date];
+      renderWtBtn();
+      var wp = document.getElementById('wtPanel');
+      if (wp && wp.classList.contains('on')) { wtPanelMode = 'view'; renderWtPanel(); }
+      showToast('Не сохранилось — войдите своим логином водителя');
+    }
+  });
 }
 function flushWtQueue() {
   Object.keys(wtQueue).forEach(function (date) {
@@ -401,8 +414,8 @@ window.addEventListener('online', function () { setTimeout(flushWtQueue, 2500); 
 function renderWtBtn() {
   var b = document.getElementById('wtBtn'); if (!b) return;
   var rec = wtToday();
-  if (!rec.start) { b.className = 'wt-btn idle'; b.innerHTML = '&#128336; Смена'; }
-  else if (!rec.end) { b.className = 'wt-btn run'; b.innerHTML = '&#128994; ' + wtElapsed(rec); }
+  if (!rec.start) { b.className = 'wt-btn idle'; b.innerHTML = '<span class="wt-dot"></span>Смена'; }
+  else if (!rec.end) { b.className = 'wt-btn run'; b.innerHTML = '<span class="wt-dot"></span>' + wtElapsed(rec); }
   else { b.className = 'wt-btn done'; b.innerHTML = '&#10003; ' + wtHours(rec) + ' ч'; }
 }
 function openWtPanel() { wtPanelMode = 'view'; document.getElementById('wtPanel').classList.add('on'); renderWtPanel(); }
