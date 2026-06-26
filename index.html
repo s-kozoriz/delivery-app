@@ -135,6 +135,27 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .dg-5{border-left:4px solid #007a7a!important;background:#f0fafa}
 .dg-6{border-left:4px solid #4a4a4a!important;background:#f5f5f5}
 .date-group-hdr td{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px!important;border-bottom:none;border-top:2px solid currentColor}
+/* ТАБЕЛЬ */
+.tabel-soon{padding:24px 16px;text-align:center;color:#80786e;font-size:14px;line-height:1.5}
+.tabel-drv{border:1px solid #e3e8ee;border-radius:12px;margin:10px 12px;overflow:hidden}
+.tabel-drv-hd{display:flex;justify-content:space-between;align-items:center;background:#f6f8fb;padding:10px 14px;font-weight:700;font-size:15px;color:#1a2a3a}
+.tabel-total{color:#1a7a40;font-size:15px}
+.tabel-empty{padding:10px 14px;color:#9aa5b1;font-size:13px}
+.tabel-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid #eef1f5;font-size:14px}
+.tabel-d{width:54px;color:#5a6470;font-weight:600;flex-shrink:0}
+.tabel-t{flex:1;color:#1a2a3a}
+.tabel-h{width:62px;text-align:right;color:#1a7a40;font-weight:600;flex-shrink:0}
+.tabel-edit,.tabel-save,.tabel-cancel{border:none;background:#eef1f5;border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:15px;flex-shrink:0}
+.tabel-edit:active{background:#dde3ea}
+.tabel-save{background:#1a7a40;color:#fff}
+.tabel-cancel{background:#f6e3e3;color:#b00020}
+.tabel-inp{width:84px;border:1px solid #cdd6e0;border-radius:8px;padding:7px;font-size:14px;font-family:inherit}
+.tabel-inp-d{width:140px;border:1px solid #cdd6e0;border-radius:8px;padding:7px;font-size:13px;font-family:inherit}
+.tabel-row-edit{background:#fcfcf6;flex-wrap:wrap}
+.tabel-add{margin:8px 14px 12px;background:none;border:1px dashed #c7d0da;border-radius:10px;padding:9px;width:calc(100% - 28px);color:#5a6470;font-size:13px;cursor:pointer}
+.tabel-add:active{background:#f6f8fb}
+.tabel-seg{flex:1;border:1px solid #cdd6e0;background:#fff;border-radius:10px;padding:9px;font-size:14px;font-weight:600;color:#5a6470;cursor:pointer}
+.tabel-seg.on{background:#1a2a3a;color:#fff;border-color:#1a2a3a}
 </style>
 </head>
 <body>
@@ -178,6 +199,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <button class="tab" id="tabStat" onclick="sw('stat')">Статистика</button>
     <button class="tab" id="tabImport" onclick="sw('import')">Импорт</button>
     <button class="tab" id="tabVoice" onclick="sw('voice')">Сообщения</button>
+    <button class="tab" id="tabTabel" onclick="sw('tabel')">Табель</button>
     <button class="tab" id="tabCfg" onclick="sw('cfg')">Настройки</button>
   </div>
 </div>
@@ -338,6 +360,23 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 </div>
 
 
+<div id="ttab" style="display:none">
+  <div class="card">
+    <div class="ch">
+      <h2>Табель рабочего времени</h2>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-sm" onclick="tabelShift(-1)">&#8249;</button>
+        <span id="tabelMonthLbl" style="min-width:118px;text-align:center;font-weight:600"></span>
+        <button class="btn btn-sm" onclick="tabelShift(1)">&#8250;</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 12px 10px">
+      <button class="tabel-seg on" id="tabelSegDrv" onclick="tabelSeg('drv')">Водители</button>
+      <button class="tabel-seg" id="tabelSegLag" onclick="tabelSeg('lag')">Грузчики</button>
+    </div>
+    <div id="tabelBody"></div>
+  </div>
+</div>
 <div id="tvoice" style="display:none">
   <div class="card">
     <div class="ch">
@@ -511,6 +550,7 @@ var cfg={
 var CITIES=cfg.cities.slice();
 var CITIESC=cfg.citiesC?cfg.citiesC.slice():['Aurich','Wilhelmshaven','Varel'];
 var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRowId=null,newRowDraft=null,pinBuf='',viewOnly=false,disp2Mode=false,pinMode='dispatcher',_lastEdit=0;
+var wtAll={},tabelMonth='',tabelView='drv',tabelEdit=null;
 
 firebase.initializeApp({
   apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
@@ -545,6 +585,7 @@ db.ref('cfg').on('value',function(s){
 });
 db.ref('sent').on('value',function(s){sent=s.val()||{};gm();rh();});
 db.ref('trips').on('value',function(s){tripStatus=s.val()||{};gm();});
+db.ref('worktime').on('value',function(s){wtAll=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
 db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
 __startTechsListener();
@@ -1611,12 +1652,12 @@ function swCfg(name){
 }
 
 function sw(n){
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',import:'timp',voice:'tvoice'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',import:'timp',voice:'tvoice',tabel:'ttab'};
   Object.keys(tabMap).forEach(function(t){
     var el=document.getElementById(tabMap[t]);
     if(el)el.style.display=t===n?'':'none';
   });
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',import:'Импорт',voice:'Сообщения'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',import:'Импорт',voice:'Сообщения',tabel:'Табель'};
   document.querySelectorAll('.tab').forEach(function(b){
     b.classList.toggle('on',b.textContent.trim()===(nameMap[n]||''));
   });
@@ -1629,6 +1670,69 @@ function sw(n){
   if(n==='voice'){loadDispVoiceMsgs();}
   if(n==='cfg'){lcfg();swCfg('drivers');}
   if(n==='plan')loadNotes();
+  if(n==='tabel')renderTabel();
+}
+
+// ─── ТАБЕЛЬ рабочего времени ───────────────────────────────
+function wtHm(s){var p=(s||'0:0').split(':');return (parseInt(p[0],10)||0)*60+(parseInt(p[1],10)||0);}
+function wtHrs(rec){if(!rec||!rec.start||!rec.end)return null;var d=wtHm(rec.end)-wtHm(rec.start);if(d<0)d+=1440;return Math.round(d/6)/10;}
+function tabelMonthName(ym){var mn=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];var p=ym.split('-');return mn[(parseInt(p[1],10)||1)-1]+' '+p[0];}
+function tabelShift(d){var p=tabelMonth.split('-');var dt=new Date(parseInt(p[0],10),(parseInt(p[1],10)-1)+d,1);tabelMonth=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');tabelEdit=null;renderTabel();}
+function tabelSeg(s){tabelView=s;tabelEdit=null;renderTabel();}
+function tabelEditDay(k,d){tabelEdit={drv:k,date:d};renderTabel();}
+function tabelAddDay(k){tabelEdit={drv:k,nw:true};renderTabel();}
+function tabelCancel(){tabelEdit=null;renderTabel();}
+function tabelSave(k,isNew,d){
+  var date=isNew?document.getElementById('tabelNewDate').value:d;
+  if(!date){toast('Укажите дату');return;}
+  var start=document.getElementById('tabelES').value;
+  var end=document.getElementById('tabelEE').value;
+  db.ref('worktime/'+k+'/'+date).update({start:start||null,end:end||null}).then(function(){toast('Сохранено');});
+  tabelEdit=null;renderTabel();
+}
+function tabelRowEdit(k,d,start,end,isNew){
+  return '<div class="tabel-row tabel-row-edit">'+
+    (isNew?'<input type="date" id="tabelNewDate" class="tabel-inp-d" value="'+(d||isoD(0))+'">':'<span class="tabel-d">'+d.slice(8)+'.'+d.slice(5,7)+'</span>')+
+    '<input type="time" id="tabelES" class="tabel-inp" value="'+(start||'')+'">'+
+    '<input type="time" id="tabelEE" class="tabel-inp" value="'+(end||'')+'">'+
+    '<button class="tabel-save" onclick="tabelSave(\''+k+'\','+(isNew?'true':'false')+',\''+(d||'')+'\')">&#10003;</button>'+
+    '<button class="tabel-cancel" onclick="tabelCancel()">&#10005;</button>'+
+    '</div>';
+}
+function tabelRow(k,d,rec){
+  if(tabelEdit&&tabelEdit.drv===k&&tabelEdit.date===d&&!tabelEdit.nw)return tabelRowEdit(k,d,rec.start||'',rec.end||'',false);
+  var h=wtHrs(rec);
+  return '<div class="tabel-row">'+
+    '<span class="tabel-d">'+d.slice(8)+'.'+d.slice(5,7)+'</span>'+
+    '<span class="tabel-t">'+(rec.start||'—')+' – '+(rec.end||'—')+'</span>'+
+    '<span class="tabel-h">'+(h!=null?h+' ч':'')+'</span>'+
+    '<button class="tabel-edit" onclick="tabelEditDay(\''+k+'\',\''+d+'\')">&#9998;</button>'+
+    '</div>';
+}
+function renderTabel(){
+  if(!tabelMonth)tabelMonth=isoD(0).slice(0,7);
+  var lbl=document.getElementById('tabelMonthLbl');if(lbl)lbl.textContent=tabelMonthName(tabelMonth);
+  var segD=document.getElementById('tabelSegDrv'),segL=document.getElementById('tabelSegLag');
+  if(segD)segD.classList.toggle('on',tabelView==='drv');
+  if(segL)segL.classList.toggle('on',tabelView==='lag');
+  var body=document.getElementById('tabelBody');if(!body)return;
+  if(tabelView==='lag'){
+    body.innerHTML='<div class="tabel-soon">Грузчики появятся после отдельной настройки (свой PIN каждому). Сейчас доступны водители.</div>';
+    return;
+  }
+  var html='';
+  DRV_KEYS.forEach(function(k){
+    var nm=dname(k);if(!nm)return;
+    var days=wtAll[k]||{};
+    var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
+    var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
+    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span></div>';
+    if(!dates.length&&!(tabelEdit&&tabelEdit.drv===k&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
+    dates.forEach(function(d){html+=tabelRow(k,d,days[d]);});
+    if(tabelEdit&&tabelEdit.drv===k&&tabelEdit.nw)html+=tabelRowEdit(k,'','','',true);
+    html+='<button class="tabel-add" onclick="tabelAddDay(\''+k+'\')">+ добавить день</button></div>';
+  });
+  body.innerHTML=html||'<div class="tabel-soon">Нет водителей</div>';
 }
 
 function openEdit(id){

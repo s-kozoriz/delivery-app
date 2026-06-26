@@ -125,6 +125,37 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .pdot.on{background:#fff;border-color:#fff}
 .ppb{height:72px;border-radius:14px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:24px;font-weight:500;cursor:pointer}
 .ppb:active{background:rgba(255,255,255,.3)}
+/* WORKTIME (рабочее время) */
+.hdr-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hdr-top h1{margin-bottom:0}
+.wt-btn{border:none;border-radius:12px;padding:8px 13px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;color:#fff;background:#e0922b;white-space:nowrap;flex-shrink:0;line-height:1.1}
+.wt-btn:active{transform:scale(.95)}
+.wt-btn.idle{background:#e0922b;animation:wtAttn 2.2s ease-in-out infinite}
+.wt-btn.run{background:#16a34a;animation:wtPulse 1.7s ease-in-out infinite}
+.wt-btn.done{background:rgba(255,255,255,.22);color:#fff;animation:none}
+@keyframes wtAttn{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(224,146,43,.55)}50%{transform:scale(1.05);box-shadow:0 0 0 7px rgba(224,146,43,0)}}
+@keyframes wtPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}70%{box-shadow:0 0 0 13px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
+.wt-panel{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:20px}
+.wt-panel.on{display:flex}
+.wt-panel-inner{background:#fff;width:100%;max-width:340px;border-radius:18px;padding:22px 20px;text-align:center;animation:wtPop .2s ease}
+@keyframes wtPop{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+.wt-panel-title{font-size:13px;font-weight:600;color:#80786e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:14px}
+.wt-status{font-size:17px;color:#141a16;line-height:1.5;margin-bottom:18px}
+.wt-status b{font-size:22px;color:#1a7a40}
+.wt-main{width:100%;border:none;border-radius:14px;padding:16px;font-size:17px;font-weight:700;color:#fff;cursor:pointer}
+.wt-main.start{background:#16a34a}
+.wt-main.end{background:#d9342b}
+.wt-main:active{transform:scale(.98)}
+.wt-q{font-size:18px;font-weight:700;color:#141a16;margin-bottom:6px}
+.wt-qs{font-size:16px;color:#5a7060;line-height:1.5;margin-bottom:18px}
+.wt-qs b{font-size:22px;color:#1a7a40}
+.wt-qbtns{display:flex;gap:10px}
+.wt-cancel,.wt-yes{flex:1;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:700;cursor:pointer}
+.wt-cancel{background:#f0f0f0;color:#80786e}
+.wt-yes{background:#1a7a40;color:#fff}
+.wt-cancel:active,.wt-yes:active{transform:scale(.97)}
+.wt-done-note{font-size:12px;color:#80786e;margin-top:6px}
+.wt-close{margin-top:14px;background:none;border:none;color:#80786e;font-size:14px;cursor:pointer;padding:6px}
 </style>
 </head>
 <body>
@@ -146,7 +177,10 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 </div>
 <div id="driverApp" style="display:none">
 <div class="hdr">
-  <h1 id="dn">Лёша <span class="sync" id="sync"></span></h1>
+  <div class="hdr-top">
+    <h1 id="dn">Лёша <span class="sync" id="sync"></span></h1>
+    <button class="wt-btn idle" id="wtBtn" onclick="openWtPanel()">&#128336; Смена</button>
+  </div>
   <div class="nav">
     <button id="prev">&#8249;</button>
     <div class="lbl" id="dl">загрузка...</div>
@@ -181,6 +215,14 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 <input type="file" id="photoInputGallery" accept="image/*" style="display:none">
 
 <div class="toast" id="toast"></div>
+<!-- WORKTIME panel -->
+<div class="wt-panel" id="wtPanel" onclick="if(event.target===this)closeWtPanel()">
+  <div class="wt-panel-inner">
+    <div class="wt-panel-title">Рабочее время · сегодня</div>
+    <div id="wtPanelBody"></div>
+    <button class="wt-close" id="wtCloseBtn" onclick="closeWtPanel()">Закрыть</button>
+  </div>
+</div>
 <!-- FAB Add Task -->
 <button class="fab-add" id="fabAddTask" onclick="openAddSheet()" title="Добавить задание">+</button>
 
@@ -326,6 +368,82 @@ function updateTripUI() {
   if (data.end) txt += ' &nbsp; &#9632; вернулся ' + data.end;
   if (statusEl) statusEl.innerHTML = txt;
 }
+
+// ─── WORKTIME (рабочее время / смена) ───────────────────────────
+var wtData = {};                                              // {date:{start,end}} с сервера (worktime/DRV)
+var wtQueue = JSON.parse(localStorage.getItem('wtQueue_' + DRV) || '{}'); // оффлайн-очередь
+var wtPanelMode = 'view';
+function saveWtQueue() { localStorage.setItem('wtQueue_' + DRV, JSON.stringify(wtQueue)); }
+function wtDate() { return isoD(0); }                          // всегда сегодня, не зависит от просмотра маршрута
+function wtToday() { return Object.assign({}, wtData[wtDate()], wtQueue[wtDate()]); }
+function hm(s) { var p = (s || '0:0').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); }
+function wtHours(rec) { if (!rec || !rec.start || !rec.end) return null; var d = hm(rec.end) - hm(rec.start); if (d < 0) d += 1440; return Math.round(d / 6) / 10; }
+function wtElapsed(rec) { if (!rec || !rec.start) return '0:00'; var n = new Date(); var d = (n.getHours() * 60 + n.getMinutes()) - hm(rec.start); if (d < 0) d += 1440; return Math.floor(d / 60) + ':' + String(d % 60).padStart(2, '0'); }
+function wtSet(patch) {
+  var date = wtDate();
+  var cur = Object.assign({}, wtData[date], wtQueue[date], patch);
+  wtQueue[date] = cur; saveWtQueue();
+  wtData[date] = Object.assign({}, wtData[date], patch);
+  renderWtBtn();
+  db.ref('worktime/' + DRV + '/' + date).update(patch).then(function () {
+    if (wtQueue[date] && JSON.stringify(wtQueue[date]) === JSON.stringify(cur)) { delete wtQueue[date]; saveWtQueue(); }
+  }).catch(function () {});
+}
+function flushWtQueue() {
+  Object.keys(wtQueue).forEach(function (date) {
+    var val = wtQueue[date];
+    db.ref('worktime/' + DRV + '/' + date).update(val).then(function () {
+      if (wtQueue[date] && JSON.stringify(wtQueue[date]) === JSON.stringify(val)) { delete wtQueue[date]; saveWtQueue(); }
+    }).catch(function () {});
+  });
+}
+window.addEventListener('online', function () { setTimeout(flushWtQueue, 2500); });
+function renderWtBtn() {
+  var b = document.getElementById('wtBtn'); if (!b) return;
+  var rec = wtToday();
+  if (!rec.start) { b.className = 'wt-btn idle'; b.innerHTML = '&#128336; Смена'; }
+  else if (!rec.end) { b.className = 'wt-btn run'; b.innerHTML = '&#128994; ' + wtElapsed(rec); }
+  else { b.className = 'wt-btn done'; b.innerHTML = '&#10003; ' + wtHours(rec) + ' ч'; }
+}
+function openWtPanel() { wtPanelMode = 'view'; document.getElementById('wtPanel').classList.add('on'); renderWtPanel(); }
+function closeWtPanel() { document.getElementById('wtPanel').classList.remove('on'); }
+function wtAsk(which) { wtPanelMode = 'confirm' + which; renderWtPanel(); }
+function wtBack() { wtPanelMode = 'view'; renderWtPanel(); }
+function wtConfirmStart() { wtSet({ start: nowTime() }); wtPanelMode = 'view'; renderWtPanel(); if (navigator.vibrate) navigator.vibrate(60); }
+function wtConfirmEnd() { wtSet({ end: nowTime() }); wtPanelMode = 'view'; renderWtPanel(); if (navigator.vibrate) navigator.vibrate([60, 40, 60]); }
+function renderWtPanel() {
+  var box = document.getElementById('wtPanelBody'); if (!box) return;
+  var rec = wtToday();
+  var closeBtn = document.getElementById('wtCloseBtn');
+  if (wtPanelMode === 'confirmStart') {
+    if (closeBtn) closeBtn.style.display = 'none';
+    box.innerHTML = '<div class="wt-q">Начать смену?</div><div class="wt-qs">Сейчас <b>' + nowTime() + '</b></div>' +
+      '<div class="wt-qbtns"><button class="wt-cancel" onclick="wtBack()">Отмена</button><button class="wt-yes" onclick="wtConfirmStart()">Да</button></div>';
+    return;
+  }
+  if (wtPanelMode === 'confirmEnd') {
+    if (closeBtn) closeBtn.style.display = 'none';
+    var t = nowTime(); var h = wtHours(Object.assign({}, rec, { end: t }));
+    box.innerHTML = '<div class="wt-q">Завершить смену?</div><div class="wt-qs">' + rec.start + ' – ' + t + '<br><b>' + (h != null ? h + ' ч' : '') + '</b></div>' +
+      '<div class="wt-qbtns"><button class="wt-cancel" onclick="wtBack()">Отмена</button><button class="wt-yes" onclick="wtConfirmEnd()">Да</button></div>';
+    return;
+  }
+  if (closeBtn) closeBtn.style.display = '';
+  if (!rec.start) {
+    box.innerHTML = '<div class="wt-status">Смена ещё не начата</div><button class="wt-main start" onclick="wtAsk(\'Start\')">&#9654; Начать работу</button>';
+  } else if (!rec.end) {
+    box.innerHTML = '<div class="wt-status">Идёт смена с ' + rec.start + '<br><span id="wtElapsedTxt">' + wtElapsed(rec) + '</span></div><button class="wt-main end" onclick="wtAsk(\'End\')">&#9632; Завершить</button>';
+  } else {
+    box.innerHTML = '<div class="wt-status">Смена: ' + rec.start + ' – ' + rec.end + '<br><b>' + wtHours(rec) + ' ч</b> &#10003;</div><div class="wt-done-note">На сегодня всё. Правки — у диспетчера.</div>';
+  }
+}
+setInterval(function () {
+  var rec = wtToday();
+  if (rec.start && !rec.end) {
+    renderWtBtn();
+    var el = document.getElementById('wtElapsedTxt'); if (el) el.textContent = wtElapsed(rec);
+  }
+}, 30000);
 
 // PHOTO
 function triggerPhoto(rowId) {
@@ -717,6 +835,14 @@ db.ref('trips').on('value', function(snap) {
   tripData = snap.val() || {};
   updateTripUI();
 });
+
+db.ref('worktime/' + DRV).on('value', function(snap) {
+  wtData = snap.val() || {};
+  renderWtBtn();
+  if (document.getElementById('wtPanel') && document.getElementById('wtPanel').classList.contains('on')) renderWtPanel();
+});
+flushWtQueue();
+renderWtBtn();
 
 curD = isoD(0);
 render();
