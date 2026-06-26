@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a7a40">
+<title>Рабочее время — грузчик</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-size:15px;min-height:100vh}
+.hdr{background:#1a7a40;padding:18px 20px;position:sticky;top:0;z-index:10}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hdr-top h1{color:#fff;font-size:18px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exit-btn{border:none;background:rgba(255,255,255,.16);color:#fff;border-radius:10px;padding:0 12px;height:36px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0}
+.exit-btn:active{background:rgba(255,255,255,.3)}
+.sub{color:rgba(255,255,255,.85);font-size:12px;margin-top:8px}
+.main{padding:20px}
+.bigcard{background:#fff;border-radius:18px;border:2px solid #d8ede2;padding:26px 20px;text-align:center;max-width:440px;margin:10px auto}
+.bigcard .lbl{font-size:13px;color:#80786e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
+.bigcard .big{font-size:36px;font-weight:800;color:#1a7a40;margin-bottom:8px;line-height:1}
+.bigcard .segs{font-size:13px;color:#5a7060;line-height:1.8;margin-bottom:20px;min-height:18px}
+.act{width:100%;border:none;border-radius:14px;padding:17px;font-size:17px;font-weight:700;color:#fff;cursor:pointer}
+.act:active{transform:scale(.98)}
+.act.start{background:#16a34a}
+.act.pause{background:#e8902e}
+.act.end{background:#d9342b}
+.two{display:flex;gap:10px}
+.two .act{flex:1;font-size:15px;padding:15px 8px}
+.note{font-size:12px;color:#80786e;margin-top:14px}
+.wt-panel{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:20px}
+.wt-panel.on{display:flex}
+.wt-panel-inner{background:#fff;width:100%;max-width:340px;border-radius:18px;padding:22px 20px;text-align:center}
+.wt-q{font-size:18px;font-weight:700;color:#141a16;margin-bottom:6px}
+.wt-qs{font-size:16px;color:#5a7060;line-height:1.5;margin-bottom:18px}
+.wt-qs b{font-size:22px;color:#1a7a40}
+.wt-qbtns{display:flex;gap:10px}
+.wt-cancel,.wt-yes{flex:1;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:700;cursor:pointer}
+.wt-cancel{background:#f0f0f0;color:#80786e}
+.wt-yes{background:#1a7a40;color:#fff}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2a1e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:998;opacity:0;transition:.22s;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.loading{text-align:center;padding:80px 20px;color:#5a7060;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="loading" class="loading">Загрузка…</div>
+<div id="app" style="display:none">
+  <div class="hdr">
+    <div class="hdr-top">
+      <h1 id="who">Грузчик</h1>
+      <button class="exit-btn" onclick="lgLogout()">Выход</button>
+    </div>
+    <div class="sub" id="subDate"></div>
+  </div>
+  <div class="main"><div class="bigcard" id="card"></div></div>
+</div>
+<div class="wt-panel" id="wtPanel" onclick="if(event.target===this)closeWtPanel()">
+  <div class="wt-panel-inner"><div id="wtPanelBody"></div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script>
+firebase.initializeApp({ apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q', databaseURL:'https://lk-bauservice-bb872-default-rtdb.europe-west1.firebasedatabase.app', storageBucket:'lk-bauservice-bb872.firebasestorage.app', projectId:'lk-bauservice-bb872', appId:'1:704709078597:web:1e336d874a8cf524583d2c' });
+var db = firebase.database();
+var DRV = '';       // = lagerId грузчика
+var NAME = '';
+var wtData = {}, wtQueue = {}, wtPanelMode = 'view';
+
+function isoD(n){ var d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function nowTime(){ var d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function fmtDate(iso){ var d=new Date(iso+'T12:00:00'); var dn=['вс','пн','вт','ср','чт','пт','сб']; var mn=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']; return dn[d.getDay()]+', '+d.getDate()+' '+mn[d.getMonth()]; }
+function showToast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); setTimeout(function(){ t.classList.remove('on'); },2500); }
+function lgLogout(){ if(confirm('Выйти и сменить вход?')){ firebase.auth().signOut().then(function(){ location.replace('login.html'); }); } }
+
+function saveWtQueue(){ localStorage.setItem('wtQueue_'+DRV, JSON.stringify(wtQueue)); }
+function wtDate(){ return isoD(0); }
+function wtToday(){ return wtData[wtDate()] || wtQueue[wtDate()] || {}; }
+function wtClone(o){ return o?JSON.parse(JSON.stringify(o)):null; }
+function hm(s){ var p=(s||'0:0').split(':'); return (parseInt(p[0],10)||0)*60+(parseInt(p[1],10)||0); }
+function wtSegs(rec){ var s=rec&&rec.seg; if(!s)return[]; return Array.isArray(s)?s.slice():Object.keys(s).map(function(k){return s[k];}); }
+function wtOpenIdx(rec){ var L=wtSegs(rec); for(var i=L.length-1;i>=0;i--){ if(L[i]&&L[i].s&&!L[i].e) return i; } return -1; }
+function wtWorkedMin(rec,live){ var L=wtSegs(rec),total=0,nowM=null; for(var i=0;i<L.length;i++){ var g=L[i]; if(!g||!g.s)continue; if(g.e){ var d=hm(g.e)-hm(g.s); if(d<0)d+=1440; total+=d; } else if(live){ if(nowM==null){ var n=new Date(); nowM=n.getHours()*60+n.getMinutes(); } var d2=nowM-hm(g.s); if(d2<0)d2+=1440; total+=d2; } } return total; }
+function wtFmt(m){ return Math.floor(m/60)+':'+String(Math.round(m)%60).padStart(2,'0'); }
+function wtHoursDec(rec){ return Math.round(wtWorkedMin(rec,false)/6)/10; }
+function wtState(rec){ if(rec&&rec.done)return 'done'; if(wtOpenIdx(rec)>=0)return 'run'; if(wtSegs(rec).length)return 'pause'; return 'idle'; }
+function segLine(rec){ var L=wtSegs(rec); if(!L.length)return ''; return L.map(function(g){ return (g.s||'?')+'&#8211;'+(g.e||'…'); }).join(' &middot; '); }
+
+function wtMutate(fn){
+  var date=wtDate(); var prev=wtClone(wtData[date]); var rec=wtClone(wtData[date])||{}; fn(rec);
+  wtData[date]=rec; wtQueue[date]=rec; saveWtQueue(); renderCard();
+  db.ref('worktime/'+DRV+'/'+date).set(rec).then(function(){ if(wtQueue[date]&&JSON.stringify(wtQueue[date])===JSON.stringify(rec)){ delete wtQueue[date]; saveWtQueue(); } }).catch(function(){
+    if(navigator.onLine){ delete wtQueue[date]; saveWtQueue(); if(prev)wtData[date]=prev; else delete wtData[date]; renderCard(); showToast('Не сохранилось — войдите своим PIN'); }
+  });
+}
+function lgStart(){ wtMutate(function(rec){ var L=wtSegs(rec); L.push({s:nowTime()}); rec.seg=L; rec.done=null; }); if(navigator.vibrate)navigator.vibrate(60); }
+function lgPause(){ wtMutate(function(rec){ var L=wtSegs(rec); var i=wtOpenIdx(rec); if(i>=0)L[i].e=nowTime(); rec.seg=L; }); if(navigator.vibrate)navigator.vibrate(40); }
+function lgFinish(){ wtMutate(function(rec){ var L=wtSegs(rec); var i=wtOpenIdx(rec); if(i>=0)L[i].e=nowTime(); rec.seg=L; rec.done=true; }); if(navigator.vibrate)navigator.vibrate([60,40,60]); }
+
+function renderCard(){
+  var card=document.getElementById('card'); if(!card)return;
+  var rec=wtToday(); var st=wtState(rec); var w=wtWorkedMin(rec,true);
+  var h='';
+  if(st==='idle'){
+    h='<div class="lbl">Рабочее время &middot; сегодня</div><div class="big">0:00</div><div class="segs">смена ещё не начата</div><button class="act start" onclick="ask(\'start\')">&#9654; Начать работу</button>';
+  } else if(st==='run'){
+    h='<div class="lbl">Идёт смена</div><div class="big" id="bigW">'+wtFmt(w)+'</div><div class="segs">'+segLine(rec)+'</div><div class="two"><button class="act pause" onclick="lgPause()">&#9208; Перерыв</button><button class="act end" onclick="ask(\'finish\')">&#9209; Завершить день</button></div>';
+  } else if(st==='pause'){
+    h='<div class="lbl">Перерыв</div><div class="big">'+wtFmt(w)+'</div><div class="segs">'+segLine(rec)+'</div><div class="two"><button class="act start" onclick="ask(\'start\')">&#9654; Продолжить</button><button class="act end" onclick="ask(\'finish\')">&#9209; Завершить день</button></div>';
+  } else {
+    h='<div class="lbl">День завершён</div><div class="big">'+wtHoursDec(rec)+' ч &#10003;</div><div class="segs">'+segLine(rec)+'</div><button class="act start" onclick="ask(\'start\')">&#9654; Возобновить работу</button><div class="note">Правки — у диспетчера.</div>';
+  }
+  card.innerHTML=h;
+}
+function closeWtPanel(){ document.getElementById('wtPanel').classList.remove('on'); }
+function ask(m){
+  wtPanelMode=m; var rec=wtToday(); var box=document.getElementById('wtPanelBody');
+  if(m==='start'){ box.innerHTML='<div class="wt-q">Начать работу?</div><div class="wt-qs">Сейчас <b>'+nowTime()+'</b></div><div class="wt-qbtns"><button class="wt-cancel" onclick="closeWtPanel()">Отмена</button><button class="wt-yes" onclick="doStart()">Да</button></div>'; }
+  else { box.innerHTML='<div class="wt-q">Завершить день?</div><div class="wt-qs">Отработано <b>'+(Math.round(wtWorkedMin(rec,true)/6)/10)+' ч</b></div><div class="wt-qbtns"><button class="wt-cancel" onclick="closeWtPanel()">Отмена</button><button class="wt-yes" onclick="doFinish()">Да</button></div>'; }
+  document.getElementById('wtPanel').classList.add('on');
+}
+function doStart(){ closeWtPanel(); lgStart(); }
+function doFinish(){ closeWtPanel(); lgFinish(); }
+function flushWtQueue(){ Object.keys(wtQueue).forEach(function(date){ var val=wtQueue[date]; db.ref('worktime/'+DRV+'/'+date).set(val).then(function(){ if(wtQueue[date]&&JSON.stringify(wtQueue[date])===JSON.stringify(val)){ delete wtQueue[date]; saveWtQueue(); } }).catch(function(){}); }); }
+window.addEventListener('online', function(){ setTimeout(flushWtQueue, 2500); });
+setInterval(function(){ var rec=wtToday(); if(wtState(rec)==='run'){ var el=document.getElementById('bigW'); if(el)el.textContent=wtFmt(wtWorkedMin(rec,true)); } }, 30000);
+
+function startLager(){
+  wtQueue = JSON.parse(localStorage.getItem('wtQueue_'+DRV) || '{}');
+  document.getElementById('who').textContent = NAME || 'Грузчик';
+  document.getElementById('subDate').textContent = fmtDate(isoD(0));
+  db.ref('worktime/'+DRV).on('value', function(snap){ wtData = snap.val() || {}; renderCard(); });
+  flushWtQueue();
+  renderCard();
+}
+
+firebase.auth().onAuthStateChanged(function(user){
+  if(!user){ location.replace('login.html'); return; }
+  user.getIdTokenResult().then(function(res){
+    var c = res.claims || {};
+    if(c.role !== 'loader' || !c.lagerId){
+      document.getElementById('loading').innerHTML = 'Этот вход не для грузчика.<br><br><button class="exit-btn" style="background:#1a7a40" onclick="lgLogout()">Сменить вход</button>';
+      return;
+    }
+    DRV = c.lagerId; NAME = c.name || '';
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = '';
+    startLager();
+  });
+});
+</script>
+</body>
+</html>

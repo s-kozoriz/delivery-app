@@ -163,6 +163,10 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .tabel-addseg{border:1px dashed #c7d0da;background:none;border-radius:8px;padding:9px 12px;color:#5a6470;font-size:13px;cursor:pointer;white-space:nowrap}
 .tabel-savebig{flex:1;border:none;background:#1a7a40;color:#fff;border-radius:10px;padding:11px;font-size:14px;font-weight:600;cursor:pointer}
 .tabel-open{font-size:11px;color:#15a34a;font-weight:600;margin-left:6px;background:#e6f5ec;padding:1px 6px;border-radius:5px}
+.lag-meta{display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:13px;color:#5a6470;border-top:1px solid #eef1f5;flex-wrap:wrap}
+.lag-edit,.lag-del{border:none;background:#eef1f5;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;color:#5a6470}
+.lag-del{background:#f6e3e3;color:#b00020}
+.lag-addbtn{display:block;width:calc(100% - 24px);margin:12px;background:#1a2a3a;color:#fff;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
@@ -558,7 +562,7 @@ var cfg={
 var CITIES=cfg.cities.slice();
 var CITIESC=cfg.citiesC?cfg.citiesC.slice():['Aurich','Wilhelmshaven','Varel'];
 var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRowId=null,newRowDraft=null,pinBuf='',viewOnly=false,disp2Mode=false,pinMode='dispatcher',_lastEdit=0;
-var wtAll={},tabelMonth='',tabelView='drv',tabelEdit=null;
+var wtAll={},tabelMonth='',tabelView='drv',tabelEdit=null,lagerStaff={};
 
 firebase.initializeApp({
   apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
@@ -594,6 +598,7 @@ db.ref('cfg').on('value',function(s){
 db.ref('sent').on('value',function(s){sent=s.val()||{};gm();rh();});
 db.ref('trips').on('value',function(s){tripStatus=s.val()||{};gm();});
 db.ref('worktime').on('value',function(s){wtAll=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
+db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none'&&tabelView==='lag')renderTabel();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
 db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
 __startTechsListener();
@@ -1732,7 +1737,7 @@ function renderTabel(){
   if(segD)segD.classList.toggle('on',tabelView==='drv');
   if(segL)segL.classList.toggle('on',tabelView==='lag');
   var body=document.getElementById('tabelBody');if(!body)return;
-  if(tabelView==='lag'){body.innerHTML='<div class="tabel-soon">Грузчики появятся после отдельной настройки (свой PIN каждому). Сейчас доступны водители.</div>';return;}
+  if(tabelView==='lag'){body.innerHTML=renderTabelLag();return;}
   var html='';
   DRV_KEYS.forEach(function(k){
     var nm=dname(k);if(!nm)return;
@@ -1749,6 +1754,44 @@ function renderTabel(){
     html+='<button class="tabel-add" onclick="tabelAddDay(\''+k+'\')">+ добавить день</button></div>';
   });
   body.innerHTML=html||'<div class="tabel-soon">Нет водителей</div>';
+}
+
+function renderTabelLag(){
+  var html='';var ids=Object.keys(lagerStaff);
+  ids.forEach(function(id){
+    var st=lagerStaff[id]||{};var nm=st.name||'без имени';
+    var days=wtAll[id]||{};
+    var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
+    var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
+    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span></div>';
+    html+='<div class="lag-meta">PIN: '+xe(String(st.pin||'—'))+'<button class="lag-edit" onclick="tabelEditLoader(\''+id+'\')">изменить</button><button class="lag-del" onclick="tabelDelLoader(\''+id+'\')">удалить</button></div>';
+    if(!dates.length&&!(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
+    dates.forEach(function(d){if(tabelEdit&&tabelEdit.drv===id&&!tabelEdit.nw&&tabelEdit.date===d)html+=tabelEditForm();else html+=tabelRow(id,d,days[d]);});
+    if(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw)html+=tabelEditForm();
+    html+='<button class="tabel-add" onclick="tabelAddDay(\''+id+'\')">+ добавить день</button></div>';
+  });
+  html+='<button class="lag-addbtn" onclick="tabelAddLoader()">+ добавить грузчика</button>';
+  return html;
+}
+function tabelLagDup(pin,exceptId){return Object.keys(lagerStaff).some(function(x){return x!==exceptId&&String((lagerStaff[x]||{}).pin)===pin;});}
+function tabelAddLoader(){
+  var name=prompt('Имя грузчика:');if(name===null)return;name=name.trim();if(!name){toast('Имя пустое');return;}
+  var pin=prompt('PIN для входа (4 цифры):');if(pin===null)return;pin=String(pin).trim();if(!/^\d{4}$/.test(pin)){toast('PIN — 4 цифры');return;}
+  if(tabelLagDup(pin,null)){toast('Такой PIN уже у другого грузчика');return;}
+  var id='lg'+Date.now().toString(36);
+  db.ref('lager_staff/'+id).set({name:name,pin:pin}).then(function(){toast('Грузчик добавлен');});
+}
+function tabelEditLoader(id){
+  var st=lagerStaff[id]||{};
+  var name=prompt('Имя грузчика:',st.name||'');if(name===null)return;name=name.trim();if(!name){toast('Имя пустое');return;}
+  var pin=prompt('PIN для входа (4 цифры):',st.pin||'');if(pin===null)return;pin=String(pin).trim();if(!/^\d{4}$/.test(pin)){toast('PIN — 4 цифры');return;}
+  if(tabelLagDup(pin,id)){toast('Такой PIN уже у другого грузчика');return;}
+  db.ref('lager_staff/'+id).update({name:name,pin:pin}).then(function(){toast('Сохранено');});
+}
+function tabelDelLoader(id){
+  var st=lagerStaff[id]||{};
+  if(!confirm('Удалить грузчика '+(st.name||'')+'? Отметки времени в базе останутся.'))return;
+  db.ref('lager_staff/'+id).remove().then(function(){toast('Удалён');});
 }
 
 function openEdit(id){
