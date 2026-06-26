@@ -156,6 +156,13 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .tabel-add:active{background:#f6f8fb}
 .tabel-seg{flex:1;border:1px solid #cdd6e0;background:#fff;border-radius:10px;padding:9px;font-size:14px;font-weight:600;color:#5a6470;cursor:pointer}
 .tabel-seg.on{background:#1a2a3a;color:#fff;border-color:#1a2a3a}
+.tabel-segedit{display:flex;align-items:center;gap:8px;padding:6px 14px}
+.tabel-dash{color:#9aa5b1}
+.tabel-segdel{border:none;background:#f6e3e3;color:#b00020;border-radius:8px;width:32px;height:32px;cursor:pointer;flex-shrink:0;font-size:13px}
+.tabel-editbtns{display:flex;align-items:center;gap:8px;padding:8px 14px 12px}
+.tabel-addseg{border:1px dashed #c7d0da;background:none;border-radius:8px;padding:9px 12px;color:#5a6470;font-size:13px;cursor:pointer;white-space:nowrap}
+.tabel-savebig{flex:1;border:none;background:#1a7a40;color:#fff;border-radius:10px;padding:11px;font-size:14px;font-weight:600;cursor:pointer}
+.tabel-open{font-size:11px;color:#15a34a;font-weight:600;margin-left:6px;background:#e6f5ec;padding:1px 6px;border-radius:5px}
 </style>
 </head>
 <body>
@@ -1673,41 +1680,48 @@ function sw(n){
   if(n==='tabel')renderTabel();
 }
 
-// ─── ТАБЕЛЬ рабочего времени ───────────────────────────────
+// ─── ТАБЕЛЬ рабочего времени (сегменты) ─────────────────────
 function wtHm(s){var p=(s||'0:0').split(':');return (parseInt(p[0],10)||0)*60+(parseInt(p[1],10)||0);}
-function wtHrs(rec){if(!rec||!rec.start||!rec.end)return null;var d=wtHm(rec.end)-wtHm(rec.start);if(d<0)d+=1440;return Math.round(d/6)/10;}
+function tSegs(rec){var s=rec&&rec.seg;if(!s){if(rec&&rec.start)return [{s:rec.start,e:rec.end||''}];return [];}return Array.isArray(s)?s.slice():Object.keys(s).map(function(k){return s[k];});}
+function tWorked(rec){var L=tSegs(rec),t=0;L.forEach(function(g){if(g&&g.s&&g.e){var d=wtHm(g.e)-wtHm(g.s);if(d<0)d+=1440;t+=d;}});return t;}
+function wtHrs(rec){var L=tSegs(rec);if(!L.length)return null;return Math.round(tWorked(rec)/6)/10;}
 function tabelMonthName(ym){var mn=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];var p=ym.split('-');return mn[(parseInt(p[1],10)||1)-1]+' '+p[0];}
 function tabelShift(d){var p=tabelMonth.split('-');var dt=new Date(parseInt(p[0],10),(parseInt(p[1],10)-1)+d,1);tabelMonth=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');tabelEdit=null;renderTabel();}
 function tabelSeg(s){tabelView=s;tabelEdit=null;renderTabel();}
-function tabelEditDay(k,d){tabelEdit={drv:k,date:d};renderTabel();}
-function tabelAddDay(k){tabelEdit={drv:k,nw:true};renderTabel();}
+var tabelEditSegs=[],tabelEditDone=false,tabelEditDate='';
+function tabelEditDay(k,d){var rec=(wtAll[k]||{})[d]||{};tabelEdit={drv:k,date:d};tabelEditSegs=tSegs(rec).map(function(g){return {s:g.s||'',e:g.e||''};});if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];tabelEditDone=!!rec.done;tabelEditDate=d;renderTabel();}
+function tabelAddDay(k){tabelEdit={drv:k,nw:true};tabelEditSegs=[{s:'',e:''}];tabelEditDone=false;tabelEditDate=isoD(0);renderTabel();}
 function tabelCancel(){tabelEdit=null;renderTabel();}
-function tabelSave(k,isNew,d){
-  var date=isNew?document.getElementById('tabelNewDate').value:d;
-  if(!date){toast('Укажите дату');return;}
-  var start=document.getElementById('tabelES').value;
-  var end=document.getElementById('tabelEE').value;
-  db.ref('worktime/'+k+'/'+date).update({start:start||null,end:end||null}).then(function(){toast('Сохранено');});
+function tabelReadInputs(){tabelEditSegs.forEach(function(g,i){var es=document.getElementById('tseg_s_'+i),ee=document.getElementById('tseg_e_'+i);if(es)g.s=es.value;if(ee)g.e=ee.value;});var dt=document.getElementById('tabelNewDate');if(dt)tabelEditDate=dt.value;}
+function tabelAddSeg(){tabelReadInputs();tabelEditSegs.push({s:'',e:''});renderTabel();}
+function tabelDelSeg(i){tabelReadInputs();tabelEditSegs.splice(i,1);if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];renderTabel();}
+function tabelSave(){
+  tabelReadInputs();
+  var k=tabelEdit.drv,d=tabelEditDate;
+  if(!d){toast('Укажите дату');return;}
+  var segs=tabelEditSegs.filter(function(g){return g.s;}).map(function(g){return g.e?{s:g.s,e:g.e}:{s:g.s};});
+  if(!segs.length){db.ref('worktime/'+k+'/'+d).remove().then(function(){toast('Удалено');});}
+  else{var rec={seg:segs};if(tabelEditDone)rec.done=true;db.ref('worktime/'+k+'/'+d).set(rec).then(function(){toast('Сохранено');});}
   tabelEdit=null;renderTabel();
 }
-function tabelRowEdit(k,d,start,end,isNew){
-  return '<div class="tabel-row tabel-row-edit">'+
-    (isNew?'<input type="date" id="tabelNewDate" class="tabel-inp-d" value="'+(d||isoD(0))+'">':'<span class="tabel-d">'+d.slice(8)+'.'+d.slice(5,7)+'</span>')+
-    '<input type="time" id="tabelES" class="tabel-inp" value="'+(start||'')+'">'+
-    '<input type="time" id="tabelEE" class="tabel-inp" value="'+(end||'')+'">'+
-    '<button class="tabel-save" onclick="tabelSave(\''+k+'\','+(isNew?'true':'false')+',\''+(d||'')+'\')">&#10003;</button>'+
-    '<button class="tabel-cancel" onclick="tabelCancel()">&#10005;</button>'+
-    '</div>';
+function tabelEditForm(){
+  var h='<div class="tabel-row tabel-row-edit">';
+  if(tabelEdit.nw)h+='<input type="date" id="tabelNewDate" class="tabel-inp-d" value="'+tabelEditDate+'"><span style="color:#9aa5b1;font-size:12px">новый день</span>';
+  else h+='<span class="tabel-d">'+tabelEditDate.slice(8)+'.'+tabelEditDate.slice(5,7)+'</span><span style="color:#9aa5b1;font-size:12px">правка отрезков</span>';
+  h+='</div>';
+  tabelEditSegs.forEach(function(g,i){
+    h+='<div class="tabel-segedit"><input type="time" id="tseg_s_'+i+'" class="tabel-inp" value="'+(g.s||'')+'"><span class="tabel-dash">&#8211;</span><input type="time" id="tseg_e_'+i+'" class="tabel-inp" value="'+(g.e||'')+'"><button class="tabel-segdel" onclick="tabelDelSeg('+i+')">&#10005;</button></div>';
+  });
+  h+='<div class="tabel-editbtns"><button class="tabel-addseg" onclick="tabelAddSeg()">+ отрезок</button><button class="tabel-cancel" onclick="tabelCancel()">&#10005;</button><button class="tabel-savebig" onclick="tabelSave()">Сохранить</button></div>';
+  return h;
 }
 function tabelRow(k,d,rec){
-  if(tabelEdit&&tabelEdit.drv===k&&tabelEdit.date===d&&!tabelEdit.nw)return tabelRowEdit(k,d,rec.start||'',rec.end||'',false);
-  var h=wtHrs(rec);
-  return '<div class="tabel-row">'+
-    '<span class="tabel-d">'+d.slice(8)+'.'+d.slice(5,7)+'</span>'+
-    '<span class="tabel-t">'+(rec.start||'—')+' – '+(rec.end||'—')+'</span>'+
+  var L=tSegs(rec);var h=wtHrs(rec);var open=L.some(function(g){return g&&g.s&&!g.e;});
+  var segtxt=L.map(function(g){return (g.s||'?')+'&#8211;'+(g.e||'…');}).join(', ');
+  return '<div class="tabel-row"><span class="tabel-d">'+d.slice(8)+'.'+d.slice(5,7)+'</span>'+
+    '<span class="tabel-t">'+(segtxt||'—')+(open?'<span class="tabel-open">идёт</span>':'')+'</span>'+
     '<span class="tabel-h">'+(h!=null?h+' ч':'')+'</span>'+
-    '<button class="tabel-edit" onclick="tabelEditDay(\''+k+'\',\''+d+'\')">&#9998;</button>'+
-    '</div>';
+    '<button class="tabel-edit" onclick="tabelEditDay(\''+k+'\',\''+d+'\')">&#9998;</button></div>';
 }
 function renderTabel(){
   if(!tabelMonth)tabelMonth=isoD(0).slice(0,7);
@@ -1716,10 +1730,7 @@ function renderTabel(){
   if(segD)segD.classList.toggle('on',tabelView==='drv');
   if(segL)segL.classList.toggle('on',tabelView==='lag');
   var body=document.getElementById('tabelBody');if(!body)return;
-  if(tabelView==='lag'){
-    body.innerHTML='<div class="tabel-soon">Грузчики появятся после отдельной настройки (свой PIN каждому). Сейчас доступны водители.</div>';
-    return;
-  }
+  if(tabelView==='lag'){body.innerHTML='<div class="tabel-soon">Грузчики появятся после отдельной настройки (свой PIN каждому). Сейчас доступны водители.</div>';return;}
   var html='';
   DRV_KEYS.forEach(function(k){
     var nm=dname(k);if(!nm)return;
@@ -1728,8 +1739,11 @@ function renderTabel(){
     var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
     html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span></div>';
     if(!dates.length&&!(tabelEdit&&tabelEdit.drv===k&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
-    dates.forEach(function(d){html+=tabelRow(k,d,days[d]);});
-    if(tabelEdit&&tabelEdit.drv===k&&tabelEdit.nw)html+=tabelRowEdit(k,'','','',true);
+    dates.forEach(function(d){
+      if(tabelEdit&&tabelEdit.drv===k&&!tabelEdit.nw&&tabelEdit.date===d)html+=tabelEditForm();
+      else html+=tabelRow(k,d,days[d]);
+    });
+    if(tabelEdit&&tabelEdit.drv===k&&tabelEdit.nw)html+=tabelEditForm();
     html+='<button class="tabel-add" onclick="tabelAddDay(\''+k+'\')">+ добавить день</button></div>';
   });
   body.innerHTML=html||'<div class="tabel-soon">Нет водителей</div>';
