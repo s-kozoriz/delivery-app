@@ -167,6 +167,18 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .lag-edit,.lag-del{border:none;background:#eef1f5;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;color:#5a6470}
 .lag-del{background:#f6e3e3;color:#b00020}
 .lag-addbtn{display:block;width:calc(100% - 24px);margin:12px;background:#1a2a3a;color:#fff;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer}
+.live-row{display:flex;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid #eef1f5;font-size:14px}
+.live-row:first-child{border-top:none}
+.live-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;background:#c4ccd4}
+.live-run .live-dot{background:#15a34a;animation:liveBeat 1.4s ease-in-out infinite}
+.live-pause .live-dot{background:#e8902e}
+.live-done .live-dot{background:#9aa5b1}
+@keyframes liveBeat{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.55}}
+.live-nm{font-weight:600;color:#1a2a3a;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.live-info{font-size:13px;color:#5a6470;flex-shrink:0}
+.live-run .live-info b{color:#15a34a}
+.live-row.live-run{background:#f3fbf6}
+.live-row.live-idle .live-nm{color:#9aa5b1}
 </style>
 </head>
 <body>
@@ -374,6 +386,10 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 
 <div id="ttab" style="display:none">
   <div class="card">
+    <div class="ch"><h2>Сейчас на смене</h2></div>
+    <div id="liveBoard"></div>
+  </div>
+  <div class="card">
     <div class="ch">
       <h2>Табель рабочего времени</h2>
       <div style="display:flex;gap:6px;align-items:center">
@@ -562,7 +578,7 @@ var cfg={
 var CITIES=cfg.cities.slice();
 var CITIESC=cfg.citiesC?cfg.citiesC.slice():['Aurich','Wilhelmshaven','Varel'];
 var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRowId=null,newRowDraft=null,pinBuf='',viewOnly=false,disp2Mode=false,pinMode='dispatcher',_lastEdit=0;
-var wtAll={},tabelMonth='',tabelView='drv',tabelEdit=null,lagerStaff={};
+var wtAll={},tabelMonth='',tabelView='drv',tabelEdit=null,lagerStaff={},wtDenied=false;
 
 firebase.initializeApp({
   apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
@@ -597,8 +613,8 @@ db.ref('cfg').on('value',function(s){
 });
 db.ref('sent').on('value',function(s){sent=s.val()||{};gm();rh();});
 db.ref('trips').on('value',function(s){tripStatus=s.val()||{};gm();});
-db.ref('worktime').on('value',function(s){wtAll=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
-db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none'&&tabelView==='lag')renderTabel();});
+db.ref('worktime').on('value',function(s){wtAll=s.val()||{};wtDenied=false;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
+db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
 db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
 __startTechsListener();
@@ -1730,13 +1746,41 @@ function tabelRow(k,d,rec){
     '<span class="tabel-h">'+(h!=null?h+' ч':'')+'</span>'+
     '<button class="tabel-edit" onclick="tabelEditDay(\''+k+'\',\''+d+'\')">&#9998;</button></div>';
 }
+function liveOpenIdx(rec){var L=tSegs(rec);for(var i=L.length-1;i>=0;i--){if(L[i]&&L[i].s&&!L[i].e)return i;}return -1;}
+function liveState(rec){if(rec&&rec.done)return 'done';if(liveOpenIdx(rec)>=0)return 'run';if(tSegs(rec).length)return 'pause';return 'idle';}
+function liveWorkedMin(rec,live){var L=tSegs(rec),t=0,nowM=null;for(var i=0;i<L.length;i++){var g=L[i];if(!g||!g.s)continue;if(g.e){var d=wtHm(g.e)-wtHm(g.s);if(d<0)d+=1440;t+=d;}else if(live){if(nowM==null){var n=new Date();nowM=n.getHours()*60+n.getMinutes();}var d2=nowM-wtHm(g.s);if(d2<0)d2+=1440;t+=d2;}}return t;}
+function liveFmt(m){return Math.floor(m/60)+':'+String(Math.round(m)%60).padStart(2,'0');}
+function liveStart(rec){var L=tSegs(rec);return (L.length&&L[0].s)?L[0].s:'';}
+function renderLiveBoard(){
+  var el=document.getElementById('liveBoard');if(!el)return;
+  if(wtDenied){el.innerHTML='<div class="tabel-soon">Доступно только в главном входе (Zentrum).</div>';return;}
+  var today=isoD(0);var list=[];
+  DRV_KEYS.forEach(function(k){var nm=dname(k);if(nm)list.push({id:k,name:nm});});
+  Object.keys(lagerStaff).forEach(function(id){list.push({id:id,name:(lagerStaff[id]||{}).name||'грузчик'});});
+  var items=list.map(function(r){var rec=(wtAll[r.id]||{})[today]||{};return {name:r.name,st:liveState(rec),rec:rec};});
+  var order={run:0,pause:1,done:2,idle:3};
+  items.sort(function(a,b){return (order[a.st]-order[b.st])||a.name.localeCompare(b.name);});
+  var html='';
+  items.forEach(function(it){
+    var w=liveWorkedMin(it.rec,true);var info,cls;
+    if(it.st==='run'){cls='live-run';info='с '+liveStart(it.rec)+' &middot; идёт <b>'+liveFmt(w)+'</b>';}
+    else if(it.st==='pause'){cls='live-pause';info='перерыв &middot; '+liveFmt(w);}
+    else if(it.st==='done'){cls='live-done';info='завершил &middot; '+(Math.round(w/6)/10)+' ч';}
+    else{cls='live-idle';info='не на смене';}
+    html+='<div class="live-row '+cls+'"><span class="live-dot"></span><span class="live-nm">'+xe(it.name)+'</span><span class="live-info">'+info+'</span></div>';
+  });
+  el.innerHTML=html||'<div class="tabel-empty">нет сотрудников</div>';
+}
+setInterval(function(){var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderLiveBoard();},30000);
 function renderTabel(){
   if(!tabelMonth)tabelMonth=isoD(0).slice(0,7);
   var lbl=document.getElementById('tabelMonthLbl');if(lbl)lbl.textContent=tabelMonthName(tabelMonth);
   var segD=document.getElementById('tabelSegDrv'),segL=document.getElementById('tabelSegLag');
   if(segD)segD.classList.toggle('on',tabelView==='drv');
   if(segL)segL.classList.toggle('on',tabelView==='lag');
+  renderLiveBoard();
   var body=document.getElementById('tabelBody');if(!body)return;
+  if(wtDenied){body.innerHTML='<div class="tabel-soon">Табель и список доступны только в главном входе (Zentrum). Сейчас вход как второй диспетчер.</div>';return;}
   if(tabelView==='lag'){body.innerHTML=renderTabelLag();return;}
   var html='';
   DRV_KEYS.forEach(function(k){
@@ -1779,19 +1823,19 @@ function tabelAddLoader(){
   var pin=prompt('PIN для входа (4 цифры):');if(pin===null)return;pin=String(pin).trim();if(!/^\d{4}$/.test(pin)){toast('PIN — 4 цифры');return;}
   if(tabelLagDup(pin,null)){toast('Такой PIN уже у другого грузчика');return;}
   var id='lg'+Date.now().toString(36);
-  db.ref('lager_staff/'+id).set({name:name,pin:pin}).then(function(){toast('Грузчик добавлен');});
+  db.ref('lager_staff/'+id).set({name:name,pin:pin}).then(function(){toast('Грузчик добавлен');}).catch(function(){toast('Нет прав. Войдите главным диспетчером (Zentrum).');});
 }
 function tabelEditLoader(id){
   var st=lagerStaff[id]||{};
   var name=prompt('Имя грузчика:',st.name||'');if(name===null)return;name=name.trim();if(!name){toast('Имя пустое');return;}
   var pin=prompt('PIN для входа (4 цифры):',st.pin||'');if(pin===null)return;pin=String(pin).trim();if(!/^\d{4}$/.test(pin)){toast('PIN — 4 цифры');return;}
   if(tabelLagDup(pin,id)){toast('Такой PIN уже у другого грузчика');return;}
-  db.ref('lager_staff/'+id).update({name:name,pin:pin}).then(function(){toast('Сохранено');});
+  db.ref('lager_staff/'+id).update({name:name,pin:pin}).then(function(){toast('Сохранено');}).catch(function(){toast('Нет прав. Войдите главным диспетчером (Zentrum).');});
 }
 function tabelDelLoader(id){
   var st=lagerStaff[id]||{};
   if(!confirm('Удалить грузчика '+(st.name||'')+'? Отметки времени в базе останутся.'))return;
-  db.ref('lager_staff/'+id).remove().then(function(){toast('Удалён');});
+  db.ref('lager_staff/'+id).remove().then(function(){toast('Удалён');}).catch(function(){toast('Нет прав. Войдите главным диспетчером (Zentrum).');});
 }
 
 function openEdit(id){
