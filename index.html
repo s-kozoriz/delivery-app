@@ -179,6 +179,32 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .live-run .live-info b{color:#15a34a}
 .live-row.live-run{background:#f3fbf6}
 .live-row.live-idle .live-nm{color:#9aa5b1}
+.calib-hint{font-size:13px;color:#5a6470;line-height:1.5;margin-bottom:12px}
+.calib-photos{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.calib-thumb-wrap{position:relative;width:72px;height:72px}
+.calib-thumb{width:72px;height:72px;border-radius:10px;object-fit:cover;border:1px solid #d8dee5}
+.calib-rm{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:none;background:#b00020;color:#fff;font-size:12px;cursor:pointer;line-height:1}
+.calib-thumb-up,.calib-thumb-err{position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,.6);color:#fff;border-radius:5px;font-size:11px;padding:0 4px}
+.calib-thumb-err{background:#b00020}
+.calib-addphoto{border:1px dashed #c7d0da;background:none;border-radius:10px;padding:11px 14px;font-size:14px;color:#5a6470;cursor:pointer;margin-bottom:10px}
+.calib-inp{width:100%;border:1px solid #cdd6e0;border-radius:9px;padding:10px 12px;font-size:14px;font-family:inherit;margin-bottom:10px}
+.calib-btn{width:100%;border:none;background:#1856a0;color:#fff;border-radius:11px;padding:13px;font-size:15px;font-weight:600;cursor:pointer}
+.calib-btn:disabled{background:#aab6c4;cursor:not-allowed}
+.calib-ai{background:#eef3fb;border-radius:10px;padding:12px;font-size:14px;color:#1a2a3a;line-height:1.5;margin:12px 0}
+.calib-ai b{color:#1856a0}
+.calib-actual-row label{display:block;font-size:13px;color:#5a6470}
+.calib-actual-row .calib-inp{margin-top:5px}
+.calib-toggle{display:flex;gap:8px;margin-bottom:10px}
+.calib-seg{flex:1;border:1px solid #cdd6e0;background:#fff;border-radius:9px;padding:9px;font-size:13px;font-weight:600;color:#5a6470;cursor:pointer}
+.calib-seg.on{background:#1a7a40;color:#fff;border-color:#1a7a40}
+.calib-save{width:100%;border:none;background:#1a7a40;color:#fff;border-radius:11px;padding:13px;font-size:15px;font-weight:700;cursor:pointer}
+.calib-stats{padding:10px 14px;border-bottom:1px solid #eef1f5}
+.calib-statbig{font-size:17px;font-weight:700;color:#1a2a3a;padding:4px 0}
+.calib-li{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid #eef1f5}
+.calib-li-th{width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.calib-li-info{font-size:14px;color:#1a2a3a;flex:1}
+.calib-li-src{font-size:11px;color:#80786e;background:#f0f0ec;padding:1px 6px;border-radius:5px;margin-left:4px}
+.calib-li-d{font-size:12px;color:#80786e;margin-top:2px}
 </style>
 </head>
 <body>
@@ -224,6 +250,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <button class="tab" id="tabImport" onclick="sw('import')">Импорт</button>
     <button class="tab" id="tabVoice" onclick="sw('voice')">Сообщения</button>
     <button class="tab" id="tabTabel" onclick="sw('tabel')">Табель</button>
+    <button class="tab" id="tabCalib" onclick="sw('calib')">Калибровка</button>
     <button class="tab" id="tabCfg" onclick="sw('cfg')">Настройки</button>
   </div>
 </div>
@@ -403,6 +430,25 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
       <button class="tabel-seg" id="tabelSegLag" onclick="tabelSeg('lag')">Грузчики</button>
     </div>
     <div id="tabelBody"></div>
+  </div>
+</div>
+<div id="tcalib" style="display:none">
+  <div class="card">
+    <div class="ch"><h2>Калибровка AI-оценки веса</h2></div>
+    <div style="padding:14px">
+      <div class="calib-hint">Загрузите ≥2 фото мусора → «Оценить» → впишите фактический вес. Так копим данные, чтобы повысить точность AI.</div>
+      <div class="calib-photos" id="calibPhotos"></div>
+      <button class="calib-addphoto" onclick="document.getElementById('calibFile').click()">&#128247; Добавить фото</button>
+      <input type="file" id="calibFile" accept="image/*" multiple style="display:none" onchange="calibAddFiles(this.files)">
+      <input type="text" class="calib-inp" id="calibCaption" placeholder="Комментарий (необязательно): что за мусор, объект…">
+      <button class="calib-btn" id="calibEstimateBtn" onclick="calibEstimate()" disabled>Нужно ≥2 фото</button>
+      <div id="calibResult"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><h2>Собрано точек: <span id="calibCount">0</span></h2></div>
+    <div id="calibStats" class="calib-stats"></div>
+    <div id="calibList"></div>
   </div>
 </div>
 <div id="tvoice" style="display:none">
@@ -615,6 +661,7 @@ db.ref('sent').on('value',function(s){sent=s.val()||{};gm();rh();});
 db.ref('trips').on('value',function(s){tripStatus=s.val()||{};gm();});
 db.ref('worktime').on('value',function(s){wtAll=s.val()||{};wtDenied=false;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
+db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
 db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
 __startTechsListener();
@@ -1682,12 +1729,12 @@ function swCfg(name){
 }
 
 function sw(n){
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',import:'timp',voice:'tvoice',tabel:'ttab'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',import:'timp',voice:'tvoice',tabel:'ttab',calib:'tcalib'};
   Object.keys(tabMap).forEach(function(t){
     var el=document.getElementById(tabMap[t]);
     if(el)el.style.display=t===n?'':'none';
   });
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',import:'Импорт',voice:'Сообщения',tabel:'Табель'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',import:'Импорт',voice:'Сообщения',tabel:'Табель',calib:'Калибровка'};
   document.querySelectorAll('.tab').forEach(function(b){
     b.classList.toggle('on',b.textContent.trim()===(nameMap[n]||''));
   });
@@ -1701,6 +1748,7 @@ function sw(n){
   if(n==='cfg'){lcfg();swCfg('drivers');}
   if(n==='plan')loadNotes();
   if(n==='tabel')renderTabel();
+  if(n==='calib')renderCalib();
 }
 
 // ─── ТАБЕЛЬ рабочего времени (сегменты) ─────────────────────
@@ -1837,6 +1885,119 @@ function tabelDelLoader(id){
   if(!confirm('Удалить грузчика '+(st.name||'')+'? Отметки времени в базе останутся.'))return;
   db.ref('lager_staff/'+id).remove().then(function(){toast('Удалён');}).catch(function(){toast('Нет прав. Войдите главным диспетчером (Zentrum).');});
 }
+
+// ─── КАЛИБРОВКА AI-оценки веса ──────────────────────────────
+var CALIB_URL='https://lk-proxy.s-kozorizz.workers.dev/estimate';
+var calibPhotos=[];        // {file,url,downloadUrl,err}
+var calibAi=null;
+var calibAll={};
+var _calibSess=uid();
+var calibActualSrc='measured';
+
+function calibAddFiles(files){
+  Array.prototype.forEach.call(files,function(file){
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var po={file:file,url:ev.target.result,downloadUrl:null,err:null};
+      calibPhotos.push(po);
+      var path='calib-photos/'+_calibSess+'/'+Date.now()+'_'+Math.random().toString(36).slice(2,6)+'.jpg';
+      po.uploadPromise=storage.ref(path).put(file).then(function(s){return s.ref.getDownloadURL();}).then(function(u){po.downloadUrl=u;renderCalibPhotos();return u;}).catch(function(e){po.err=e.message||'upload';renderCalibPhotos();});
+      renderCalibPhotos();
+    };
+    reader.readAsDataURL(file);
+  });
+  var fi=document.getElementById('calibFile'); if(fi)fi.value='';
+}
+function calibRemovePhoto(i){ calibPhotos.splice(i,1); renderCalibPhotos(); }
+function renderCalibPhotos(){
+  var el=document.getElementById('calibPhotos'); if(!el)return;
+  el.innerHTML=calibPhotos.map(function(p,i){
+    var badge=p.err?'<span class="calib-thumb-err">!</span>':(p.downloadUrl?'':'<span class="calib-thumb-up">⏳</span>');
+    return '<div class="calib-thumb-wrap"><img class="calib-thumb" src="'+p.url+'">'+badge+'<button class="calib-rm" onclick="calibRemovePhoto('+i+')">&#10005;</button></div>';
+  }).join('');
+  var ready=calibPhotos.filter(function(p){return p.downloadUrl;}).length;
+  var btn=document.getElementById('calibEstimateBtn');
+  if(btn){ btn.disabled = ready<2; btn.textContent = ready<2 ? ('Нужно ≥2 фото (загружено '+ready+')') : 'Оценить через AI ('+ready+' фото)'; }
+}
+function calibEstimate(){
+  var urls=calibPhotos.filter(function(p){return p.downloadUrl;}).map(function(p){return p.downloadUrl;});
+  if(urls.length<2){toast('Нужно ≥2 загруженных фото');return;}
+  var cap=(document.getElementById('calibCaption')||{}).value||'';
+  var res=document.getElementById('calibResult');
+  res.innerHTML='<div class="calib-ai">⏳ AI оценивает…</div>';
+  calibAi=null;
+  fetch(CALIB_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photoUrls:urls,caption:cap.trim()})})
+    .then(function(r){return r.json();})
+    .then(function(data){ if(data&&data.error){throw new Error(data.error);} calibAi=data; renderCalibResult(); })
+    .catch(function(e){ res.innerHTML='<div class="calib-ai" style="color:#b00020">AI не смог оценить: '+xe(e.message||'ошибка')+'. Можно сохранить факт без оценки или повторить.</div>'+calibActualForm(); });
+}
+function calibAvg(ai){ return ai&&ai.weight_kg? Math.round((ai.weight_kg.min+ai.weight_kg.max)/2):null; }
+function calibActualForm(){
+  return '<div class="calib-actual-row">'+
+    '<label>Фактический вес, кг<input type="number" id="calibActual" class="calib-inp" placeholder="напр. 380"></label>'+
+    '</div>'+
+    '<div class="calib-toggle">'+
+      '<button id="calibSrcM" class="calib-seg on" onclick="calibSetSrc(\'measured\')">взвешено</button>'+
+      '<button id="calibSrcE" class="calib-seg" onclick="calibSetSrc(\'estimate\')">на глаз</button>'+
+    '</div>'+
+    '<button class="calib-save" onclick="calibSave()">Сохранить в калибровку</button>';
+}
+function calibSetSrc(s){ calibActualSrc=s; var m=document.getElementById('calibSrcM'),e=document.getElementById('calibSrcE'); if(m)m.classList.toggle('on',s==='measured'); if(e)e.classList.toggle('on',s==='estimate'); }
+function renderCalibResult(){
+  var res=document.getElementById('calibResult'); if(!res)return;
+  var a=calibAi; var avg=calibAvg(a);
+  var conf={HIGH:'высокая',MEDIUM:'средняя',LOW:'низкая'};
+  var ai='<div class="calib-ai"><b>AI: '+a.weight_kg.min+'–'+a.weight_kg.max+' кг</b> (≈'+avg+' кг) · '+
+    a.volume_m3.min+'–'+a.volume_m3.max+' м³ · калфасы '+a.kalfas.min+'–'+a.kalfas.max+' · мешки '+a.bags.min+'–'+a.bags.max+
+    ' · уверенность '+(conf[a.confidence]||a.confidence)+'</div>';
+  res.innerHTML=ai+calibActualForm();
+  calibActualSrc='measured';
+}
+function calibSave(){
+  var actual=parseFloat((document.getElementById('calibActual')||{}).value);
+  if(isNaN(actual)||actual<=0){toast('Впишите фактический вес');return;}
+  var urls=calibPhotos.filter(function(p){return p.downloadUrl;}).map(function(p){return p.downloadUrl;});
+  var cap=(document.getElementById('calibCaption')||{}).value||'';
+  var rec={ts:Date.now(),photoUrls:urls,caption:cap.trim(),ai:calibAi||null,aiAvgKg:calibAvg(calibAi),actualKg:actual,actualSource:calibActualSrc};
+  db.ref('calibration/'+uid()).set(rec).then(function(){toast('Точка сохранена');calibReset();}).catch(function(){toast('Нет прав (войдите главным диспетчером)');});
+}
+function calibReset(){
+  calibPhotos=[]; calibAi=null; _calibSess=uid();
+  var c=document.getElementById('calibCaption'); if(c)c.value='';
+  var r=document.getElementById('calibResult'); if(r)r.innerHTML='';
+  renderCalibPhotos();
+}
+function calibComputeStats(arr){
+  var pts=arr.filter(function(r){return r&&r.aiAvgKg>0&&r.actualKg>0;});
+  if(!pts.length)return null;
+  var ratios=pts.map(function(r){return r.actualKg/r.aiAvgKg;});
+  var mean=ratios.reduce(function(x,y){return x+y;},0)/ratios.length;
+  return {n:pts.length,ratio:Math.round(mean*100)/100,errPct:Math.round((mean-1)*100)};
+}
+function renderCalibList(){
+  var arr=Object.keys(calibAll).map(function(k){return calibAll[k];}).sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+  var cnt=document.getElementById('calibCount'); if(cnt)cnt.textContent=arr.length;
+  var st=document.getElementById('calibStats');
+  if(st){
+    var s=calibComputeStats(arr);
+    if(!s){ st.innerHTML='<div class="calib-hint">Пока нет пар «оценка+факт» для статистики.</div>'; }
+    else{
+      var dir=s.errPct>0?('занижает на ~'+s.errPct+'%'):(s.errPct<0?('завышает на ~'+(-s.errPct)+'%'):'без перекоса');
+      var enough=s.n>=10;
+      st.innerHTML='<div class="calib-statbig">AI '+dir+'</div>'+
+        '<div class="calib-hint">по '+s.n+' парам · коэффициент ×'+s.ratio+(enough?' — данных достаточно для калибровки':' — нужно ещё ~'+(10-s.n)+' для надёжности')+'</div>';
+    }
+  }
+  var list=document.getElementById('calibList'); if(!list)return;
+  list.innerHTML=arr.map(function(r){
+    var d=new Date(r.ts||0); var dd=String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0');
+    var ai=r.aiAvgKg?('AI ≈'+r.aiAvgKg+' кг'):'AI —';
+    var th=(r.photoUrls&&r.photoUrls[0])?'<img class="calib-li-th" src="'+r.photoUrls[0]+'">':'';
+    var src=r.actualSource==='estimate'?'на глаз':'взвешено';
+    return '<div class="calib-li">'+th+'<div class="calib-li-info"><b>факт '+r.actualKg+' кг</b> · '+ai+' <span class="calib-li-src">'+src+'</span><div class="calib-li-d">'+dd+(r.caption?' · '+xe(r.caption):'')+'</div></div></div>';
+  }).join('')||'<div class="calib-hint">Точек пока нет.</div>';
+}
+function renderCalib(){ renderCalibPhotos(); renderCalibList(); }
 
 function openEdit(id){
   if(editingRowId===id)return;
