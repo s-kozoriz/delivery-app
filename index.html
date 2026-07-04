@@ -651,7 +651,7 @@ var cfg={
 };
 var CITIES=cfg.cities.slice();
 var CITIESC=cfg.citiesC?cfg.citiesC.slice():['Aurich','Wilhelmshaven','Varel'];
-var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRowId=null,newRowDraft=null,pinBuf='',viewOnly=false,disp2Mode=false,pinMode='dispatcher',_lastEdit=0;
+var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRowId=null,newRowDraft=null,pinBuf='',viewOnly=false,disp2Mode=false,pinMode='dispatcher',_lastEdit=0,_pending={};
 var wtAll={},tabelMonth='',tabelView='drv',tabelEdit=null,lagerStaff={},wtDenied=false;
 
 firebase.initializeApp({
@@ -670,6 +670,7 @@ var _fromD=_d1.toISOString().slice(0,10),_toD=_d2.toISOString().slice(0,10);
 function __startDB(){
 db.ref('rows').orderByChild('date').startAt(_fromD).endAt(_toD).on('value',function(s){
   rows=s.val()?Object.values(s.val()):[];
+  _applyPending();
   if(Date.now()-_lastEdit>1500){rtbl();}
   gm();rh();
   document.getElementById('sync').className='sync ok';
@@ -935,8 +936,21 @@ function panelMoveRow(id,drv,dir){
 }
 function ur(id,f,v){
   _lastEdit=Date.now();
+  _pending[id+'/'+f]={v:v,ts:Date.now()};
   db.ref('rows/'+id+'/'+f).set(v);
   var r=rows.find(function(x){return x.id===id;});if(r)r[f]=v;
+}
+function _applyPending(){
+  var now=Date.now();
+  Object.keys(_pending).forEach(function(key){
+    var p=_pending[key];
+    if(now-p.ts>10000){delete _pending[key];return;}
+    var i=key.indexOf('/');var id=key.slice(0,i),f=key.slice(i+1);
+    var r=rows.find(function(x){return x.id===id;});if(!r)return;
+    var cur=(r[f]===undefined||r[f]===null)?'':String(r[f]);
+    var want=(p.v===undefined||p.v===null)?'':String(p.v);
+    if(cur===want){delete _pending[key];}else{r[f]=p.v;}
+  });
 }
 function tr(id,v){db.ref('rows/'+id+'/inRoute').set(v);}
 function ai(id){
@@ -1036,7 +1050,7 @@ function _rtblNow(){
       sel+='</select></td>';
       h+=sel;
     } else {
-      var drvLabel=r.drv?xe(dname(r.drv)||r.drv):(r.fromTech?'<span style="color:#E24B4A;font-size:11px;font-weight:600">Не назначен</span>':'');
+      var drvLabel=r.drv?xe(dname(r.drv)||r.drv):'<span style="color:#E24B4A;font-size:11px;font-weight:600">Не назначен</span>';
       h+='<td style="width:80px;'+dc+'"><span style="font-size:12px;font-weight:600;padding:2px 4px;display:block">'+drvLabel+'</span></td>';
     }
     var cityList=disp2Mode?CITIESC:CITIES;
