@@ -205,6 +205,24 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .calib-li-info{font-size:14px;color:#1a2a3a;flex:1}
 .calib-li-src{font-size:11px;color:#80786e;background:#f0f0ec;padding:1px 6px;border-radius:5px;margin-left:4px}
 .calib-li-d{font-size:12px;color:#80786e;margin-top:2px}
+#tabInc{position:relative}
+#tabInc.has-new::after{content:'';position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:#e24b4a}
+.inc-badge{font-size:13px;color:#e24b4a;font-weight:700;margin-left:6px}
+.inc-empty{padding:26px;text-align:center;color:#80786e}
+.inc-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
+.inc-tbl td{padding:7px 8px;border-bottom:1px solid #eef1f5;vertical-align:top}
+.inc-tbl tr.inc-ready{background:#eaf3ff}
+.inc-tbl tr.inc-reserve{background:#eefaf0}
+.inc-tbl tr.inc-order{background:#fdeef2}
+.inc-sub{font-size:11px;color:#80786e;margin-top:1px}
+.inc-lock{color:#c4ccd4}
+.inc-tbl input[type=checkbox]{width:18px;height:18px;cursor:pointer}
+.inc-bar{position:sticky;bottom:0;background:#fff;border-top:2px solid #e3e8ee;padding:12px 14px;font-size:14px;color:#1a2a3a;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.inc-accept{border:none;background:#1a7a40;color:#fff;border-radius:9px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer;margin-left:auto}
+.inc-taken-h{padding:10px 14px;font-size:13px;color:#5a6470;cursor:pointer;border-top:1px solid #eef1f5;background:#fafbfc}
+.inc-taken-row{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;font-size:13px;border-top:1px solid #f2f4f7}
+.inc-return{border:none;background:#eef1f5;color:#5a6470;border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -251,6 +269,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <button class="tab" id="tabVoice" onclick="sw('voice')">Сообщения</button>
     <button class="tab" id="tabTabel" onclick="sw('tabel')">Табель</button>
     <button class="tab" id="tabCalib" onclick="sw('calib')">Калибровка</button>
+    <button class="tab" id="tabInc" onclick="sw('inc')">Входящие 1С</button>
     <button class="tab" id="tabCfg" onclick="sw('cfg')">Настройки</button>
   </div>
 </div>
@@ -449,6 +468,14 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <div class="ch"><h2>Собрано точек: <span id="calibCount">0</span></h2></div>
     <div id="calibStats" class="calib-stats"></div>
     <div id="calibList"></div>
+  </div>
+</div>
+<div id="tinc" style="display:none">
+  <div class="card">
+    <div class="ch"><h2>Входящие из 1С <span id="incCount" class="inc-badge"></span></h2></div>
+    <div id="incBody" style="overflow-x:auto"></div>
+    <div class="inc-bar" id="incBar"></div>
+    <div id="incTaken"></div>
   </div>
 </div>
 <div id="tvoice" style="display:none">
@@ -662,6 +689,7 @@ db.ref('trips').on('value',function(s){tripStatus=s.val()||{};gm();});
 db.ref('worktime').on('value',function(s){wtAll=s.val()||{};wtDenied=false;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
+db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
 db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
 __startTechsListener();
@@ -1729,12 +1757,12 @@ function swCfg(name){
 }
 
 function sw(n){
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',import:'timp',voice:'tvoice',tabel:'ttab',calib:'tcalib'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',import:'timp',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc'};
   Object.keys(tabMap).forEach(function(t){
     var el=document.getElementById(tabMap[t]);
     if(el)el.style.display=t===n?'':'none';
   });
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',import:'Импорт',voice:'Сообщения',tabel:'Табель',calib:'Калибровка'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',import:'Импорт',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С'};
   document.querySelectorAll('.tab').forEach(function(b){
     b.classList.toggle('on',b.textContent.trim()===(nameMap[n]||''));
   });
@@ -1749,6 +1777,7 @@ function sw(n){
   if(n==='plan')loadNotes();
   if(n==='tabel')renderTabel();
   if(n==='calib')renderCalib();
+  if(n==='inc')renderInc();
 }
 
 // ─── ТАБЕЛЬ рабочего времени (сегменты) ─────────────────────
@@ -1998,6 +2027,93 @@ function renderCalibList(){
   }).join('')||'<div class="calib-hint">Точек пока нет.</div>';
 }
 function renderCalib(){ renderCalibPhotos(); renderCalibList(); }
+
+// ─── ВХОДЯЩИЕ ИЗ 1С ─────────────────────────────────────────
+var incAll={};        // /1c/delivery/incoming/{invoice}
+var incSel={};        // {invoice:true} — отмеченные
+var incShowTaken=false;
+function incList(){ return Object.keys(incAll).map(function(k){return incAll[k];}).filter(function(r){return r&&r.invoice;}); }
+function incReady(r){ return (r.ready_status||'').indexOf('Собран')===0; }
+function incColor(r){ var s=r.ready_status||''; if(s.indexOf('Собран')===0)return 'inc-ready'; if(s.indexOf('Заказ')===0)return 'inc-order'; return 'inc-reserve'; }
+function incSelWeight(){ var t=0; Object.keys(incSel).forEach(function(inv){ var r=incAll[inv]; if(r&&incSel[inv]&&typeof r.weight_kg==='number')t+=r.weight_kg; }); return Math.round(t*100)/100; }
+function incBadge(){ var n=incList().filter(function(r){return !r.accepted;}).length; var t=document.getElementById('tabInc'); if(t)t.classList.toggle('has-new',n>0); var c=document.getElementById('incCount'); if(c)c.textContent=n?('('+n+')'):''; }
+function incToggle(inv,cb){ if(cb.checked)incSel[inv]=true; else delete incSel[inv]; incUpdateBar(); }
+function incUpdateBar(){
+  var bar=document.getElementById('incBar'); if(!bar)return;
+  var n=Object.keys(incSel).length; var w=incSelWeight();
+  bar.innerHTML = n ? ('Отмечено: <b>'+n+'</b> · вес <b>'+w+' кг</b><button class="inc-accept" onclick="incAccept()">Принять отмеченные ('+n+') &rarr;</button>')
+                    : '<span style="color:#80786e">Отметьте накладные (галочка только у «Собрано») — попадут в маршрут.</span>';
+}
+function renderInc(){
+  incBadge();
+  var body=document.getElementById('incBody'); if(!body)return;
+  Object.keys(incSel).forEach(function(inv){ if(!incAll[inv]||incAll[inv].accepted)delete incSel[inv]; });
+  var arr=incList().filter(function(r){return !r.accepted;});
+  arr.sort(function(a,b){ return (a.city||'').localeCompare(b.city||'')||(a.address||'').localeCompare(b.address||''); });
+  if(!arr.length){ body.innerHTML='<div class="inc-empty">Нет входящих накладных из 1С.</div>'; incUpdateBar(); renderIncTaken(); return; }
+  var h='<table class="inc-tbl"><thead><tr><th></th><th>Состояние</th><th>Накладная</th><th>Склад</th><th>Адрес</th><th>Город</th><th>Дата</th><th>Вес</th><th>Комментарий</th></tr></thead><tbody>';
+  arr.forEach(function(r){
+    var cb = incReady(r) ? ('<input type="checkbox" '+(incSel[r.invoice]?'checked':'')+' onchange="incToggle(\''+r.invoice+'\',this)">') : '<span class="inc-lock" title="не собрано">—</span>';
+    var w=(typeof r.weight_kg==='number')?r.weight_kg:'—';
+    h+='<tr class="'+incColor(r)+'">'+
+      '<td>'+cb+'</td>'+
+      '<td>'+xe(r.ready_status||'')+'</td>'+
+      '<td>'+xe(r.invoice)+(r.order_code?'<div class="inc-sub">'+xe(r.order_code)+'</div>':'')+'</td>'+
+      '<td>'+xe(r.warehouse||'—')+'</td>'+
+      '<td>'+xe(r.address||'')+(r.work_type?'<div class="inc-sub">'+xe(r.work_type)+'</div>':'')+'</td>'+
+      '<td>'+xe(r.city||'')+'</td>'+
+      '<td>'+xe(r.desired_date||'')+'</td>'+
+      '<td>'+w+'</td>'+
+      '<td>'+xe(r.note||'')+'</td>'+
+      '</tr>';
+  });
+  h+='</tbody></table>';
+  body.innerHTML=h; incUpdateBar(); renderIncTaken();
+}
+function incAccept(){
+  var invs=Object.keys(incSel).filter(function(inv){ var r=incAll[inv]; return r&&incReady(r)&&!r.accepted; });
+  if(!invs.length){ toast('Отметьте «Собрано» накладные'); return; }
+  var groups={};
+  invs.forEach(function(inv){ var r=incAll[inv]; var key=(r.city||'')+'|'+(r.address||''); (groups[key]=groups[key]||[]).push(r); });
+  var maxOrder=0; rows.forEach(function(x){ if(x.order!=null&&x.order>maxOrder)maxOrder=x.order; });
+  var madeRows=0;
+  Object.keys(groups).forEach(function(key){
+    var g=groups[key]; var first=g[0];
+    var wsum=g.reduce(function(a,r){return a+(typeof r.weight_kg==='number'?r.weight_kg:0);},0);
+    maxOrder+=10;
+    var cmt=(first.note||'');
+    if(first.desired_date)cmt=(cmt?cmt+' · ':'')+'план '+first.desired_date;
+    var row={
+      id:uid(), date:(curD||isoD(0)), drv:'', city:first.city||'', timeSlot:'',
+      addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
+      comment:cmt, weight:wsum||null, volume_m3:null, inRoute:true, done:false,
+      createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null
+    };
+    db.ref('rows/'+row.id).set(row);
+    g.forEach(function(r){ db.ref('1c/delivery/incoming/'+r.invoice).update({accepted:true,acceptedRow:row.id}); });
+    madeRows++;
+  });
+  incSel={};
+  toast('Принято: '+invs.length+' накл. → '+madeRows+' заказ(ов) в маршруте');
+  renderInc();
+}
+function renderIncTaken(){
+  var el=document.getElementById('incTaken'); if(!el)return;
+  var taken=incList().filter(function(r){return r.accepted;});
+  if(!taken.length){ el.innerHTML=''; return; }
+  var head='<div class="inc-taken-h" onclick="incShowTaken=!incShowTaken;renderIncTaken()">Принятые ранее: '+taken.length+'  '+(incShowTaken?'&#9650;':'&#9660;')+'</div>';
+  if(!incShowTaken){ el.innerHTML=head; return; }
+  el.innerHTML=head+taken.map(function(r){
+    return '<div class="inc-taken-row"><span>'+xe(r.invoice)+' &middot; '+xe(r.address||'')+'</span><button class="inc-return" onclick="incReturn(\''+r.invoice+'\',\''+(r.acceptedRow||'')+'\')">вернуть</button></div>';
+  }).join('');
+}
+function incReturn(inv,rowId){
+  if(rowId) db.ref('rows/'+rowId).remove();
+  db.ref('1c/delivery/incoming/'+inv+'/accepted').remove();
+  db.ref('1c/delivery/incoming/'+inv+'/acceptedRow').remove();
+  toast('Возвращено во входящие');
+}
+function renderInc0(){ renderInc(); }
 
 function openEdit(id){
   if(editingRowId===id)return;
