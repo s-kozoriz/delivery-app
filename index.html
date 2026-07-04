@@ -2083,12 +2083,11 @@ function incAccept(){
     var wsum=g.reduce(function(a,r){return a+(typeof r.weight_kg==='number'?r.weight_kg:0);},0);
     maxOrder+=10;
     var cmt=(first.note||'');
-    if(first.desired_date)cmt=(cmt?cmt+' · ':'')+'план '+first.desired_date;
     var row={
       id:uid(), date:(first.ship_date||first.desired_date||curD||isoD(0)), drv:'', city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
       comment:cmt, weight:wsum||null, volume_m3:null, inRoute:true, done:false,
-      createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null
+      createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null
     };
     db.ref('rows/'+row.id).set(row);
     g.forEach(function(r){ db.ref('1c/delivery/incoming/'+r.invoice).update({accepted:true,acceptedRow:row.id}); });
