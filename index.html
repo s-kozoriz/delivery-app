@@ -2052,7 +2052,7 @@ function renderInc(){
   var arr=incList().filter(function(r){return !r.accepted;});
   arr.sort(function(a,b){ return (a.city||'').localeCompare(b.city||'')||(a.address||'').localeCompare(b.address||''); });
   if(!arr.length){ body.innerHTML='<div class="inc-empty">Нет входящих накладных из 1С.</div>'; incUpdateBar(); renderIncTaken(); return; }
-  var h='<table class="inc-tbl"><thead><tr><th></th><th>Состояние</th><th>Накладная</th><th>Склад</th><th>Адрес</th><th>Город</th><th>Дата</th><th>Вес</th><th>Комментарий</th></tr></thead><tbody>';
+  var h='<table class="inc-tbl"><thead><tr><th></th><th>Состояние</th><th>Накладная</th><th>Склад</th><th>Адрес</th><th>Город</th><th>Отгрузка</th><th>Вес</th><th>Комментарий</th></tr></thead><tbody>';
   arr.forEach(function(r){
     var cb = incReady(r) ? ('<input type="checkbox" '+(incSel[r.invoice]?'checked':'')+' onchange="incToggle(\''+r.invoice+'\',this)">') : '<span class="inc-lock" title="не собрано">—</span>';
     var w=(typeof r.weight_kg==='number')?r.weight_kg:'—';
@@ -2063,7 +2063,7 @@ function renderInc(){
       '<td>'+xe(r.warehouse||'—')+'</td>'+
       '<td>'+xe(r.address||'')+(r.work_type?'<div class="inc-sub">'+xe(r.work_type)+'</div>':'')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
-      '<td>'+xe(r.desired_date||'')+'</td>'+
+      '<td>'+xe(r.ship_date||'—')+(r.desired_date?'<div class="inc-sub">план '+xe(r.desired_date)+'</div>':'')+'</td>'+
       '<td>'+w+'</td>'+
       '<td>'+xe(r.note||'')+'</td>'+
       '</tr>';
@@ -2085,7 +2085,7 @@ function incAccept(){
     var cmt=(first.note||'');
     if(first.desired_date)cmt=(cmt?cmt+' · ':'')+'план '+first.desired_date;
     var row={
-      id:uid(), date:(curD||isoD(0)), drv:'', city:first.city||'', timeSlot:'',
+      id:uid(), date:(first.ship_date||first.desired_date||curD||isoD(0)), drv:'', city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
       comment:cmt, weight:wsum||null, volume_m3:null, inRoute:true, done:false,
       createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null
