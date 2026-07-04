@@ -2087,16 +2087,16 @@ function renderInc(){
 }
 function incAccept(){
   var invs=Object.keys(incSel).filter(function(inv){ var r=incAll[inv]; return r&&incReady(r)&&!r.accepted; });
-  if(!invs.length){ toast('Отметьте «Собрано» накладные'); return; }
+  if(!invs.length){ toast('Отметьте «Собрано»/«К сборке» накладные'); return; }
   var groups={};
-  invs.forEach(function(inv){ var r=incAll[inv]; var key=(r.city||'')+'|'+(r.address||''); (groups[key]=groups[key]||[]).push(r); });
+  invs.forEach(function(inv){ var r=incAll[inv]; var edate=(r.ship_date||r.desired_date||isoD(0)); var key=(r.city||'')+'|'+(r.address||'')+'|'+edate; (groups[key]=groups[key]||[]).push(r); });
   var maxOrder=0; rows.forEach(function(x){ if(x.order!=null&&x.order>maxOrder)maxOrder=x.order; });
   var madeRows=0;
   Object.keys(groups).forEach(function(key){
     var g=groups[key]; var first=g[0];
     var wsum=g.reduce(function(a,r){return a+(typeof r.weight_kg==='number'?r.weight_kg:0);},0);
     maxOrder+=10;
-    var cmt=(first.note||'');
+    var _seen={}; var cmt=g.map(function(r){return (r.note||'').trim();}).filter(function(n){ if(!n||_seen[n])return false; _seen[n]=1; return true; }).join(', ');
     var row={
       id:uid(), date:(first.ship_date||first.desired_date||isoD(0)), drv:'', city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
