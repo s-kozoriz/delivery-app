@@ -2084,7 +2084,7 @@ function incAccept(){
     maxOrder+=10;
     var cmt=(first.note||'');
     var row={
-      id:uid(), date:(first.ship_date||first.desired_date||curD||isoD(0)), drv:'', city:first.city||'', timeSlot:'',
+      id:uid(), date:(first.ship_date||first.desired_date||isoD(0)), drv:'', city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
       comment:cmt, weight:wsum||null, volume_m3:null, inRoute:true, done:false,
       createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null
