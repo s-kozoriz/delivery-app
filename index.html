@@ -2170,7 +2170,7 @@ function incAccept(){
     var g=groups[key]; var first=g[0];
     var wsum=g.reduce(function(a,r){return a+(typeof r.weight_kg==='number'?r.weight_kg:0);},0);
     maxOrder+=10;
-    var _seen={}; var cmt=g.map(function(r){return (r.note||'').trim();}).filter(function(n){ if(!n||_seen[n])return false; _seen[n]=1; return true; }).join(', ');
+    var _seen={}; var _parts=[]; g.forEach(function(r){ [(r.work_type||'').trim(),(r.note||'').trim()].forEach(function(p){ if(p&&!_seen[p]){_seen[p]=1;_parts.push(p);} }); }); var cmt=_parts.join(', ');
     var _sd=(first.ship_date||'').trim();
     var row={
       id:uid(), date:(_sd||isoD(0)), date_pending:(_sd?null:true), drv:'', city:first.city||'', timeSlot:'',
