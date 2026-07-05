@@ -1063,7 +1063,7 @@ function _rtblNow(){
     h+='<td style="width:90px">'+(isEditing?'<input type="date" value="'+(r.date_pending?'':(r.date||''))+'"'+dis+' onchange="ur(\''+r.id+'\',\'date\',this.value)" style="font-size:12px;padding:5px 4px">':(r.date_pending?'<span style="font-size:11px;padding:2px 4px;display:block;color:#E24B4A;font-weight:600" title="1С не передала дату отгрузки — задайте дату">— нет даты</span>':'<span style="font-size:12px;padding:2px 4px;display:block">'+fmt(r.date||'')+'</span>'))+'</td>';
     if(isEditing){
       var sel='<td style="width:80px"><select onchange="ur(\''+r.id+'\',\'drv\',this.value)" style="'+dc+'">';
-      if(r.fromTech)sel+='<option value=""'+((!r.drv||r.drv==='')?' selected':'')+'>— назначить —</option>';
+      sel+='<option value=""'+((!r.drv||r.drv==='')?' selected':'')+'>— назначить —</option>';
       DRV_KEYS.forEach(function(k){var n=dname(k);if(n||k!=='C')sel+='<option value="'+k+'"'+(r.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
       sel+='</select></td>';
       h+=sel;
