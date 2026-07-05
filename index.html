@@ -233,6 +233,22 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .inc-h-selon{border-color:#1a7a40;color:#1a7a40;background:#f2fbf5;font-weight:600}
 .inc-h-reset{border:none;background:#f2d9dc;color:#c0392b;border-radius:50%;width:22px;height:22px;font-size:15px;line-height:20px;cursor:pointer;padding:0}
 .inc-h-reset:hover{background:#e9c4c8}
+.inc-invlink{color:#1856a0;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;font-weight:600}
+.inc-invlink:hover{color:#0c447c}
+.posm{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;align-items:center;justify-content:center;padding:16px}
+.posm-card{background:#fff;color:#1a2a3a;border-radius:12px;max-width:780px;width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 14px 44px rgba(0,0,0,.32);overflow:hidden}
+.posm-hd{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid #e3e8ee}
+.posm-hd h3{margin:0;font-size:16px;font-weight:700}
+.posm-x{border:none;background:transparent;font-size:26px;line-height:1;cursor:pointer;color:#80786e;padding:0 4px}
+.posm-bd{overflow:auto}
+.pos-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.pos-tbl th{position:sticky;top:0;background:#f6f8fb;text-align:left;padding:8px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee}
+.pos-tbl td{padding:7px 12px;border-bottom:1px solid #eef1f5;vertical-align:top}
+.pos-tbl .num{text-align:right;white-space:nowrap}
+.pos-tbl tfoot .pos-tot td{font-weight:700;border-top:2px solid #cdd6e0;background:#fafbfc;position:sticky;bottom:0}
+.pos-code{font-size:10px;color:#a0a6ad;margin-top:1px}
+.pos-empty{padding:30px;text-align:center;color:#80786e}
+.pos-note{padding:8px 14px 12px;font-size:11px;color:#80786e}
 </style>
 </head>
 <body>
@@ -639,6 +655,12 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
   <button id="dispLbNext" onclick="lbNext()" style="display:none;position:absolute;right:16px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.5);border:none;color:#fff;font-size:22px;cursor:pointer;align-items:center;justify-content:center;z-index:10">&#8250;</button>
   <div class="lb-info" id="dispLbInfo"></div>
   <button class="lb-del" id="dispLbDel">&#128465; Удалить фото</button>
+</div>
+<div class="posm" id="incPosModal" onclick="if(event.target===this)incClosePos()">
+  <div class="posm-card">
+    <div class="posm-hd"><h3 id="incPosTitle">Состав накладной</h3><button class="posm-x" onclick="incClosePos()">&#215;</button></div>
+    <div class="posm-bd" id="incPosBody"></div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -2147,7 +2169,7 @@ function renderInc(){
     h+='<tr class="'+incColor(r)+'">'+
       '<td>'+cb+'</td>'+
       '<td>'+xe(r.ready_status||'')+'</td>'+
-      '<td>'+xe(r.invoice)+(r.order_code?'<div class="inc-sub">'+xe(r.order_code)+'</div>':'')+'</td>'+
+      '<td><span class="inc-invlink" onclick="incShowPos(\''+r.invoice+'\')" title="Показать состав накладной">'+xe(r.invoice)+'</span>'+(r.order_code?'<div class="inc-sub">'+xe(r.order_code)+'</div>':'')+'</td>'+
       '<td>'+xe(r.warehouse||'—')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
       '<td>'+xe(r.address||'')+(r.work_type?'<div class="inc-sub">'+xe(r.work_type)+'</div>':'')+'</td>'+
@@ -2208,6 +2230,39 @@ function incReturn(inv,rowId){
   }
   toast('Возвращено в «Входящие»');
   renderInc();
+}
+// ── Состав накладной (клик по номеру → модалка, ленивое чтение позиций) ──
+function incShowPos(inv){
+  var m=document.getElementById('incPosModal'); if(!m)return;
+  document.getElementById('incPosTitle').textContent='Состав накладной '+inv;
+  document.getElementById('incPosBody').innerHTML='<div class="pos-empty">Загрузка…</div>';
+  m.style.display='flex';
+  db.ref('1c/delivery/positions/'+inv).once('value').then(function(s){ incRenderPos(s.val()); })
+    .catch(function(){ var b=document.getElementById('incPosBody'); if(b)b.innerHTML='<div class="pos-empty">Ошибка загрузки позиций.</div>'; });
+}
+function incClosePos(){ var m=document.getElementById('incPosModal'); if(m)m.style.display='none'; }
+function incNum2(n){ return (typeof n==='number'&&!isNaN(n))?n.toFixed(2):'—'; }
+function incRenderPos(val){
+  var body=document.getElementById('incPosBody'); if(!body)return;
+  var list=Array.isArray(val)?val.filter(Boolean):(val&&typeof val==='object'?Object.keys(val).map(function(k){return val[k];}).filter(Boolean):[]);
+  if(!list.length){ body.innerHTML='<div class="pos-empty">Позиции ещё не загружены.</div>'; return; }
+  var totW=0,totS=0,hasW=false,missW=false;
+  var h='<table class="pos-tbl"><thead><tr><th>Наименование</th><th class="num">Кол-во</th><th>Ед</th><th class="num">Вес, кг</th><th class="num">Цена, €</th><th class="num">Сумма, €</th></tr></thead><tbody>';
+  list.forEach(function(p){
+    var w=(typeof p.weight==='number')?p.weight:0;
+    if(w>0){totW+=w;hasW=true;}else{missW=true;}
+    if(typeof p.sum==='number')totS+=p.sum;
+    var unit=(''+(p.unit||'')).trim();
+    h+='<tr><td>'+xe(p.name||'')+(p.code?'<div class="pos-code">'+xe(p.code)+'</div>':'')+'</td>'+
+       '<td class="num">'+(p.qty!=null&&p.qty!==''?xe(''+p.qty):'—')+'</td>'+
+       '<td>'+(unit?xe(unit):'—')+'</td>'+
+       '<td class="num">'+(w>0?w.toFixed(2):'—')+'</td>'+
+       '<td class="num">'+incNum2(p.price)+'</td>'+
+       '<td class="num">'+incNum2(p.sum)+'</td></tr>';
+  });
+  h+='</tbody><tfoot><tr class="pos-tot"><td>Итого · '+list.length+' поз.</td><td></td><td></td><td class="num">'+(hasW?totW.toFixed(2):'—')+'</td><td></td><td class="num">'+totS.toFixed(2)+'</td></tr></tfoot></table>';
+  if(missW)h+='<div class="pos-note">Вес указан не для всех позиций (в 1С нет веса в справочнике) — «Итого вес» может быть неполным.</div>';
+  body.innerHTML=h;
 }
 function renderInc0(){ renderInc(); }
 
