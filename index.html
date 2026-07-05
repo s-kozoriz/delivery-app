@@ -2111,7 +2111,7 @@ function renderInc(){
     h+='<tr class="'+incColor(r)+'">'+
       '<td>'+cb+'</td>'+
       '<td>'+xe(r.ready_status||'')+'</td>'+
-      '<td><span class="inc-invlink" onclick="incShowPos(\''+r.invoice+'\')" title="Показать состав накладной">'+xe(r.invoice)+'</span>'+(r.order_code?'<div class="inc-sub">'+xe(r.order_code)+'</div>':'')+'</td>'+
+      '<td><span class="inc-invlink" onclick="incShowPos(\''+r.invoice+'\')" title="Показать состав накладной">'+xe(r.invoice)+'</span></td>'+
       '<td>'+xe(r.warehouse||'—')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
       '<td>'+xe(r.address||'')+(r.work_type?'<div class="inc-sub">'+xe(r.work_type)+'</div>':'')+'</td>'+
