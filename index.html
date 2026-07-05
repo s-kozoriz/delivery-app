@@ -291,7 +291,6 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <button class="tab on" onclick="sw('plan')">Маршрут</button>
     <button class="tab" onclick="sw('hist')">История</button>
     <button class="tab" id="tabStat" onclick="sw('stat')">Статистика</button>
-    <button class="tab" id="tabImport" onclick="sw('import')">Импорт</button>
     <button class="tab" id="tabVoice" onclick="sw('voice')">Сообщения</button>
     <button class="tab" id="tabTabel" onclick="sw('tabel')">Табель</button>
     <button class="tab" id="tabCalib" onclick="sw('calib')">Калибровка</button>
@@ -400,61 +399,6 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <div id="hl" class="hlist"></div>
   </div>
 </div>
-
-<div id="timp" style="display:none">
-  <div class="card">
-    <div class="ch"><h2>Импорт из 1С</h2></div>
-    <div style="padding:14px 16px">
-      <div style="font-size:13px;color:var(--mu);margin-bottom:12px">Сфотографируй экран 1С и загрузи фото &#8212; система распознает накладные, адреса и статусы.</div>
-      <div id="imp1c-zone" onclick="document.getElementById('imp1c-input').click()" style="border:2px dashed var(--bd2);border-radius:10px;padding:24px;text-align:center;cursor:pointer;margin-bottom:12px;transition:.15s">
-        <div style="font-size:32px;margin-bottom:8px">&#128202;</div>
-        <div style="font-size:13px;font-weight:600;color:var(--tx)">Загрузить Excel из 1С (.xlsx)</div>
-        <div style="font-size:11px;color:var(--mu);margin-top:4px">Файл &#8594; Сохранить как &#8594; Excel</div>
-      </div>
-      <input type="file" id="imp1c-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="imp1cExcel(this)">
-      <div style="margin-bottom:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--mu);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Или вставьте текст из Ватсапа</div>
-        <textarea id="imp-text" placeholder="Вставьте текст с номерами накладных LK-XXXXXXX..." style="width:100%;min-height:80px;border:1px solid var(--bd2);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;resize:vertical;background:var(--card);color:var(--tx)"></textarea>
-        <button class="btn btn-sm" onclick="impParseText()" style="margin-top:6px">Распознать номера</button>
-      </div>
-      <div id="imp-loading" style="display:none;text-align:center;padding:20px;color:var(--mu)">
-        <div style="font-size:24px;margin-bottom:8px">&#9203;</div>
-        <div>Распозна&#1108;м накладные...</div>
-      </div>
-      <div id="imp-results" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div style="font-size:13px;font-weight:600" id="imp-summary"></div>
-          <button class="btn btn-sm" onclick="impReset()">&#10005; Сбросить</button>
-        </div>
-        <div id="imp-ready-block" style="margin-bottom:14px">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#1a7a40;margin-bottom:6px">&#128994; Готово к отгрузке</div>
-          <div id="imp-ready-list"></div>
-        </div>
-        <div id="imp-maybe-block" style="margin-bottom:14px">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#BA7517;margin-bottom:6px">&#128992; Резерв (может быть готово)</div>
-          <div id="imp-maybe-list"></div>
-        </div>
-        <div id="imp-add-block" style="background:var(--bg);border-radius:10px;padding:12px;margin-top:8px">
-          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Добавить выбранные в план</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:8px;margin-bottom:10px">
-            <div>
-              <div style="font-size:11px;color:var(--mu);margin-bottom:3px">Дата</div>
-              <input type="date" id="imp-date" class="fi" value="">
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--mu);margin-bottom:3px">Водитель</div>
-              <select id="imp-drv" class="fi"></select>
-            </div>
-            <div style="display:flex;align-items:flex-end">
-              <button onclick="impAddToPlan()" style="width:100%;padding:8px;background:var(--acc);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">+ В план</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 
 <div id="ttab" style="display:none">
   <div class="card">
@@ -664,7 +608,6 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
@@ -1812,12 +1755,12 @@ function swCfg(name){
 }
 
 function sw(n){
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',import:'timp',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc'};
   Object.keys(tabMap).forEach(function(t){
     var el=document.getElementById(tabMap[t]);
     if(el)el.style.display=t===n?'':'none';
   });
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',import:'Импорт',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С'};
   document.querySelectorAll('.tab').forEach(function(b){
     b.classList.toggle('on',b.textContent.trim()===(nameMap[n]||''));
   });
@@ -1825,7 +1768,6 @@ function sw(n){
   if(n==='cfg')lcfg();
   if(n==='warehouse')renderWarehouse();
   if(n==='stat'){statOffset=0;renderStat();}
-  if(n==='import'){impInitDrivers();}
   if(n==='hist'){loadAllRowsForHist();}
   if(n==='voice'){loadDispVoiceMsgs();}
   if(n==='cfg'){lcfg();swCfg('drivers');}
@@ -2701,161 +2643,6 @@ function loadAllRowsForHist(){
   });
 }
 
-var impRows = [];
-function impInitDrivers(){
-  var sel = document.getElementById('imp-drv');
-  if(!sel) return;
-  sel.innerHTML = '';
-  DRV_KEYS.forEach(function(k){
-    var n = dname(k);
-    if(n || k !== 'C') sel.innerHTML += '<option value="'+k+'">'+xe(n||'Водитель 3')+'</option>';
-  });
-  var dp = document.getElementById('imp-date');
-  if(dp && !dp.value) dp.value = curD || isoD(0);
-}
-function imp1cExcel(input){
-  var file = input.files[0];
-  if(!file) return;
-  document.getElementById('imp-loading').style.display = '';
-  document.getElementById('imp-results').style.display = 'none';
-  var reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      var wb = XLSX.read(e.target.result, {type:'array'});
-      var ws = wb.Sheets[wb.SheetNames[0]];
-      var rowsXl = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      var headerIdx = -1;
-      for(var i=0;i<Math.min(rowsXl.length,10);i++){
-        if(!rowsXl[i]) continue;
-        var rowStr = rowsXl[i].join(' ').toLowerCase();
-        if(rowStr.indexOf('накладная')!==-1 || rowStr.indexOf('состояние')!==-1){
-          headerIdx=i; break;
-        }
-      }
-      if(headerIdx===-1){
-        toast('Не знайдено заголовки таблиці');
-        document.getElementById('imp-loading').style.display='none';
-        return;
-      }
-      var headers = rowsXl[headerIdx].map(function(h){return String(h||'').toLowerCase().trim();});
-      var colNakl   = headers.findIndex(function(h){return h.indexOf('накладная')!==-1||h.indexOf('требование')!==-1;});
-      var colStatus = headers.findIndex(function(h){return h.indexOf('состояние')!==-1;});
-      var colCity   = headers.findIndex(function(h){return h.indexOf('город')!==-1;});
-      var colAddr   = headers.findIndex(function(h){return h.indexOf('проект')!==-1;});
-      var colWork   = headers.findIndex(function(h){return h.indexOf('вид')!==-1;});
-      var colCmt    = headers.findIndex(function(h){return h.indexOf('коммент')!==-1;});
-      var parsed = [];
-      for(var j=headerIdx+1;j<rowsXl.length;j++){
-        var r = rowsXl[j];
-        if(!r || r.length===0) continue;
-        var naklStr = String(r[colNakl]||'');
-        var invMatch = naklStr.match(/LK-\d+/);
-        if(!invMatch) continue;
-        var rawAddr = colAddr>=0 ? String(r[colAddr]||'') : '';
-        var addrMatch = rawAddr.match(/^(.*?\s+\d+[a-zA-Z]?\s*(?:EG|OG|DG|UG)?_?[LRM])/);
-        var cleanA = addrMatch ? addrMatch[1].trim() : rawAddr.split('+')[0].trim();
-        parsed.push({
-          inv: invMatch[0], addr: cleanA,
-          city: colCity>=0 ? String(r[colCity]||'') : '',
-          status: colStatus>=0 ? String(r[colStatus]||'') : '',
-          work_type: colWork>=0 ? String(r[colWork]||'') : '',
-          comment: colCmt>=0 ? String(r[colCmt]||'') : ''
-        });
-      }
-      if(!parsed.length){
-        toast('Накладные не найдены');
-        document.getElementById('imp-loading').style.display='none';
-        return;
-      }
-      impRenderResults(parsed);
-    }catch(err){
-      document.getElementById('imp-loading').style.display='none';
-      toast('Ошибка: '+err.message);
-    }
-  };
-  reader.readAsArrayBuffer(file);
-  input.value='';
-}
-function impParseText(){
-  var text = document.getElementById('imp-text').value;
-  if(!text.trim()) return;
-  var matches = text.match(/LK-\d+/g);
-  if(!matches||!matches.length){toast('Номера не найдены');return;}
-  var unique = matches.filter(function(v,i,a){return a.indexOf(v)===i;});
-  var parsed = unique.map(function(inv){
-    return {inv:inv, addr:'', city:'', status:'', work_type:'', comment:''};
-  });
-  impRenderResults(parsed);
-}
-function impRenderResults(rowsP){
-  document.getElementById('imp-loading').style.display = 'none';
-  document.getElementById('imp-results').style.display = '';
-  impRows = rowsP;
-  var ready=[], maybe=[];
-  rowsP.forEach(function(r, i){
-    r._idx = i; r._selected = false;
-    var st = (r.status||'').toLowerCase();
-    if(st.indexOf('собрано')!==-1||st.indexOf('к сборке')!==-1){r._category='ready';r._selected=true;ready.push(r);}
-    else if(st.indexOf('резерв')!==-1||st.indexOf('заказ')!==-1){r._category='maybe';maybe.push(r);}
-  });
-  document.getElementById('imp-summary').textContent = 'Готово: '+ready.length+' · Резерв: '+maybe.length+' из '+rowsP.length;
-  function renderList(list, containerId){
-    var el = document.getElementById(containerId);
-    if(!list.length){ el.innerHTML = '<div style="color:var(--mu);font-size:12px;padding:4px 0">Нет</div>'; return; }
-    el.innerHTML = list.map(function(r){
-      return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--bd)">'
-        +'<input type="checkbox" '+(r._selected?'checked':'')+' onchange="impToggle('+r._idx+',this.checked)">'
-        +'<div style="flex:1">'
-        +'<div style="font-size:12px;font-weight:700;color:#1856a0">'+xe(r.inv)+'</div>'
-        +(r.addr?'<div style="font-size:12px">'+xe(r.addr)+'</div>':'')
-        +(r.city?'<div style="font-size:11px;color:var(--mu)">'+xe(r.city)+'</div>':'')
-        +'</div></div>';
-    }).join('');
-  }
-  renderList(ready, 'imp-ready-list');
-  renderList(maybe, 'imp-maybe-list');
-  impInitDrivers();
-}
-function impToggle(idx, checked){
-  if(impRows[idx]) impRows[idx]._selected = checked;
-}
-function impReset(){
-  impRows = [];
-  document.getElementById('imp-results').style.display = 'none';
-  document.getElementById('imp-text').value = '';
-}
-function impAddToPlan(){
-  var date = document.getElementById('imp-date').value;
-  var drv = document.getElementById('imp-drv').value;
-  if(!date || !drv){ toast('Выберите дату и водителя'); return; }
-  var selected = impRows.filter(function(r){ return r._selected && r.inv; });
-  if(!selected.length){ toast('Выберите накладные'); return; }
-  var grouped = {};
-  selected.forEach(function(r){
-    var key = (r.addr||'') + '||' + (r.city||'');
-    if(!grouped[key]){
-      grouped[key] = {addr: r.addr||'', city: r.city||'', invs: [], comment: r.work_type||''};
-    }
-    grouped[key].invs.push(r.inv);
-  });
-  var maxOrder = 0;
-  rows.forEach(function(x){ if(x.order!=null&&x.order>maxOrder) maxOrder=x.order; });
-  var now = Date.now();
-  Object.values(grouped).forEach(function(g, i){
-    var rowId = uid();
-    maxOrder += 10;
-    db.ref('rows/'+rowId).set({
-      id: rowId, date: date, drv: drv,
-      city: g.city, addr: g.addr, invs: g.invs,
-      status: '—', comment: g.comment,
-      inRoute: true, done: false,
-      createdAt: now + i, order: maxOrder
-    });
-  });
-  toast('Добавлено '+Object.keys(grouped).length+' адресов ✓');
-  impReset();
-  sw('plan');
-}
 
 </script>
 </body>
