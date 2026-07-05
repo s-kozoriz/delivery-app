@@ -224,6 +224,11 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .inc-taken-h{padding:10px 14px;font-size:13px;color:#5a6470;cursor:pointer;border-top:1px solid #eef1f5;background:#fafbfc}
 .inc-taken-row{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;font-size:13px;border-top:1px solid #f2f4f7}
 .inc-return{border:none;background:#eef1f5;color:#5a6470;border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer}
+.inc-filters{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:10px 14px;border-bottom:1px solid #eef1f5;background:#fafbfc}
+.inc-fl{font-size:13px;color:#5a6470;display:inline-flex;align-items:center;gap:5px}
+.inc-fl select{border:1px solid #cdd6e0;border-radius:7px;padding:5px 8px;font-size:13px;font-family:inherit;background:#fff}
+.inc-fl input[type=checkbox]{width:16px;height:16px}
+.inc-fl-clear{border:none;background:#eef1f5;color:#5a6470;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -474,6 +479,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 <div id="tinc" style="display:none">
   <div class="card">
     <div class="ch"><h2>Входящие из 1С <span id="incCount" class="inc-badge"></span></h2></div>
+    <div id="incFilters" class="inc-filters"></div>
     <div id="incBody" style="overflow-x:auto"></div>
     <div class="inc-bar" id="incBar"></div>
     <div id="incTaken"></div>
@@ -2059,13 +2065,38 @@ function incUpdateBar(){
   bar.innerHTML = n ? ('Отмечено: <b>'+n+'</b> · вес <b>'+w+' кг</b><button class="inc-accept" onclick="incAccept()">Принять отмеченные ('+n+') &rarr;</button>')
                     : '<span style="color:#80786e">Отметьте накладные («Собрано» и «К сборке») — попадут в маршрут.</span>';
 }
+var incFilter={city:'',date:'',wh:'',ready:false};
+function incSetFilter(k,v){ incFilter[k]=v; renderInc(); }
+function incToggleReady(cb){ incFilter.ready=cb.checked; renderInc(); }
+function incClearFilters(){ incFilter={city:'',date:'',wh:'',ready:false}; renderInc(); }
+function incDistinct(arr,field){ var set={},out=[]; arr.forEach(function(r){var v=((r[field]||'')+'').trim(); if(v&&!set[v]){set[v]=1;out.push(v);}}); out.sort(); return out; }
+function incMatches(r){
+  if(incFilter.city && (r.city||'')!==incFilter.city)return false;
+  if(incFilter.date && (r.ship_date||'')!==incFilter.date)return false;
+  if(incFilter.wh && (r.warehouse||'')!==incFilter.wh)return false;
+  if(incFilter.ready && !incReady(r))return false;
+  return true;
+}
+function renderIncFilters(all){
+  var el=document.getElementById('incFilters'); if(!el)return;
+  function opts(list,cur){ return '<option value="">все</option>'+list.map(function(v){return '<option value="'+xe(v)+'"'+(cur===v?' selected':'')+'>'+xe(v)+'</option>';}).join(''); }
+  var active=(incFilter.city||incFilter.date||incFilter.wh||incFilter.ready);
+  el.innerHTML=
+    '<span class="inc-fl">Город <select onchange="incSetFilter(\'city\',this.value)">'+opts(incDistinct(all,'city'),incFilter.city)+'</select></span>'+
+    '<span class="inc-fl">Отгрузка <select onchange="incSetFilter(\'date\',this.value)">'+opts(incDistinct(all,'ship_date'),incFilter.date)+'</select></span>'+
+    '<span class="inc-fl">Склад <select onchange="incSetFilter(\'wh\',this.value)">'+opts(incDistinct(all,'warehouse'),incFilter.wh)+'</select></span>'+
+    '<label class="inc-fl"><input type="checkbox"'+(incFilter.ready?' checked':'')+' onchange="incToggleReady(this)"> только готовые</label>'+
+    (active?'<button class="inc-fl-clear" onclick="incClearFilters()">сбросить</button>':'');
+}
 function renderInc(){
   incBadge();
   var body=document.getElementById('incBody'); if(!body)return;
   Object.keys(incSel).forEach(function(inv){ if(!incAll[inv]||incAll[inv].accepted)delete incSel[inv]; });
-  var arr=incList().filter(function(r){return !r.accepted;});
-  arr.sort(function(a,b){ return (a.city||'').localeCompare(b.city||'')||(a.address||'').localeCompare(b.address||''); });
-  if(!arr.length){ body.innerHTML='<div class="inc-empty">Нет входящих накладных из 1С.</div>'; incUpdateBar(); renderIncTaken(); return; }
+  var all=incList().filter(function(r){return !r.accepted;});
+  renderIncFilters(all);
+  var arr=all.filter(incMatches);
+  arr.sort(function(a,b){ return (a.ship_date||'').localeCompare(b.ship_date||'')||(a.city||'').localeCompare(b.city||'')||(a.address||'').localeCompare(b.address||''); });
+  if(!arr.length){ body.innerHTML='<div class="inc-empty">'+(all.length?'Нет накладных под текущий фильтр.':'Нет входящих накладных из 1С.')+'</div>'; incUpdateBar(); renderIncTaken(); return; }
   var h='<table class="inc-tbl"><thead><tr><th></th><th>Состояние</th><th>Накладная</th><th>Склад</th><th>Адрес</th><th>Город</th><th>Отгрузка</th><th>Вес</th><th>Комментарий</th></tr></thead><tbody>';
   arr.forEach(function(r){
     var cb = incReady(r) ? ('<input type="checkbox" '+(incSel[r.invoice]?'checked':'')+' onchange="incToggle(\''+r.invoice+'\',this)">') : '<span class="inc-lock" title="не собрано">—</span>';
