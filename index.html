@@ -948,6 +948,7 @@ function ur(id,f,v){
   _pending[id+'/'+f]={v:v,ts:Date.now()};
   db.ref('rows/'+id+'/'+f).set(v);
   var r=rows.find(function(x){return x.id===id;});if(r)r[f]=v;
+  if(f==='date'&&v){ db.ref('rows/'+id+'/date_pending').remove(); if(r)r.date_pending=null; }
 }
 function _applyPending(){
   var now=Date.now();
@@ -1051,7 +1052,7 @@ function _rtblNow(){
     h+='</td>';
     h+='<td style="width:32px;text-align:center"><input type="checkbox" class="rchk"'+(r.inRoute!==false?' checked':'')+' onchange="tr(\''+r.id+'\',this.checked)"></td>';
     var dis=viewOnly?' disabled':'';
-    h+='<td style="width:90px">'+(isEditing?'<input type="date" value="'+(r.date||'')+'"'+dis+' onchange="ur(\''+r.id+'\',\'date\',this.value)" style="font-size:12px;padding:5px 4px">':'<span style="font-size:12px;padding:2px 4px;display:block">'+fmt(r.date||'')+'</span>')+'</td>';
+    h+='<td style="width:90px">'+(isEditing?'<input type="date" value="'+(r.date_pending?'':(r.date||''))+'"'+dis+' onchange="ur(\''+r.id+'\',\'date\',this.value)" style="font-size:12px;padding:5px 4px">':(r.date_pending?'<span style="font-size:11px;padding:2px 4px;display:block;color:#E24B4A;font-weight:600" title="1С не передала дату отгрузки — задайте дату">— нет даты</span>':'<span style="font-size:12px;padding:2px 4px;display:block">'+fmt(r.date||'')+'</span>'))+'</td>';
     if(isEditing){
       var sel='<td style="width:80px"><select onchange="ur(\''+r.id+'\',\'drv\',this.value)" style="'+dc+'">';
       if(r.fromTech)sel+='<option value=""'+((!r.drv||r.drv==='')?' selected':'')+'>— назначить —</option>';
@@ -2144,7 +2145,7 @@ function incAccept(){
   var invs=Object.keys(incSel).filter(function(inv){ var r=incAll[inv]; return r&&incReady(r)&&!r.accepted; });
   if(!invs.length){ toast('Отметьте «Собрано»/«К сборке» накладные'); return; }
   var groups={};
-  invs.forEach(function(inv){ var r=incAll[inv]; var edate=(r.ship_date||r.desired_date||isoD(0)); var key=(r.city||'')+'|'+(r.address||'')+'|'+edate; (groups[key]=groups[key]||[]).push(r); });
+  invs.forEach(function(inv){ var r=incAll[inv]; var edate=(r.ship_date||'').trim(); var key=(r.city||'')+'|'+(r.address||'')+'|'+edate; (groups[key]=groups[key]||[]).push(r); });
   var maxOrder=0; rows.forEach(function(x){ if(x.order!=null&&x.order>maxOrder)maxOrder=x.order; });
   var madeRows=0;
   Object.keys(groups).forEach(function(key){
@@ -2152,8 +2153,9 @@ function incAccept(){
     var wsum=g.reduce(function(a,r){return a+(typeof r.weight_kg==='number'?r.weight_kg:0);},0);
     maxOrder+=10;
     var _seen={}; var cmt=g.map(function(r){return (r.note||'').trim();}).filter(function(n){ if(!n||_seen[n])return false; _seen[n]=1; return true; }).join(', ');
+    var _sd=(first.ship_date||'').trim();
     var row={
-      id:uid(), date:(first.ship_date||first.desired_date||isoD(0)), drv:'', city:first.city||'', timeSlot:'',
+      id:uid(), date:(_sd||isoD(0)), date_pending:(_sd?null:true), drv:'', city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
       comment:cmt, weight:wsum||null, volume_m3:null, inRoute:true, done:false,
       createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null
