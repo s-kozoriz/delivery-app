@@ -2069,6 +2069,7 @@ var incFilter={city:'',date:'',wh:'',ready:false};
 function incSetFilter(k,v){ incFilter[k]=v; renderInc(); }
 function incToggleReady(cb){ incFilter.ready=cb.checked; renderInc(); }
 function incClearFilters(){ incFilter={city:'',date:'',wh:'',ready:false}; renderInc(); }
+function incFmtDate(d){ if(!d)return ''; var p=(''+d).split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):(''+d); }
 function incDistinct(arr,field){ var set={},out=[]; arr.forEach(function(r){var v=((r[field]||'')+'').trim(); if(v&&!set[v]){set[v]=1;out.push(v);}}); out.sort(); return out; }
 function incMatches(r){
   if(incFilter.city && (r.city||'')!==incFilter.city)return false;
@@ -2083,7 +2084,7 @@ function renderIncFilters(all){
   var active=(incFilter.city||incFilter.date||incFilter.wh||incFilter.ready);
   el.innerHTML=
     '<span class="inc-fl">Город <select onchange="incSetFilter(\'city\',this.value)">'+opts(incDistinct(all,'city'),incFilter.city)+'</select></span>'+
-    '<span class="inc-fl">Отгрузка <select onchange="incSetFilter(\'date\',this.value)">'+opts(incDistinct(all,'ship_date'),incFilter.date)+'</select></span>'+
+    '<span class="inc-fl">Дата отгрузки <select onchange="incSetFilter(\'date\',this.value)"><option value="">все</option>'+incDistinct(all,'ship_date').map(function(v){return '<option value="'+xe(v)+'"'+(incFilter.date===v?' selected':'')+'>'+incFmtDate(v)+'</option>';}).join('')+'</select></span>'+
     '<span class="inc-fl">Склад <select onchange="incSetFilter(\'wh\',this.value)">'+opts(incDistinct(all,'warehouse'),incFilter.wh)+'</select></span>'+
     '<label class="inc-fl"><input type="checkbox"'+(incFilter.ready?' checked':'')+' onchange="incToggleReady(this)"> только готовые</label>'+
     (active?'<button class="inc-fl-clear" onclick="incClearFilters()">сбросить</button>':'');
@@ -2097,7 +2098,7 @@ function renderInc(){
   var arr=all.filter(incMatches);
   arr.sort(function(a,b){ return (a.ship_date||'').localeCompare(b.ship_date||'')||(a.city||'').localeCompare(b.city||'')||(a.address||'').localeCompare(b.address||''); });
   if(!arr.length){ body.innerHTML='<div class="inc-empty">'+(all.length?'Нет накладных под текущий фильтр.':'Нет входящих накладных из 1С.')+'</div>'; incUpdateBar(); renderIncTaken(); return; }
-  var h='<table class="inc-tbl"><thead><tr><th></th><th>Состояние</th><th>Накладная</th><th>Склад</th><th>Адрес</th><th>Город</th><th>Отгрузка</th><th>Вес</th><th>Комментарий</th></tr></thead><tbody>';
+  var h='<table class="inc-tbl"><thead><tr><th></th><th>Состояние</th><th>Накладная</th><th>Склад</th><th>Город</th><th>Адрес</th><th>Дата отгрузки</th><th>Вес</th><th>Комментарий</th></tr></thead><tbody>';
   arr.forEach(function(r){
     var cb = incReady(r) ? ('<input type="checkbox" '+(incSel[r.invoice]?'checked':'')+' onchange="incToggle(\''+r.invoice+'\',this)">') : '<span class="inc-lock" title="не собрано">—</span>';
     var w=(typeof r.weight_kg==='number')?r.weight_kg:'—';
@@ -2106,9 +2107,9 @@ function renderInc(){
       '<td>'+xe(r.ready_status||'')+'</td>'+
       '<td>'+xe(r.invoice)+(r.order_code?'<div class="inc-sub">'+xe(r.order_code)+'</div>':'')+'</td>'+
       '<td>'+xe(r.warehouse||'—')+'</td>'+
-      '<td>'+xe(r.address||'')+(r.work_type?'<div class="inc-sub">'+xe(r.work_type)+'</div>':'')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
-      '<td>'+xe(r.ship_date||'—')+(r.desired_date?'<div class="inc-sub">план '+xe(r.desired_date)+'</div>':'')+'</td>'+
+      '<td>'+xe(r.address||'')+(r.work_type?'<div class="inc-sub">'+xe(r.work_type)+'</div>':'')+'</td>'+
+      '<td>'+(r.ship_date?incFmtDate(r.ship_date):'—')+(r.desired_date?'<div class="inc-sub">план '+incFmtDate(r.desired_date)+'</div>':'')+'</td>'+
       '<td>'+w+'</td>'+
       '<td>'+xe(r.note||'')+'</td>'+
       '</tr>';
