@@ -211,8 +211,6 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .inc-empty{padding:26px;text-align:center;color:#80786e}
 .inc-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
-.inc-th-sort{cursor:pointer;user-select:none}
-.inc-th-sort:hover{background:#eef1f5;color:#1a2a3a}
 .inc-tbl td{padding:7px 8px;border-bottom:1px solid #eef1f5;vertical-align:top}
 .inc-tbl tr.inc-ready{background:#eaf3ff}
 .inc-tbl tr.inc-reserve{background:#eefaf0}
@@ -226,11 +224,15 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .inc-taken-h{padding:10px 14px;font-size:13px;color:#5a6470;cursor:pointer;border-top:1px solid #eef1f5;background:#fafbfc}
 .inc-taken-row{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;font-size:13px;border-top:1px solid #f2f4f7}
 .inc-return{border:none;background:#eef1f5;color:#5a6470;border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer}
-.inc-filters{display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:10px 14px;border-bottom:1px solid #eef1f5;background:#fafbfc}
-.inc-fl{font-size:13px;color:#5a6470;display:inline-flex;align-items:center;gap:5px}
-.inc-fl select{border:1px solid #cdd6e0;border-radius:7px;padding:5px 8px;font-size:13px;font-family:inherit;background:#fff}
-.inc-fl input[type=checkbox]{width:16px;height:16px}
-.inc-fl-clear{border:none;background:#eef1f5;color:#5a6470;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer}
+.inc-h{vertical-align:top}
+.inc-h-cb{width:34px;text-align:center}
+.inc-h-lbl{cursor:pointer;user-select:none;white-space:nowrap;padding:2px 3px;border-radius:5px;display:inline-block}
+.inc-h-lbl:hover{background:#eef1f5;color:#1a2a3a}
+.inc-h-on{color:#1a2a3a}
+.inc-h-sel{margin-top:6px;width:100%;min-width:94px;max-width:170px;border:1px solid #cdd6e0;border-radius:6px;padding:4px 6px;font-size:12px;font-family:inherit;font-weight:400;text-transform:none;letter-spacing:normal;color:#5a6470;background:#fff}
+.inc-h-selon{border-color:#1a7a40;color:#1a7a40;background:#f2fbf5;font-weight:600}
+.inc-h-reset{border:none;background:#f2d9dc;color:#c0392b;border-radius:50%;width:22px;height:22px;font-size:15px;line-height:20px;cursor:pointer;padding:0}
+.inc-h-reset:hover{background:#e9c4c8}
 </style>
 </head>
 <body>
@@ -481,7 +483,6 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 <div id="tinc" style="display:none">
   <div class="card">
     <div class="ch"><h2>Входящие из 1С <span id="incCount" class="inc-badge"></span></h2></div>
-    <div id="incFilters" class="inc-filters"></div>
     <div id="incBody" style="overflow-x:auto"></div>
     <div class="inc-bar" id="incBar"></div>
     <div id="incTaken"></div>
@@ -2067,10 +2068,10 @@ function incUpdateBar(){
   bar.innerHTML = n ? ('Отмечено: <b>'+n+'</b> · вес <b>'+w+' кг</b><button class="inc-accept" onclick="incAccept()">Принять отмеченные ('+n+') &rarr;</button>')
                     : '<span style="color:#80786e">Отметьте накладные («Собрано» и «К сборке») — попадут в маршрут.</span>';
 }
-var incFilter={state:'',wh:'',city:'',date:'',ready:false};
+var incFilter={state:'',wh:'',city:'',date:''};
 function incSetFilter(k,v){ incFilter[k]=v; renderInc(); }
-function incToggleReady(cb){ incFilter.ready=cb.checked; renderInc(); }
-function incClearFilters(){ incFilter={state:'',wh:'',city:'',date:'',ready:false}; renderInc(); }
+function incClearFilters(){ incFilter={state:'',wh:'',city:'',date:''}; renderInc(); }
+function incFilterActive(){ return !!(incFilter.state||incFilter.wh||incFilter.city||incFilter.date); }
 var incSort={field:'ship_date',dir:1};
 function incSortBy(f){ if(incSort.field===f){incSort.dir=-incSort.dir;}else{incSort.field=f;incSort.dir=1;} renderInc(); }
 function incCmp(a,b){
@@ -2078,39 +2079,49 @@ function incCmp(a,b){
   if(f==='weight_kg'){ var wa=(typeof a.weight_kg==='number'?a.weight_kg:-1),wb=(typeof b.weight_kg==='number'?b.weight_kg:-1); return (wa-wb)*incSort.dir; }
   return (((a[f]||'')+'').toLowerCase()).localeCompare(((b[f]||'')+'').toLowerCase())*incSort.dir;
 }
-function incTh(label,field){ var ar=incSort.field===field?(incSort.dir>0?' &#9650;':' &#9660;'):''; return '<th class="inc-th-sort" onclick="incSortBy(\''+field+'\')">'+label+ar+'</th>'; }
+function incThF(label,field,fkey,list){
+  var ar=incSort.field===field?(incSort.dir>0?' &#9650;':' &#9660;'):'';
+  var lbl='<div class="inc-h-lbl'+(incSort.field===field?' inc-h-on':'')+'" onclick="incSortBy(\''+field+'\')" title="сортировать">'+label+ar+'</div>';
+  var sel='';
+  if(fkey){
+    var cur=incFilter[fkey];
+    var o='<option value="">все</option>';
+    if(fkey==='state'&&list.length) o+='<option value="__ready__"'+(cur==='__ready__'?' selected':'')+'>готовые</option>';
+    o+=list.map(function(v){return '<option value="'+xe(v)+'"'+(cur===v?' selected':'')+'>'+(fkey==='date'?incFmtDate(v):xe(v))+'</option>';}).join('');
+    sel='<select class="inc-h-sel'+(cur?' inc-h-selon':'')+'" onchange="incSetFilter(\''+fkey+'\',this.value)">'+o+'</select>';
+  }
+  return '<th class="inc-h">'+lbl+sel+'</th>';
+}
 function incFmtDate(d){ if(!d)return ''; var p=(''+d).split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):(''+d); }
 function incDistinct(arr,field){ var set={},out=[]; arr.forEach(function(r){var v=((r[field]||'')+'').trim(); if(v&&!set[v]){set[v]=1;out.push(v);}}); out.sort(); return out; }
 function incMatches(r){
-  if(incFilter.state && (r.ready_status||'')!==incFilter.state)return false;
+  if(incFilter.state){ if(incFilter.state==='__ready__'){ if(!incReady(r))return false; } else if((r.ready_status||'')!==incFilter.state)return false; }
   if(incFilter.city && (r.city||'')!==incFilter.city)return false;
   if(incFilter.date && (r.ship_date||'')!==incFilter.date)return false;
   if(incFilter.wh && (r.warehouse||'')!==incFilter.wh)return false;
-  if(incFilter.ready && !incReady(r))return false;
   return true;
-}
-function renderIncFilters(all){
-  var el=document.getElementById('incFilters'); if(!el)return;
-  function opts(list,cur){ return '<option value="">все</option>'+list.map(function(v){return '<option value="'+xe(v)+'"'+(cur===v?' selected':'')+'>'+xe(v)+'</option>';}).join(''); }
-  var active=(incFilter.state||incFilter.wh||incFilter.city||incFilter.date||incFilter.ready);
-  el.innerHTML=
-    '<span class="inc-fl">Состояние <select onchange="incSetFilter(\'state\',this.value)">'+opts(incDistinct(all,'ready_status'),incFilter.state)+'</select></span>'+
-    '<span class="inc-fl">Склад <select onchange="incSetFilter(\'wh\',this.value)">'+opts(incDistinct(all,'warehouse'),incFilter.wh)+'</select></span>'+
-    '<span class="inc-fl">Город <select onchange="incSetFilter(\'city\',this.value)">'+opts(incDistinct(all,'city'),incFilter.city)+'</select></span>'+
-    '<span class="inc-fl">Дата отгрузки <select onchange="incSetFilter(\'date\',this.value)"><option value="">все</option>'+incDistinct(all,'ship_date').map(function(v){return '<option value="'+xe(v)+'"'+(incFilter.date===v?' selected':'')+'>'+incFmtDate(v)+'</option>';}).join('')+'</select></span>'+
-    '<label class="inc-fl"><input type="checkbox"'+(incFilter.ready?' checked':'')+' onchange="incToggleReady(this)"> только готовые</label>'+
-    (active?'<button class="inc-fl-clear" onclick="incClearFilters()">сбросить</button>':'');
 }
 function renderInc(){
   incBadge();
   var body=document.getElementById('incBody'); if(!body)return;
   Object.keys(incSel).forEach(function(inv){ if(!incAll[inv]||incAll[inv].accepted)delete incSel[inv]; });
   var all=incList().filter(function(r){return !r.accepted;});
-  renderIncFilters(all);
+  if(!all.length){ body.innerHTML='<div class="inc-empty">Нет входящих накладных из 1С.</div>'; incUpdateBar(); renderIncTaken(); return; }
   var arr=all.filter(incMatches);
   arr.sort(incCmp);
-  if(!arr.length){ body.innerHTML='<div class="inc-empty">'+(all.length?'Нет накладных под текущий фильтр.':'Нет входящих накладных из 1С.')+'</div>'; incUpdateBar(); renderIncTaken(); return; }
-  var h='<table class="inc-tbl"><thead><tr><th></th>'+incTh('Состояние','ready_status')+incTh('Накладная','invoice')+incTh('Склад','warehouse')+incTh('Город','city')+incTh('Адрес','address')+incTh('Дата отгрузки','ship_date')+incTh('Вес','weight_kg')+'<th>Комментарий</th></tr></thead><tbody>';
+  var reset=incFilterActive()?'<button class="inc-h-reset" title="сбросить фильтры" onclick="incClearFilters()">&times;</button>':'';
+  var h='<table class="inc-tbl"><thead><tr>'+
+    '<th class="inc-h-cb">'+reset+'</th>'+
+    incThF('Состояние','ready_status','state',incDistinct(all,'ready_status'))+
+    incThF('Накладная','invoice','')+
+    incThF('Склад','warehouse','wh',incDistinct(all,'warehouse'))+
+    incThF('Город','city','city',incDistinct(all,'city'))+
+    incThF('Адрес','address','')+
+    incThF('Дата отгрузки','ship_date','date',incDistinct(all,'ship_date'))+
+    incThF('Вес','weight_kg','')+
+    '<th class="inc-h">Комментарий</th>'+
+    '</tr></thead><tbody>';
+  if(!arr.length){ h+='<tr><td colspan="9" class="inc-empty">Нет накладных под текущий фильтр. <a href="#" onclick="incClearFilters();return false;">сбросить</a></td></tr>'; }
   arr.forEach(function(r){
     var cb = incReady(r) ? ('<input type="checkbox" '+(incSel[r.invoice]?'checked':'')+' onchange="incToggle(\''+r.invoice+'\',this)">') : '<span class="inc-lock" title="не собрано">—</span>';
     var w=(typeof r.weight_kg==='number')?r.weight_kg:'—';
