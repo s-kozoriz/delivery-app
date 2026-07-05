@@ -681,9 +681,11 @@ db.ref('rows').orderByChild('date').startAt(_fromD).endAt(_toD).on('value',funct
   rows=s.val()?Object.values(s.val()):[];
   _applyPending();
   if(Date.now()-_lastEdit>1500){rtbl();}
-  gm();rh();
+  gm();rh();incReconcile();
   document.getElementById('sync').className='sync ok';
 },function(){document.getElementById('sync').className='sync err';});
+
+db.ref('1c/delivery/placed').on('value',function(s){incPlaced=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
 
 db.ref('cfg').on('value',function(s){
   if(s.val()){
@@ -916,7 +918,11 @@ function renderNrfInvs(cell){
   cell.innerHTML=html;
 }
 
-function dr(id){db.ref('rows/'+id).remove();}
+function dr(id){
+  var r=rows.find(function(x){return x.id===id;});
+  if(r){ (r.invs||[]).forEach(function(inv){ inv=(''+(inv||'')).trim(); if(inv&&incPlaced[inv]&&incPlaced[inv].rowId===id) db.ref('1c/delivery/placed/'+inv).remove(); }); }
+  db.ref('rows/'+id).remove();
+}
 function toggleDone(id,val){
   db.ref('rows/'+id+'/done').set(val);
   if(val)db.ref('rows/'+id+'/doneTs').set(Date.now());
@@ -972,9 +978,11 @@ function di(id,i){
   _lastEdit=Date.now();
   var r=rows.find(function(x){return x.id===id;});if(!r)return;
   var inv=[].concat(r.invs||['']);
+  var removed=(''+(inv[i]||'')).trim();
   if(inv.length===1){inv[0]='';}else{inv.splice(i,1);}
   r.invs=inv;
   db.ref('rows/'+id+'/invs').set(inv);
+  if(removed&&incPlaced[removed]&&incPlaced[removed].rowId===id) db.ref('1c/delivery/placed/'+removed).remove();
   rtbl();
 }
 function ui(id,i,v){
@@ -2056,12 +2064,22 @@ function renderCalib(){ renderCalibPhotos(); renderCalibList(); }
 // ─── ВХОДЯЩИЕ ИЗ 1С ─────────────────────────────────────────
 var incAll={};        // /1c/delivery/incoming/{invoice}
 var incSel={};        // {invoice:true} — отмеченные
+var incPlaced={};     // /1c/delivery/placed/{invoice} — реестр «взято в план» (raper НЕ трогает)
 var incShowTaken=false;
 function incList(){ return Object.keys(incAll).map(function(k){return incAll[k];}).filter(function(r){return r&&r.invoice;}); }
+// самолечение реестра: любая накладная, уже присутствующая в строке плана, помечается placed
+function incReconcile(){
+  if(!rows||!rows.length)return;
+  rows.forEach(function(r){ if(!r||!r.invs)return;
+    (r.invs||[]).forEach(function(inv){ inv=(''+(inv||'')).trim();
+      if(inv&&!incPlaced[inv]){ db.ref('1c/delivery/placed/'+inv).set({rowId:r.id,date:r.date||'',invoice:inv,address:r.addr||'',city:r.city||'',ts:Date.now()}); }
+    });
+  });
+}
 function incReady(r){ var s=(r.ready_status||'').trim(); if(!s)return true; return s.indexOf('Собран')===0||s.indexOf('К сбор')===0; }
 function incColor(r){ var s=(r.ready_status||'').trim(); if(!s)return ''; if(s.indexOf('Собран')===0)return 'inc-ready'; if(s.indexOf('К сбор')===0)return 'inc-tosb'; if(s.indexOf('Заказ')===0)return 'inc-order'; return 'inc-reserve'; }
 function incSelWeight(){ var t=0; Object.keys(incSel).forEach(function(inv){ var r=incAll[inv]; if(r&&incSel[inv]&&typeof r.weight_kg==='number')t+=r.weight_kg; }); return Math.round(t*100)/100; }
-function incBadge(){ var n=incList().filter(function(r){return !r.accepted;}).length; var t=document.getElementById('tabInc'); if(t)t.classList.toggle('has-new',n>0); var c=document.getElementById('incCount'); if(c)c.textContent=n?('('+n+')'):''; }
+function incBadge(){ var n=incList().filter(function(r){return !incPlaced[r.invoice];}).length; var t=document.getElementById('tabInc'); if(t)t.classList.toggle('has-new',n>0); var c=document.getElementById('incCount'); if(c)c.textContent=n?('('+n+')'):''; }
 function incToggle(inv,cb){ if(cb.checked)incSel[inv]=true; else delete incSel[inv]; incUpdateBar(); }
 function incUpdateBar(){
   var bar=document.getElementById('incBar'); if(!bar)return;
@@ -2105,8 +2123,8 @@ function incMatches(r){
 function renderInc(){
   incBadge();
   var body=document.getElementById('incBody'); if(!body)return;
-  Object.keys(incSel).forEach(function(inv){ if(!incAll[inv]||incAll[inv].accepted)delete incSel[inv]; });
-  var all=incList().filter(function(r){return !r.accepted;});
+  Object.keys(incSel).forEach(function(inv){ if(!incAll[inv]||incPlaced[inv])delete incSel[inv]; });
+  var all=incList().filter(function(r){return !incPlaced[r.invoice];});
   if(!all.length){ body.innerHTML='<div class="inc-empty">Нет входящих накладных из 1С.</div>'; incUpdateBar(); renderIncTaken(); return; }
   var arr=all.filter(incMatches);
   arr.sort(incCmp);
@@ -2142,7 +2160,7 @@ function renderInc(){
   body.innerHTML=h; incUpdateBar(); renderIncTaken();
 }
 function incAccept(){
-  var invs=Object.keys(incSel).filter(function(inv){ var r=incAll[inv]; return r&&incReady(r)&&!r.accepted; });
+  var invs=Object.keys(incSel).filter(function(inv){ var r=incAll[inv]; return r&&incReady(r)&&!incPlaced[inv]; });
   if(!invs.length){ toast('Отметьте «Собрано»/«К сборке» накладные'); return; }
   var groups={};
   invs.forEach(function(inv){ var r=incAll[inv]; var edate=(r.ship_date||'').trim(); var key=(r.city||'')+'|'+(r.address||'')+'|'+edate; (groups[key]=groups[key]||[]).push(r); });
@@ -2161,7 +2179,7 @@ function incAccept(){
       createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null
     };
     db.ref('rows/'+row.id).set(row);
-    g.forEach(function(r){ db.ref('1c/delivery/incoming/'+r.invoice).update({accepted:true,acceptedRow:row.id}); });
+    g.forEach(function(r){ db.ref('1c/delivery/placed/'+r.invoice).set({rowId:row.id,date:row.date,invoice:r.invoice,address:r.address||'',city:r.city||'',ts:Date.now()}); });
     madeRows++;
   });
   incSel={};
@@ -2170,19 +2188,26 @@ function incAccept(){
 }
 function renderIncTaken(){
   var el=document.getElementById('incTaken'); if(!el)return;
-  var taken=incList().filter(function(r){return r.accepted;});
+  var taken=Object.keys(incPlaced).map(function(k){return incPlaced[k];}).filter(function(p){return p&&p.invoice;});
+  taken.sort(function(a,b){return (b.ts||0)-(a.ts||0);});
   if(!taken.length){ el.innerHTML=''; return; }
-  var head='<div class="inc-taken-h" onclick="incShowTaken=!incShowTaken;renderIncTaken()">Принятые ранее: '+taken.length+'  '+(incShowTaken?'&#9650;':'&#9660;')+'</div>';
+  var head='<div class="inc-taken-h" onclick="incShowTaken=!incShowTaken;renderIncTaken()">В плане отгрузки: '+taken.length+'  '+(incShowTaken?'&#9650;':'&#9660;')+'</div>';
   if(!incShowTaken){ el.innerHTML=head; return; }
-  el.innerHTML=head+taken.map(function(r){
-    return '<div class="inc-taken-row"><span>'+xe(r.invoice)+' &middot; '+xe(r.address||'')+'</span><button class="inc-return" onclick="incReturn(\''+r.invoice+'\',\''+(r.acceptedRow||'')+'\')">вернуть</button></div>';
+  el.innerHTML=head+taken.map(function(p){
+    return '<div class="inc-taken-row"><span>'+xe(p.invoice)+' &middot; '+xe(p.address||'')+'</span><button class="inc-return" onclick="incReturn(\''+p.invoice+'\',\''+(p.rowId||'')+'\')">вернуть</button></div>';
   }).join('');
 }
 function incReturn(inv,rowId){
-  if(rowId) db.ref('rows/'+rowId).remove();
-  db.ref('1c/delivery/incoming/'+inv+'/accepted').remove();
-  db.ref('1c/delivery/incoming/'+inv+'/acceptedRow').remove();
-  toast('Возвращено во входящие');
+  db.ref('1c/delivery/placed/'+inv).remove();
+  if(rowId){
+    db.ref('rows/'+rowId+'/invs').once('value').then(function(s){
+      var iv=(s.val()||[]).filter(function(x){return (''+(x||'')).trim()&&x!==inv;});
+      if(iv.length){ db.ref('rows/'+rowId+'/invs').set(iv); }
+      else { db.ref('rows/'+rowId).remove(); }
+    });
+  }
+  toast('Возвращено в «Входящие»');
+  renderInc();
 }
 function renderInc0(){ renderInc(); }
 
