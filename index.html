@@ -2054,8 +2054,8 @@ var incAll={};        // /1c/delivery/incoming/{invoice}
 var incSel={};        // {invoice:true} — отмеченные
 var incShowTaken=false;
 function incList(){ return Object.keys(incAll).map(function(k){return incAll[k];}).filter(function(r){return r&&r.invoice;}); }
-function incReady(r){ var s=(r.ready_status||''); return s.indexOf('Собран')===0||s.indexOf('К сбор')===0; }
-function incColor(r){ var s=r.ready_status||''; if(s.indexOf('Собран')===0)return 'inc-ready'; if(s.indexOf('К сбор')===0)return 'inc-tosb'; if(s.indexOf('Заказ')===0)return 'inc-order'; return 'inc-reserve'; }
+function incReady(r){ var s=(r.ready_status||'').trim(); if(!s)return true; return s.indexOf('Собран')===0||s.indexOf('К сбор')===0; }
+function incColor(r){ var s=(r.ready_status||'').trim(); if(!s)return ''; if(s.indexOf('Собран')===0)return 'inc-ready'; if(s.indexOf('К сбор')===0)return 'inc-tosb'; if(s.indexOf('Заказ')===0)return 'inc-order'; return 'inc-reserve'; }
 function incSelWeight(){ var t=0; Object.keys(incSel).forEach(function(inv){ var r=incAll[inv]; if(r&&incSel[inv]&&typeof r.weight_kg==='number')t+=r.weight_kg; }); return Math.round(t*100)/100; }
 function incBadge(){ var n=incList().filter(function(r){return !r.accepted;}).length; var t=document.getElementById('tabInc'); if(t)t.classList.toggle('has-new',n>0); var c=document.getElementById('incCount'); if(c)c.textContent=n?('('+n+')'):''; }
 function incToggle(inv,cb){ if(cb.checked)incSel[inv]=true; else delete incSel[inv]; incUpdateBar(); }
