@@ -785,6 +785,7 @@ firebase.auth().onAuthStateChanged(function(user){
 function dispLogout(){ if(confirm('Выйти и сменить вход?')){ firebase.auth().signOut().then(function(){ location.replace('login.html'); }); } }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function isoD(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function wkg(n){ if(typeof n!=='number'||isNaN(n))return '0'; return n>=1?String(Math.round(n)):String(Math.round(n*10)/10); }
 function fmt(iso){
   var d=new Date(iso+'T12:00:00');
   var dn=['вс','пн','вт','ср','чт','пт','сб'];
@@ -1066,7 +1067,7 @@ function _rtblNow(){
     if(isEditing){
       h+='<td><input type="number" value="'+(r.weight||'')+'" min="0" max="9999" placeholder="кг" onchange="ur(\''+r.id+'\',\'weight\',this.value?Number(this.value):null)" style="width:100%;font-size:11px;padding:3px 4px;border:1px solid #c4c0b4;border-radius:4px"></td>';
     } else {
-      var wLbl=r.weight?r.weight+'кг':'—';
+      var wLbl=r.weight?wkg(r.weight)+'кг':'—';
       var wCol=r.weight>100?'color:#E24B4A':r.weight>20?'color:#854F0B':'color:var(--mu)';
       h+='<td><span style="font-size:11px;'+wCol+'">'+wLbl+'</span></td>';
     }
@@ -2107,7 +2108,7 @@ function renderInc(){
   if(!arr.length){ h+='<tr><td colspan="9" class="inc-empty">Нет накладных под текущий фильтр. <a href="#" onclick="incClearFilters();return false;">сбросить</a></td></tr>'; }
   arr.forEach(function(r){
     var cb = incReady(r) ? ('<input type="checkbox" '+(incSel[r.invoice]?'checked':'')+' onchange="incToggle(\''+r.invoice+'\',this)">') : '<span class="inc-lock" title="не собрано">—</span>';
-    var w=(typeof r.weight_kg==='number')?r.weight_kg:'—';
+    var w=(typeof r.weight_kg==='number')?wkg(r.weight_kg):'—';
     h+='<tr class="'+incColor(r)+'">'+
       '<td>'+cb+'</td>'+
       '<td>'+xe(r.ready_status||'')+'</td>'+
@@ -2139,7 +2140,7 @@ function incAccept(){
     var row={
       id:uid(), date:(_sd||isoD(0)), date_pending:(_sd?null:true), drv:'', city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
-      comment:cmt, weight:wsum||null, volume_m3:null, inRoute:true, done:false,
+      comment:cmt, weight:(wsum?Math.round(wsum*100)/100:null), volume_m3:null, inRoute:true, done:false,
       createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null
     };
     db.ref('rows/'+row.id).set(row);
