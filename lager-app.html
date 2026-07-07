@@ -138,14 +138,12 @@ function startLager(){
   renderCard();
 }
 
+function pageFor(c){c=c||{};var r=c.role;if(r==='zentrum'||r==='norden'||r==='lager')return 'index.html';if(r==='driver')return ({L:'lesha-app.html',R:'roma-app.html',C:'driver3-app.html',V:'valentyn-app.html'})[c.drv]||'login.html';if(r==='tech')return 'tech-app.html';if(r==='loader')return 'lager-app.html';return 'login.html';}
 firebase.auth().onAuthStateChanged(function(user){
   if(!user){ location.replace('login.html'); return; }
   user.getIdTokenResult().then(function(res){
     var c = res.claims || {};
-    if(c.role !== 'loader' || !c.lagerId){
-      document.getElementById('loading').innerHTML = 'Этот вход не для грузчика.<br><br><button class="exit-btn" style="background:#1a7a40" onclick="lgLogout()">Сменить вход</button>';
-      return;
-    }
+    if(c.role !== 'loader' || !c.lagerId){ location.replace(pageFor(c)); return; }
     DRV = c.lagerId; NAME = c.name || '';
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = '';

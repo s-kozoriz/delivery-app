@@ -91,19 +91,29 @@ function check(){
   document.getElementById('err').textContent = 'Проверка...';
   fetch(AUTH_URL, {
     method: 'POST',
+    cache: 'no-store',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({pin: buf})
   })
   .then(function(r){ return r.json(); })
   .then(function(res){
     if(!res || !res.ok || !res.token){ throw new Error('bad pin'); }
-    return firebase.auth().signInWithCustomToken(res.token).then(function(){
+    // Чистимо БУДЬ-ЯКУ попередню сесію (щоб чужий вхід не «протік» у наступний), тоді входимо новим токеном
+    return firebase.auth().signOut().catch(function(){}).then(function(){
+      return firebase.auth().signInWithCustomToken(res.token);
+    }).then(function(){
       sessionStorage.setItem('login_from','login');
       if(res.role==='zentrum' || res.role==='norden' || res.role==='lager'){
         sessionStorage.setItem('login_role', res.role);
+      } else {
+        sessionStorage.removeItem('login_role');
       }
       if(res.techId){ sessionStorage.setItem('login_techId', res.techId); }
-      window.location.href = res.page || 'index.html';
+      else { sessionStorage.removeItem('login_techId'); }
+      // Дочекатись, поки токен реально збережеться, і ЛИШЕ тоді переходити (усуває гонку персистентності)
+      return firebase.auth().currentUser.getIdToken().then(function(){
+        window.location.href = res.page || 'index.html';
+      });
     });
   })
   .catch(function(){

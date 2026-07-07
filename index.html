@@ -769,12 +769,14 @@ function lockNonCRows(){
     }
   });
 }
-// Auth gate (Варіант A): роль береться з custom-token claim
+// Auth gate (Варіант A): роль береться з custom-token claim; кожна сторінка звіряє СВОЮ роль
+function pageFor(c){c=c||{};var r=c.role;if(r==='zentrum'||r==='norden'||r==='lager')return 'index.html';if(r==='driver')return ({L:'lesha-app.html',R:'roma-app.html',C:'driver3-app.html',V:'valentyn-app.html'})[c.drv]||'login.html';if(r==='tech')return 'tech-app.html';if(r==='loader')return 'lager-app.html';return 'login.html';}
 firebase.auth().onAuthStateChanged(function(user){
   if(!user){ location.replace('login.html'); return; }
-  sessionStorage.removeItem('login_role');
   user.getIdTokenResult().then(function(res){
-    var role=(res.claims&&res.claims.role)||'zentrum';
+    var c=res.claims||{}; var role=c.role||'';
+    if(!(role==='zentrum'||role==='norden'||role==='lager')){ location.replace(pageFor(c)); return; }
+    sessionStorage.removeItem('login_role');
     if(role==='norden'){disp2Mode=true;enter(false);}
     else if(role==='lager'){disp2Mode=false;enter(true);}
     else{disp2Mode=false;enter(false);}
