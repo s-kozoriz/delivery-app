@@ -594,6 +594,30 @@ window.addEventListener('online', function() {
   setTimeout(processQueue, 2000);
 });
 setTimeout(processQueue, 3000);
+// периодический повтор — на случай слабой сети (событие 'online' не срабатывает, если onLine и так true)
+setInterval(function(){ if (offlineQueue.length && navigator.onLine) processQueue(); }, 30000);
+
+function enqueuePhoto(file, rowId, path, localId, ts) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var b64 = e.target.result;
+    var r = rows.find(function(x) { return x.id === rowId; });
+    var photos = (r && r.photos) ? [].concat(r.photos) : [];
+    var photoTs = (r && r.photoTs) ? [].concat(r.photoTs) : [];
+    if (photos.indexOf('pending:' + localId) === -1) { photos.push('pending:' + localId); photoTs.push(ts); }
+    if(r){ r.photos = photos; r.photoTs = photoTs; }
+    render();
+    try {
+      offlineQueue.push({rowId: rowId, path: path, b64: b64, localId: localId, ts: ts});
+      saveQueue();
+      showToast('Слабая сеть — фото сохранено, загрузится само');
+      setTimeout(processQueue, 1500);
+    } catch(e) {
+      showToast('Нет места для хранения фото');
+    }
+  };
+  reader.readAsDataURL(file);
+}
 
 function uploadPhotoWithQueue(file, rowId) {
   var ext = (file.name || 'jpg').split('.').pop().toLowerCase() || 'jpg';
@@ -602,7 +626,7 @@ function uploadPhotoWithQueue(file, rowId) {
   var ts = Date.now();
 
   if (navigator.onLine) {
-    // Online: upload directly without localStorage
+    // Есть сеть: пробуем сразу; если не удалось (слабый сигнал/таймаут) — в очередь на автоповтор
     showToast('Загружаем фото...');
     storage.ref(path).put(file).then(function(snap) {
       return snap.ref.getDownloadURL();
@@ -618,29 +642,11 @@ function uploadPhotoWithQueue(file, rowId) {
       showToast('Фото добавлено ✓');
       render();
     }).catch(function(err) {
-      showToast('Ошибка загрузки: ' + (err.message||err));
+      // Плохая сеть: НЕ теряем фото — кладём в очередь, она повторит сама
+      enqueuePhoto(file, rowId, path, localId, ts);
     });
   } else {
-    // Offline: save to localStorage queue
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var b64 = e.target.result;
-      var r = rows.find(function(x) { return x.id === rowId; });
-      var photos = (r && r.photos) ? [].concat(r.photos) : [];
-      var photoTs = (r && r.photoTs) ? [].concat(r.photoTs) : [];
-      photos.push('pending:' + localId);
-      photoTs.push(ts);
-      if(r){ r.photos = photos; r.photoTs = photoTs; }
-      render();
-      try {
-        offlineQueue.push({rowId: rowId, path: path, b64: b64, localId: localId, ts: ts});
-        saveQueue();
-        showToast('Нет сети — фото сохранено, загрузится позже');
-      } catch(e) {
-        showToast('Нет сети и нет места для хранения фото');
-      }
-    };
-    reader.readAsDataURL(file);
+    enqueuePhoto(file, rowId, path, localId, ts);
   }
 }
 
