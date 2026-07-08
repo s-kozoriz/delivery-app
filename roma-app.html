@@ -303,6 +303,8 @@ firebase.initializeApp({
 });
 var db = firebase.database();
 var storage = firebase.storage();
+// При плохой сети не ждать ~2 мин (дефолт Firebase) — быстрее признать сбой и уйти в очередь на автоповтор
+try { storage.setMaxUploadRetryTime(30000); storage.setMaxOperationRetryTime(20000); } catch(e){}
 var rows = [], cfg = {drivers:{}}, curD = '', tripData = {};
 var activeUploadRowId = null;
 
