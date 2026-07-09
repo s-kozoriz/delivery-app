@@ -2185,7 +2185,7 @@ function incAccept(){
     var _seen={}; var _parts=[]; g.forEach(function(r){ [(r.work_type||'').trim(),(r.note||'').trim()].forEach(function(p){ if(p&&!_seen[p]){_seen[p]=1;_parts.push(p);} }); }); var cmt=_parts.join(', ');
     var _sd=(first.ship_date||'').trim();
     var row={
-      id:uid(), date:(_sd||isoD(0)), date_pending:(_sd?null:true), drv:'', city:first.city||'', timeSlot:'',
+      id:uid(), date:(_sd||isoD(0)), date_pending:(_sd?null:true), drv:(disp2Mode?'C':''), city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
       comment:cmt, weight:(wsum?Math.round(wsum*100)/100:null), volume_m3:null, inRoute:true, done:false,
       createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null
