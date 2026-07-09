@@ -1333,7 +1333,7 @@ function gm(){
     var tuEl=document.getElementById('tu_'+d);
     var rsEl=document.getElementById('rs_'+d);
     var wsEl=document.getElementById('ws_'+d);
-    if(stats && stats.date===curD){
+    if(stats && stats.date===curD && drows(d).length>0){
       function fmtMin3(m){var h=Math.floor(m/60),mn=m%60;return h>0?(h+'ч '+(mn?mn+'мин':'')):mn+'мин';}
       if(tdEl){tdEl.textContent=stats.driveMin?'🚗 '+fmtMin3(stats.driveMin):'';tdEl.style.display=stats.driveMin?'':'none';}
       if(tuEl){tuEl.textContent=stats.unloadMin?'📦 '+fmtMin3(stats.unloadMin):'';tuEl.style.display=stats.unloadMin?'':'none';}
