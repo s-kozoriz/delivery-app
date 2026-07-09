@@ -2167,7 +2167,7 @@ function incUpdateBar(){
   var bar=document.getElementById('incBar'); if(!bar)return;
   var n=Object.keys(incSel).length; var w=incSelWeight();
   bar.innerHTML = n ? ('Отмечено: <b>'+n+'</b> · вес <b>'+w+' кг</b><button class="inc-accept" onclick="incAccept()">Принять отмеченные ('+n+') &rarr;</button>')
-                    : '<span style="color:#80786e">Отметьте накладные («Собрано» и «К сборке») — попадут в маршрут.</span>';
+                    : '<span style="color:#80786e">Отметьте накладные галочкой — попадут в маршрут (любой статус).</span>';
 }
 var incFilter={state:'',wh:'',city:'',date:''};
 function incSetFilter(k,v){ incFilter[k]=v; renderInc(); }
@@ -2225,7 +2225,7 @@ function renderInc(){
     '</tr></thead><tbody>';
   if(!arr.length){ h+='<tr><td colspan="9" class="inc-empty">Нет накладных под текущий фильтр. <a href="#" onclick="incClearFilters();return false;">сбросить</a></td></tr>'; }
   arr.forEach(function(r){
-    var cb = incReady(r) ? ('<input type="checkbox" '+(incSel[r.invoice]?'checked':'')+' onchange="incToggle(\''+r.invoice+'\',this)">') : '<span class="inc-lock" title="не собрано">—</span>';
+    var cb = '<input type="checkbox" '+(incSel[r.invoice]?'checked':'')+' onchange="incToggle(\''+r.invoice+'\',this)"'+(incReady(r)?'':' title="статус: '+xe(r.ready_status||'—')+'"')+'>';
     var w=(typeof r.weight_kg==='number')?wkg(r.weight_kg):'—';
     h+='<tr class="'+incColor(r)+'">'+
       '<td>'+cb+'</td>'+
@@ -2243,8 +2243,8 @@ function renderInc(){
   body.innerHTML=h; incUpdateBar(); renderIncTaken();
 }
 function incAccept(){
-  var invs=Object.keys(incSel).filter(function(inv){ var r=incAll[inv]; return r&&incReady(r)&&!incPlaced[inv]; });
-  if(!invs.length){ toast('Отметьте «Собрано»/«К сборке» накладные'); return; }
+  var invs=Object.keys(incSel).filter(function(inv){ var r=incAll[inv]; return r&&!incPlaced[inv]; });
+  if(!invs.length){ toast('Отметьте накладные галочкой'); return; }
   var groups={};
   invs.forEach(function(inv){ var r=incAll[inv]; var edate=(r.ship_date||'').trim(); var key=(r.city||'')+'|'+(r.address||'')+'|'+edate; (groups[key]=groups[key]||[]).push(r); });
   var maxOrder=0; rows.forEach(function(x){ if(x.order!=null&&x.order>maxOrder)maxOrder=x.order; });
