@@ -657,8 +657,8 @@ function __startDB(){
 db.ref('rows').orderByChild('date').startAt(_fromD).endAt(_toD).on('value',function(s){
   rows=s.val()?Object.values(s.val()):[];
   _applyPending();
-  if(Date.now()-_lastEdit>1500){rtbl();}
-  gm();rh();incReconcile();
+  if(Date.now()-_lastEdit>1500){rtbl();incReconcile();}
+  gm();rh();
   var _tnm=document.getElementById('tnordm');if(_tnm&&_tnm.style.display!=='none')renderNordMirror();
   document.getElementById('sync').className='sync ok';
 },function(){document.getElementById('sync').className='sync err';});
@@ -689,12 +689,6 @@ __startTechsListener();
 __startVoiceListener();
 }
 
-function setMode(mode){
-  pinMode=mode;
-  var labels={dispatcher:'PIN LK Zentrum',disp2:'PIN LK Norden',view:'PIN LK Lager'};
-  document.getElementById('pinLabel').textContent=labels[mode]||'Система доставок';
-  pinBuf='';[0,1,2,3].forEach(function(i){document.getElementById('d'+i).className='dot';});
-}
 function pp(d){
   if(d==='X'){pinBuf=pinBuf.slice(0,-1);}else if(pinBuf.length<4){pinBuf+=d;}
   [0,1,2,3].forEach(function(i){var el=document.getElementById('d'+i);if(el){el.style.background=i<pinBuf.length?'#fff':'transparent';el.style.borderColor=i<pinBuf.length?'#fff':'rgba(255,255,255,.35)';}});
@@ -975,8 +969,11 @@ function di(id,i){
 function ui(id,i,v){
   _lastEdit=Date.now();
   var r=rows.find(function(x){return x.id===id;});if(!r)return;
-  var inv=[].concat(r.invs||['']);inv[i]=v;
+  var inv=[].concat(r.invs||['']);
+  var old=(''+(inv[i]||'')).trim();
+  inv[i]=v;
   db.ref('rows/'+id+'/invs').set(inv);
+  if(old && old!==(''+(v||'')).trim() && incPlaced[old] && incPlaced[old].rowId===id) db.ref('1c/delivery/placed/'+old).remove();
 }
 
 function xe(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
@@ -1178,27 +1175,6 @@ function drows(d){
   return rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false&&(!disp2Mode||isNordRow(r));});
 }
 
-function bm(d){
-  var name=dname(d);var dr=drows(d);if(!dr.length)return'';
-  var ds=curD?fmt(curD):'?';
-  var m='*'+cfg.hdr.replace('{date}',ds).replace('{driver}',name)+'*\n';
-  m+='Водитель: '+name+'\n'+'-'.repeat(22)+'\n\n';
-  var bc={};dr.forEach(function(r){if(!bc[r.city])bc[r.city]=[];bc[r.city].push(r);});
-  var n=1;
-  Object.keys(bc).forEach(function(city){
-    m+='[ '+city+' ]\n';
-    bc[city].forEach(function(r){
-      m+='  '+n+'. '+(r.status==='забрать товар'?'[магазин] ':'')+r.addr;
-      if(r.timeSlot)m+=' (до '+r.timeSlot+')';m+='\n';
-      var iv=(r.invs||[]).map(function(i){return i.trim();}).filter(Boolean);
-      if(iv.length)m+='     Накл.: '+iv.join(', ')+'\n';
-      var ex=[];if(r.status&&r.status!=='—')ex.push(r.status);if(r.comment&&r.comment.trim())ex.push(r.comment.trim());
-      if(ex.length)m+='     '+ex.join(' / ')+'\n';n++;
-    });m+='\n';
-  });
-  m+='Всего: '+dr.length+' адресов';if(cfg.ftr)m+='\n'+cfg.ftr;return m;
-}
-
 function bp(d){
   var name=dname(d);var dr=drows(d);if(!dr.length)return'';
   var hasOrder=dr.some(function(r){return r.order!=null;});
@@ -1297,11 +1273,6 @@ function rebuildMsgGrid(){
 function gm(){
   var drvs=activeDrvs();
   var _g=document.getElementById('msgGrid'); if(_g && (_g.children.length!==drvs.length || drvs.some(function(d){return !document.getElementById('mc'+d);}))){rebuildMsgGrid();}
-  if(!document.getElementById('mc'+drvs[0])){rebuildMsgGrid();}
-  var hasC=cfg.drivers&&cfg.drivers.C&&cfg.drivers.C.name;
-  var mcC=document.getElementById('mcC');
-  if(hasC&&!mcC){rebuildMsgGrid();}
-  else if(!hasC&&mcC){rebuildMsgGrid();}
   drvs.forEach(function(d){
     var pv=bp(d);
     var el=document.getElementById('m'+d);if(!el)return;
@@ -2355,8 +2326,6 @@ function incRenderPos(val){
   if(missW)h+='<div class="pos-note">Вес указан не для всех позиций (в 1С нет веса в справочнике) — «Итого вес» может быть неполным.</div>';
   body.innerHTML=h;
 }
-function renderInc0(){ renderInc(); }
-
 function openEdit(id){
   if(editingRowId===id)return;
   editingRowId=id;
@@ -2365,11 +2334,6 @@ function openEdit(id){
     var tr=document.querySelector('tr.tr-editing');
     if(tr){var inp=tr.querySelector('input[type="text"],input[type="date"]');if(inp&&!inp.value)inp.focus();}
   },50);
-}
-function closeEdit(){
-  if(!editingRowId)return;
-  editingRowId=null;
-  rtbl();
 }
 
 function toast(m){var t=document.getElementById('toast');t.innerHTML=m;t.classList.add('on');setTimeout(function(){t.classList.remove('on');},2500);}
