@@ -542,6 +542,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
           <div class="fl">PIN</div><input class="fi" id="cPinDV" type="text" maxlength="4" inputmode="numeric" placeholder="1100" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
         </div>
       </div>
+      <div style="padding:0 14px 14px" id="dynDrvBox"></div>
     </div>
 
     <div id="cs-cities" class="cs-panel" style="display:none">
@@ -669,6 +670,7 @@ db.ref('cfg').on('value',function(s){
     Object.assign(cfg,s.val());
     if(!cfg.drivers)cfg.drivers={L:{name:'Лёша',phone:''},R:{name:'Рома',phone:''},C:{name:'',phone:''}};
     DRV_KEYS.forEach(function(k){if(!cfg.drivers[k])cfg.drivers[k]={name:'',phone:''};});
+    (function(){ var _b=['L','R','C','V']; DRV_KEYS=_b.concat(Object.keys(cfg.drivers||{}).filter(function(k){return _b.indexOf(k)===-1 && cfg.drivers[k] && cfg.drivers[k].dyn===true;})); })();
     if(cfg.cities)CITIES=cfg.cities.slice();
     if(cfg.citiesC)CITIESC=cfg.citiesC.slice();
     lcfg();gm();rtbl();
@@ -1773,6 +1775,7 @@ function swCfg(name){
     if(b)b.className='cfg-tab'+(t===name?' active':'');
   });
   if(name==='nord')renderNordPlanners();
+  if(name==='drivers')renderDynDrivers();
 }
 
 function sw(n){
@@ -1830,6 +1833,46 @@ function renderNordMirror(){
   if(vToday.length)h+='<div style="font-size:12px;color:#5a6470;margin-top:5px">'+vToday.map(function(r){return xe(r.addr||'');}).join(' &middot; ')+'</div>';
   h+='</div>';
   el.innerHTML=h;
+}
+// ─── ДИНАМИЧЕСКИЕ ВОДИТЕЛИ (доп. машины; появляются колонкой автоматически) ──
+function renderDynDrivers(){
+  var box=document.getElementById('dynDrvBox'); if(!box)return;
+  var base=['L','R','C','V'];
+  var ext=Object.keys(cfg.drivers||{}).filter(function(k){return base.indexOf(k)===-1 && cfg.drivers[k] && cfg.drivers[k].dyn===true;});
+  var h='<div style="font-size:11px;font-weight:700;color:#5a6470;text-transform:uppercase;letter-spacing:.04em;margin:6px 0 8px">Дополнительные водители (новые машины)</div>';
+  if(!ext.length)h+='<div style="font-size:12px;color:var(--mu);margin-bottom:8px">Пока нет. Добавьте, когда появится новый водитель/машина — он сразу появится колонкой.</div>';
+  ext.forEach(function(k){
+    var d=cfg.drivers[k]||{};
+    h+='<div class="lag-meta"><b style="color:#1a2a3a">'+xe(d.name||'без имени')+'</b>'+(d.phone?'<span>'+xe(d.phone)+'</span>':'')+(d.nord?' &middot; <b style="color:#1a7a40">Nord</b>':'')+'<button class="lag-edit" onclick="editDynDriver(\''+k+'\')">изменить</button><button class="lag-del" onclick="delDynDriver(\''+k+'\')">удалить</button></div>';
+  });
+  h+='<button class="lag-addbtn" onclick="addDynDriver()">+ добавить водителя</button>';
+  box.innerHTML=h;
+}
+function addDynDriver(){
+  var name=prompt('Имя водителя:');if(name===null)return;name=name.trim();if(!name){toast('Имя пустое');return;}
+  var phone=(prompt('Телефон (необязательно):','')||'').trim();
+  var pin=prompt('PIN для входа (4 цифры):');if(pin===null)return;pin=String(pin).trim();if(!/^\d{4}$/.test(pin)){toast('PIN — 4 цифры');return;}
+  var nord=confirm('Работает в регионе Nord? (ОК = да, Отмена = нет)');
+  var key='d'+Date.now().toString(36);
+  db.ref('cfg/drivers/'+key).set({name:name,phone:phone,dyn:true,nord:nord}).then(function(){
+    db.ref('driver_pins/'+key).set(pin).catch(function(){});
+    toast('Водитель добавлен — появится колонкой. Вход включаем отдельным шагом.');
+  }).catch(function(){toast('Нет прав. Войдите главным диспетчером (Zentrum).');});
+}
+function editDynDriver(k){
+  var d=cfg.drivers[k]||{};
+  var name=prompt('Имя водителя:',d.name||'');if(name===null)return;name=name.trim();if(!name){toast('Имя пустое');return;}
+  var phone=(prompt('Телефон:',d.phone||'')||'').trim();
+  var pin=prompt('PIN (4 цифры; пусто = не менять):','');pin=String(pin||'').trim();
+  var nord=confirm('Работает в регионе Nord? (ОК = да, Отмена = нет). Сейчас: '+(d.nord?'да':'нет'));
+  db.ref('cfg/drivers/'+k).update({name:name,phone:phone,dyn:true,nord:nord}).then(function(){toast('Сохранено');}).catch(function(){toast('Нет прав. Zentrum.');});
+  if(pin&&/^\d{4}$/.test(pin))db.ref('driver_pins/'+k).set(pin).catch(function(){});
+}
+function delDynDriver(k){
+  var d=cfg.drivers[k]||{};
+  if(!confirm('Удалить водителя '+(d.name||'')+'? Его заказы останутся, но без водителя.'))return;
+  db.ref('cfg/drivers/'+k).remove().then(function(){toast('Удалён');}).catch(function(){toast('Нет прав. Zentrum.');});
+  db.ref('driver_pins/'+k).remove().catch(function(){});
 }
 
 // ─── ТАБЕЛЬ рабочего времени (сегменты) ─────────────────────
