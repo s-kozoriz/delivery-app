@@ -295,6 +295,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <button class="tab" id="tabTabel" onclick="sw('tabel')">Табель</button>
     <button class="tab" id="tabCalib" onclick="sw('calib')">Калибровка</button>
     <button class="tab" id="tabInc" onclick="sw('inc')">Входящие 1С</button>
+    <button class="tab" id="tabNordM" onclick="sw('nordm')" style="display:none">Nord</button>
     <button class="tab" id="tabCfg" onclick="sw('cfg')">Настройки</button>
   </div>
 </div>
@@ -446,6 +447,13 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <div id="incBody" style="overflow-x:auto"></div>
     <div class="inc-bar" id="incBar"></div>
     <div id="incTaken"></div>
+  </div>
+</div>
+<div id="tnordm" style="display:none">
+  <div class="card">
+    <div class="ch"><h2>&#128506; Регион Nord — зеркало планировщиков</h2></div>
+    <div style="padding:6px 16px 2px;font-size:12px;color:var(--mu)">Что планируют техники Nord (их города). Можно вносить корректировки: дата, статус, удаление.</div>
+    <div id="nordmBody" style="overflow-x:auto;padding:8px 6px"></div>
   </div>
 </div>
 <div id="tvoice" style="display:none">
@@ -650,6 +658,7 @@ db.ref('rows').orderByChild('date').startAt(_fromD).endAt(_toD).on('value',funct
   _applyPending();
   if(Date.now()-_lastEdit>1500){rtbl();}
   gm();rh();incReconcile();
+  var _tnm=document.getElementById('tnordm');if(_tnm&&_tnm.style.display!=='none')renderNordMirror();
   document.getElementById('sync').className='sync ok';
 },function(){document.getElementById('sync').className='sync err';});
 
@@ -785,6 +794,7 @@ firebase.auth().onAuthStateChanged(function(user){
     else if(role==='lager'){disp2Mode=false;enter(true);}
     else{disp2Mode=false;enter(false);}
     if(c.plannerId){ IS_PLANNER=true; PLANNER_ID=c.plannerId; PLANNER_NAME=c.plannerName||''; ['tabVoice','tabCalib'].forEach(function(id){var b=document.getElementById(id);if(b)b.style.display='none';}); }
+    if(role==='zentrum'){ var _tn=document.getElementById('tabNordM'); if(_tn)_tn.style.display=''; }
     __startDB();
   });
 });
@@ -853,7 +863,8 @@ function saveNewRow(){
     weight:document.getElementById('nrf-weight')&&document.getElementById('nrf-weight').value?Number(document.getElementById('nrf-weight').value):null,
     volume_m3:volEl&&volEl.value?Number(volEl.value):null,
     inRoute:true,done:false,
-    createdAt:now,order:maxOrder+10
+    createdAt:now,order:maxOrder+10,
+    plannerId:(IS_PLANNER?PLANNER_ID:null),plannerName:(IS_PLANNER?PLANNER_NAME:null)
   };
   db.ref('rows/'+r.id).set(r);
   newRowDraft=null;
@@ -1066,6 +1077,7 @@ function _rtblNow(){
         ? '<input type="text" value="'+xe(r.addr)+'" placeholder="Улица, дом..." oninput="ur(\''+r.id+'\',\'addr\',this.value)">'
         : '<span style="font-size:13px;font-weight:500;padding:2px 4px;display:block">'+xe(r.addr||'')+'</span>';
     }
+    if(r.plannerName)addrCellHtml += '<div style="font-size:10px;color:#7a4a00;font-weight:600;margin-top:1px">&#128100; '+xe(r.plannerName)+'</div>';
     addrCellHtml += '</td>';
     h += addrCellHtml;
     h+='<td><div class="icel">'+ih+'<button class="iadd" onclick="ai(\''+r.id+'\')">+ накладная</button></div></td>';
@@ -1764,12 +1776,12 @@ function swCfg(name){
 }
 
 function sw(n){
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm'};
   Object.keys(tabMap).forEach(function(t){
     var el=document.getElementById(tabMap[t]);
     if(el)el.style.display=t===n?'':'none';
   });
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord'};
   document.querySelectorAll('.tab').forEach(function(b){
     b.classList.toggle('on',b.textContent.trim()===(nameMap[n]||''));
   });
@@ -1784,6 +1796,40 @@ function sw(n){
   if(n==='tabel')renderTabel();
   if(n==='calib')renderCalib();
   if(n==='inc')renderInc();
+  if(n==='nordm')renderNordMirror();
+}
+// Зеркало региона Nord (для zentrum): что планируют техники + правки + день водителя
+function renderNordMirror(){
+  var el=document.getElementById('nordmBody'); if(!el)return;
+  var today=isoD(0);
+  var nr=rows.filter(function(r){ return CITIESC.indexOf(r.city||'')!==-1 && r.addr && r.addr.trim() && !(r.done&&r.date<today); });
+  nr.sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||((a.order||0)-(b.order||0)); });
+  if(!nr.length){ el.innerHTML='<div class="inc-empty">Нет заказов по региону Nord.</div>'; return; }
+  var h='<table class="inc-tbl"><thead><tr><th></th><th>Дата</th><th>Водитель</th><th>Город</th><th>Адрес</th><th>Накладные</th><th>Статус</th><th>Запланировал</th><th>Вес</th></tr></thead><tbody>';
+  var lastD=null;
+  nr.forEach(function(r){
+    if(r.date!==lastD){ lastD=r.date; h+='<tr class="date-group-hdr"><td colspan="9" style="padding:5px 10px;font-weight:700;background:#eef1f5">'+(r.date_pending?'— нет даты':fmt(r.date||''))+'</td></tr>'; }
+    var iv=(r.invs||[]).filter(function(x){return (''+(x||'')).trim();});
+    var so=STATS.map(function(s){return '<option'+(r.status===s?' selected':'')+'>'+xe(s)+'</option>';}).join('');
+    h+='<tr>'+
+      '<td><button class="dbtn" onclick="dr(\''+r.id+'\')" title="Удалить">&#215;</button></td>'+
+      '<td><input type="date" value="'+(r.date_pending?'':(r.date||''))+'" onchange="ur(\''+r.id+'\',\'date\',this.value)" style="font-size:12px;padding:4px"></td>'+
+      '<td>'+xe(dname(r.drv)||r.drv||'—')+'</td>'+
+      '<td>'+xe(r.city||'')+'</td>'+
+      '<td>'+xe(r.addr||'')+'</td>'+
+      '<td style="font-size:12px">'+xe(iv.join(', '))+'</td>'+
+      '<td><select onchange="ur(\''+r.id+'\',\'status\',this.value)" style="font-size:12px;padding:4px">'+so+'</select></td>'+
+      '<td>'+(r.plannerName?'<b style="color:#7a4a00">'+xe(r.plannerName)+'</b>':'<span style="color:#9aa5b1">—</span>')+'</td>'+
+      '<td>'+(r.weight?wkg(r.weight)+'кг':'—')+'</td>'+
+      '</tr>';
+  });
+  h+='</tbody></table>';
+  var vName=dname('C')||'Виталик';
+  var vToday=nr.filter(function(r){ return r.drv==='C'&&r.date===today; });
+  h+='<div style="margin:14px 6px 4px;padding:12px 14px;background:#eef4ff;border-radius:10px"><b>'+xe(vName)+' сегодня ('+fmt(today)+'): '+vToday.length+' адр.</b>';
+  if(vToday.length)h+='<div style="font-size:12px;color:#5a6470;margin-top:5px">'+vToday.map(function(r){return xe(r.addr||'');}).join(' &middot; ')+'</div>';
+  h+='</div>';
+  el.innerHTML=h;
 }
 
 // ─── ТАБЕЛЬ рабочего времени (сегменты) ─────────────────────
@@ -2190,7 +2236,8 @@ function incAccept(){
       id:uid(), date:(_sd||isoD(0)), date_pending:(_sd?null:true), drv:(disp2Mode?'C':''), city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
       comment:cmt, weight:(wsum?Math.round(wsum*100)/100:null), volume_m3:null, inRoute:true, done:false,
-      createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null
+      createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null,
+      plannerId:(IS_PLANNER?PLANNER_ID:null), plannerName:(IS_PLANNER?PLANNER_NAME:null)
     };
     db.ref('rows/'+row.id).set(row);
     g.forEach(function(r){ db.ref('1c/delivery/placed/'+r.invoice).set({rowId:row.id,date:row.date,invoice:r.invoice,address:r.address||'',city:r.city||'',ts:Date.now()}); });
