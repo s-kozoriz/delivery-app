@@ -2254,9 +2254,10 @@ function incAccept(){
     var wsum=g.reduce(function(a,r){return a+(typeof r.weight_kg==='number'?r.weight_kg:0);},0);
     maxOrder+=10;
     var _seen={}; var _parts=[]; g.forEach(function(r){ [(r.work_type||'').trim(),(r.note||'').trim()].forEach(function(p){ if(p&&!_seen[p]){_seen[p]=1;_parts.push(p);} }); }); var cmt=_parts.join(', ');
-    var _sd=(first.ship_date||'').trim();
+    var _sd=(first.ship_date||'').trim(); var _td=isoD(0);
+    var _dt=_sd?((_sd<_td)?_td:_sd):_td; // прошлая/пустая дата отгрузки из 1С → сегодня; будущая/сегодняшняя → на свой день (диспетчер может изменить вручную)
     var row={
-      id:uid(), date:(_sd||isoD(0)), date_pending:(_sd?null:true), drv:(disp2Mode?'C':''), city:first.city||'', timeSlot:'',
+      id:uid(), date:_dt, date_pending:(_sd?null:true), drv:(disp2Mode?'C':''), city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
       comment:cmt, weight:(wsum?Math.round(wsum*100)/100:null), volume_m3:null, inRoute:true, done:false,
       createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null,
