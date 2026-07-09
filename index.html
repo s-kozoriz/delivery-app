@@ -993,7 +993,7 @@ function _rtblNow(){
   var today=isoD(0);
   var visible=rows.filter(function(r){
     if(r.done && r.date<today)return false;
-    if(disp2Mode){ var _blank=(!r.addr||!r.addr.trim()); if(!_blank && CITIESC.indexOf(r.city||'')===-1) return false; }
+    if(disp2Mode){ if(nordDrvKeys().indexOf(r.drv||'')===-1) return false; }
     return true;
   });
   var sorted=visible.slice().sort(function(a,b){
@@ -1163,8 +1163,10 @@ function _rtblNow(){
   }
 }
 
+// Водители региона Nord: фиксированный C (Виталик) + динамические с nord:true
+function nordDrvKeys(){ var b=['C']; Object.keys(cfg.drivers||{}).forEach(function(k){ if(b.indexOf(k)===-1 && cfg.drivers[k] && cfg.drivers[k].dyn===true && cfg.drivers[k].nord===true) b.push(k); }); return b; }
 function activeDrvs(){
-  if(disp2Mode)return ['C'];
+  if(disp2Mode)return nordDrvKeys();
   return DRV_KEYS;
 }
 function drows(d){
@@ -1805,7 +1807,7 @@ function sw(n){
 function renderNordMirror(){
   var el=document.getElementById('nordmBody'); if(!el)return;
   var today=isoD(0);
-  var nr=rows.filter(function(r){ return CITIESC.indexOf(r.city||'')!==-1 && r.addr && r.addr.trim() && !(r.done&&r.date<today); });
+  var nr=rows.filter(function(r){ return nordDrvKeys().indexOf(r.drv||'')!==-1 && r.addr && r.addr.trim() && !(r.done&&r.date<today); });
   nr.sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||((a.order||0)-(b.order||0)); });
   if(!nr.length){ el.innerHTML='<div class="inc-empty">Нет заказов по региону Nord.</div>'; return; }
   var h='<table class="inc-tbl"><thead><tr><th></th><th>Дата</th><th>Водитель</th><th>Город</th><th>Адрес</th><th>Накладные</th><th>Статус</th><th>Запланировал</th><th>Вес</th></tr></thead><tbody>';
@@ -1927,7 +1929,7 @@ function renderLiveBoard(){
   var el=document.getElementById('liveBoard');if(!el)return;
   if(wtDenied){el.innerHTML='<div class="tabel-soon">Доступно только в главном входе (Zentrum).</div>';return;}
   var today=isoD(0);var list=[];
-  (IS_PLANNER?['C']:DRV_KEYS).forEach(function(k){var nm=dname(k);if(nm)list.push({id:k,name:nm});});
+  (IS_PLANNER?nordDrvKeys():DRV_KEYS).forEach(function(k){var nm=dname(k);if(nm)list.push({id:k,name:nm});});
   (IS_PLANNER?Object.keys(lagerStaff).filter(function(id){return (lagerStaff[id]||{}).nord===true;}):Object.keys(lagerStaff)).forEach(function(id){list.push({id:id,name:(lagerStaff[id]||{}).name||'грузчик'});});
   var items=list.map(function(r){var rec=(wtAll[r.id]||{})[today]||{};return {name:r.name,st:liveState(rec),rec:rec};});
   var order={run:0,pause:1,done:2,idle:3};
@@ -1955,7 +1957,7 @@ function renderTabel(){
   if(wtDenied){body.innerHTML='<div class="tabel-soon">Табель и список доступны только в главном входе (Zentrum). Сейчас вход как второй диспетчер.</div>';return;}
   if(tabelView==='lag'){body.innerHTML=renderTabelLag();return;}
   var html='';
-  (IS_PLANNER?['C']:DRV_KEYS).forEach(function(k){
+  (IS_PLANNER?nordDrvKeys():DRV_KEYS).forEach(function(k){
     var nm=dname(k);if(!nm)return;
     var days=wtAll[k]||{};
     var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
