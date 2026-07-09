@@ -866,7 +866,7 @@ function saveNewRow(){
     volume_m3:volEl&&volEl.value?Number(volEl.value):null,
     inRoute:true,done:false,
     createdAt:now,order:maxOrder+10,
-    plannerId:(IS_PLANNER?PLANNER_ID:null),plannerName:(IS_PLANNER?PLANNER_NAME:null),nord:(disp2Mode?true:null)
+    plannerId:(IS_PLANNER?PLANNER_ID:null),plannerName:(IS_PLANNER?PLANNER_NAME:null),nord:((disp2Mode||CITIESC.indexOf((city?city.value:'')||'')!==-1)?true:null)
   };
   db.ref('rows/'+r.id).set(r);
   newRowDraft=null;
@@ -941,6 +941,7 @@ function ur(id,f,v){
   db.ref('rows/'+id+'/'+f).set(v);
   var r=rows.find(function(x){return x.id===id;});if(r)r[f]=v;
   if(f==='date'&&v){ db.ref('rows/'+id+'/date_pending').remove(); if(r)r.date_pending=null; }
+  if(f==='city'&&CITIESC.indexOf(v)!==-1){ db.ref('rows/'+id+'/nord').set(true); if(r)r.nord=true; }
 }
 function _applyPending(){
   var now=Date.now();
@@ -2288,7 +2289,7 @@ function incAccept(){
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
       comment:cmt, weight:(wsum?Math.round(wsum*100)/100:null), volume_m3:null, inRoute:true, done:false,
       createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null,
-      plannerId:(IS_PLANNER?PLANNER_ID:null), plannerName:(IS_PLANNER?PLANNER_NAME:null), nord:(disp2Mode?true:null)
+      plannerId:(IS_PLANNER?PLANNER_ID:null), plannerName:(IS_PLANNER?PLANNER_NAME:null), nord:((disp2Mode||CITIESC.indexOf(first.city||'')!==-1)?true:null)
     };
     db.ref('rows/'+row.id).set(row);
     g.forEach(function(r){ db.ref('1c/delivery/placed/'+r.invoice).set({rowId:row.id,date:row.date,invoice:r.invoice,address:r.address||'',city:r.city||'',ts:Date.now()}); });
