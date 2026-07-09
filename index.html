@@ -980,7 +980,7 @@ function ui(id,i,v){
 
 function xe(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
 function cleanAddr(a){var s=(a||'').trim();s=s.replace(/\s+\d*[A-Za-z]*_[A-Za-z]+$/,'');s=s.replace(/\s+(EG|DG|OG|\d+OG)$/i,'');return s.trim();}
-function dname(k){var o=cfg.drivers&&cfg.drivers[k];return(o&&o.name)||(k==='L'?'Лёша':k==='R'?'Рома':'Водитель 3');}
+function dname(k){if(k==='2nd')return '— второй водитель —';var o=cfg.drivers&&cfg.drivers[k];return(o&&o.name)||(k==='L'?'Лёша':k==='R'?'Рома':'Водитель 3');}
 
 var _rtblTimer=null;
 function rtbl(){
@@ -1167,8 +1167,10 @@ function _rtblNow(){
 function nordDrvKeys(){ var b=['C']; Object.keys(cfg.drivers||{}).forEach(function(k){ if(b.indexOf(k)===-1 && cfg.drivers[k] && cfg.drivers[k].dyn===true && cfg.drivers[k].nord===true) b.push(k); }); return b; }
 // Строка относится к региону Nord: Nord-водитель ИЛИ заказ в Nord-городе; НО ад-хок задача (fromDriver) чужого водителя -> в главный диспетчер
 function isNordRow(r){ var nd=nordDrvKeys().indexOf(r.drv||'')!==-1; if(r.fromDriver && !nd) return false; return nd || CITIESC.indexOf(r.city||'')!==-1; }
+// Второй (наш) водитель, назначенный на Nord-заказы текущего дня (или '' если нет)
+function secondNordDrv(){ var prim=nordDrvKeys(); var f=''; rows.forEach(function(r){ if(r.date===curD && r.drv && prim.indexOf(r.drv)===-1 && isNordRow(r) && r.addr && r.addr.trim()) f=r.drv; }); return f; }
 function activeDrvs(){
-  if(disp2Mode){ var set={}; nordDrvKeys().forEach(function(k){set[k]=1;}); rows.forEach(function(r){ if(r.drv && isNordRow(r)) set[r.drv]=1; }); return Object.keys(set); }
+  if(disp2Mode)return nordDrvKeys().concat([secondNordDrv()||'2nd']); // Виталик + всегда «второе поле»
   return DRV_KEYS;
 }
 function drows(d){
@@ -1257,8 +1259,9 @@ function buildMsgPanel(d){
   var avStyle=d==='L'?'style="background:#e6f4ea;color:#1a7a40"'
     :d==='R'?'style="background:#fce8e6;color:#a03018"'
     :d==='C'?'style="background:#e6eef9;color:#185FA5"'
+    :d==='2nd'?'style="background:#eceff1;color:#607d8b"'
     :'style="background:#f3e5f5;color:#6a1a7a"';
-  var avLetter=d==='L'?'Л':d==='R'?'Р':d==='C'?'С':'В';
+  var avLetter=d==='L'?'Л':d==='R'?'Р':d==='C'?'С':d==='2nd'?'+':'В';
   var accentColor=d==='L'?'#1a7a40':d==='R'?'#a03018':d==='C'?'#185FA5':'#6a1a7a';
   var accentBg=d==='L'?'#e6f4ea':d==='R'?'#fce8e6':d==='C'?'#e6eef9':'#f3e5f5';
   return '<div class="mc" id="mc'+d+'">'
