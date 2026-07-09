@@ -866,7 +866,7 @@ function saveNewRow(){
     volume_m3:volEl&&volEl.value?Number(volEl.value):null,
     inRoute:true,done:false,
     createdAt:now,order:maxOrder+10,
-    plannerId:(IS_PLANNER?PLANNER_ID:null),plannerName:(IS_PLANNER?PLANNER_NAME:null)
+    plannerId:(IS_PLANNER?PLANNER_ID:null),plannerName:(IS_PLANNER?PLANNER_NAME:null),nord:(disp2Mode?true:null)
   };
   db.ref('rows/'+r.id).set(r);
   newRowDraft=null;
@@ -993,7 +993,7 @@ function _rtblNow(){
   var today=isoD(0);
   var visible=rows.filter(function(r){
     if(r.done && r.date<today)return false;
-    if(disp2Mode){ if(nordDrvKeys().indexOf(r.drv||'')===-1) return false; }
+    if(disp2Mode && !isNordRow(r)) return false;
     return true;
   });
   var sorted=visible.slice().sort(function(a,b){
@@ -1165,12 +1165,14 @@ function _rtblNow(){
 
 // Водители региона Nord: фиксированный C (Виталик) + динамические с nord:true
 function nordDrvKeys(){ var b=['C']; Object.keys(cfg.drivers||{}).forEach(function(k){ if(b.indexOf(k)===-1 && cfg.drivers[k] && cfg.drivers[k].dyn===true && cfg.drivers[k].nord===true) b.push(k); }); return b; }
+// Строка относится к региону Nord: Nord-водитель ИЛИ заказ в Nord-городе; НО ад-хок задача (fromDriver) чужого водителя -> в главный диспетчер
+function isNordRow(r){ var nd=nordDrvKeys().indexOf(r.drv||'')!==-1; if(r.fromDriver && !nd) return false; return nd || CITIESC.indexOf(r.city||'')!==-1; }
 function activeDrvs(){
-  if(disp2Mode)return nordDrvKeys();
+  if(disp2Mode){ var set={}; nordDrvKeys().forEach(function(k){set[k]=1;}); rows.forEach(function(r){ if(r.drv && isNordRow(r)) set[r.drv]=1; }); return Object.keys(set); }
   return DRV_KEYS;
 }
 function drows(d){
-  return rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false;});
+  return rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false&&(!disp2Mode||isNordRow(r));});
 }
 
 function bm(d){
@@ -1290,6 +1292,7 @@ function rebuildMsgGrid(){
 
 function gm(){
   var drvs=activeDrvs();
+  var _g=document.getElementById('msgGrid'); if(_g && (_g.children.length!==drvs.length || drvs.some(function(d){return !document.getElementById('mc'+d);}))){rebuildMsgGrid();}
   if(!document.getElementById('mc'+drvs[0])){rebuildMsgGrid();}
   var hasC=cfg.drivers&&cfg.drivers.C&&cfg.drivers.C.name;
   var mcC=document.getElementById('mcC');
@@ -1807,7 +1810,7 @@ function sw(n){
 function renderNordMirror(){
   var el=document.getElementById('nordmBody'); if(!el)return;
   var today=isoD(0);
-  var nr=rows.filter(function(r){ return nordDrvKeys().indexOf(r.drv||'')!==-1 && r.addr && r.addr.trim() && !(r.done&&r.date<today); });
+  var nr=rows.filter(function(r){ return isNordRow(r) && r.addr && r.addr.trim() && !(r.done&&r.date<today); });
   nr.sort(function(a,b){ return (a.date||'').localeCompare(b.date||'')||((a.order||0)-(b.order||0)); });
   if(!nr.length){ el.innerHTML='<div class="inc-empty">Нет заказов по региону Nord.</div>'; return; }
   var h='<table class="inc-tbl"><thead><tr><th></th><th>Дата</th><th>Водитель</th><th>Город</th><th>Адрес</th><th>Накладные</th><th>Статус</th><th>Запланировал</th><th>Вес</th></tr></thead><tbody>';
@@ -2282,7 +2285,7 @@ function incAccept(){
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
       comment:cmt, weight:(wsum?Math.round(wsum*100)/100:null), volume_m3:null, inRoute:true, done:false,
       createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null,
-      plannerId:(IS_PLANNER?PLANNER_ID:null), plannerName:(IS_PLANNER?PLANNER_NAME:null)
+      plannerId:(IS_PLANNER?PLANNER_ID:null), plannerName:(IS_PLANNER?PLANNER_NAME:null), nord:(disp2Mode?true:null)
     };
     db.ref('rows/'+row.id).set(row);
     g.forEach(function(r){ db.ref('1c/delivery/placed/'+r.invoice).set({rowId:row.id,date:row.date,invoice:r.invoice,address:r.address||'',city:r.city||'',ts:Date.now()}); });
