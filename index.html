@@ -1827,7 +1827,7 @@ function tabelRow(k,d,rec){
   return '<div class="tabel-row"><span class="tabel-d">'+d.slice(8)+'.'+d.slice(5,7)+'</span>'+
     '<span class="tabel-t">'+(segtxt||'—')+(open?'<span class="tabel-open">идёт</span>':'')+'</span>'+
     '<span class="tabel-h">'+(h!=null?h+' ч':'')+'</span>'+
-    '<button class="tabel-edit" onclick="tabelEditDay(\''+k+'\',\''+d+'\')">&#9998;</button></div>';
+    (IS_PLANNER?'':'<button class="tabel-edit" onclick="tabelEditDay(\''+k+'\',\''+d+'\')">&#9998;</button>')+'</div>';
 }
 function liveOpenIdx(rec){var L=tSegs(rec);for(var i=L.length-1;i>=0;i--){if(L[i]&&L[i].s&&!L[i].e)return i;}return -1;}
 function liveState(rec){if(rec&&rec.done)return 'done';if(liveOpenIdx(rec)>=0)return 'run';if(tSegs(rec).length)return 'pause';return 'idle';}
@@ -1838,7 +1838,7 @@ function renderLiveBoard(){
   var el=document.getElementById('liveBoard');if(!el)return;
   if(wtDenied){el.innerHTML='<div class="tabel-soon">Доступно только в главном входе (Zentrum).</div>';return;}
   var today=isoD(0);var list=[];
-  DRV_KEYS.forEach(function(k){var nm=dname(k);if(nm)list.push({id:k,name:nm});});
+  (IS_PLANNER?['C']:DRV_KEYS).forEach(function(k){var nm=dname(k);if(nm)list.push({id:k,name:nm});});
   Object.keys(lagerStaff).forEach(function(id){list.push({id:id,name:(lagerStaff[id]||{}).name||'грузчик'});});
   var items=list.map(function(r){var rec=(wtAll[r.id]||{})[today]||{};return {name:r.name,st:liveState(rec),rec:rec};});
   var order={run:0,pause:1,done:2,idle:3};
@@ -1866,7 +1866,7 @@ function renderTabel(){
   if(wtDenied){body.innerHTML='<div class="tabel-soon">Табель и список доступны только в главном входе (Zentrum). Сейчас вход как второй диспетчер.</div>';return;}
   if(tabelView==='lag'){body.innerHTML=renderTabelLag();return;}
   var html='';
-  DRV_KEYS.forEach(function(k){
+  (IS_PLANNER?['C']:DRV_KEYS).forEach(function(k){
     var nm=dname(k);if(!nm)return;
     var days=wtAll[k]||{};
     var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
@@ -1878,7 +1878,7 @@ function renderTabel(){
       else html+=tabelRow(k,d,days[d]);
     });
     if(tabelEdit&&tabelEdit.drv===k&&tabelEdit.nw)html+=tabelEditForm();
-    html+='<button class="tabel-add" onclick="tabelAddDay(\''+k+'\')">+ добавить день</button></div>';
+    html+=(IS_PLANNER?'':'<button class="tabel-add" onclick="tabelAddDay(\''+k+'\')">+ добавить день</button>')+'</div>';
   });
   body.innerHTML=html||'<div class="tabel-soon">Нет водителей</div>';
 }
@@ -1891,13 +1891,13 @@ function renderTabelLag(){
     var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
     var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
     html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span></div>';
-    html+='<div class="lag-meta">PIN: '+xe(String(st.pin||'—'))+'<button class="lag-edit" onclick="tabelEditLoader(\''+id+'\')">изменить</button><button class="lag-del" onclick="tabelDelLoader(\''+id+'\')">удалить</button></div>';
+    if(!IS_PLANNER)html+='<div class="lag-meta">PIN: '+xe(String(st.pin||'—'))+'<button class="lag-edit" onclick="tabelEditLoader(\''+id+'\')">изменить</button><button class="lag-del" onclick="tabelDelLoader(\''+id+'\')">удалить</button></div>';
     if(!dates.length&&!(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
     dates.forEach(function(d){if(tabelEdit&&tabelEdit.drv===id&&!tabelEdit.nw&&tabelEdit.date===d)html+=tabelEditForm();else html+=tabelRow(id,d,days[d]);});
     if(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw)html+=tabelEditForm();
-    html+='<button class="tabel-add" onclick="tabelAddDay(\''+id+'\')">+ добавить день</button></div>';
+    html+=(IS_PLANNER?'':'<button class="tabel-add" onclick="tabelAddDay(\''+id+'\')">+ добавить день</button>')+'</div>';
   });
-  html+='<button class="lag-addbtn" onclick="tabelAddLoader()">+ добавить грузчика</button>';
+  if(!IS_PLANNER)html+='<button class="lag-addbtn" onclick="tabelAddLoader()">+ добавить грузчика</button>';
   return html;
 }
 function tabelLagDup(pin,exceptId){return Object.keys(lagerStaff).some(function(x){return x!==exceptId&&String((lagerStaff[x]||{}).pin)===pin;});}
