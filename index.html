@@ -929,7 +929,7 @@ function acEl(){ var el=document.getElementById('acDrop'); if(!el){ el=document.
 function acPos(){ var inp=_ac.inp,el=document.getElementById('acDrop'); if(!inp||!el)return; var r=inp.getBoundingClientRect(); el.style.left=r.left+'px'; el.style.top=(r.bottom+4)+'px'; el.style.width=Math.max(r.width,180)+'px'; }
 function acRender(){
   var inp=_ac.inp; if(!inp)return;
-  var cs=document.getElementById('nrf-city'); var city=cs?cs.value:'';
+  var city=acCity();
   var all=acList(city); var qq=(inp.value||'').trim().toLowerCase();
   var list=qq?all.filter(function(x){return x.a.toLowerCase().indexOf(qq)>-1;}):all;
   _ac.items=list; _ac.idx=-1;
@@ -939,7 +939,7 @@ function acRender(){
   Array.prototype.forEach.call(el.querySelectorAll('.ac-opt'),function(o){ o.addEventListener('mousedown',function(e){ e.preventDefault(); acPick(+o.getAttribute('data-k')); }); });
   acPos(); el.style.display='block'; _ac.open=true;
 }
-function acPick(k){ var x=_ac.items[k]; if(!x)return; if(_ac.inp)_ac.inp.value=x.a; acClose(); }
+function acPick(k){ var x=_ac.items[k]; if(!x)return; var inp=_ac.inp; if(inp){ inp.value=x.a; try{ inp.dispatchEvent(new Event('input',{bubbles:true})); }catch(e){} } acClose(); }
 function acClose(){ var el=document.getElementById('acDrop'); if(el)el.style.display='none'; _ac.open=false; _ac.idx=-1; }
 function acKey(e){
   if(!_ac.open)return;
@@ -951,22 +951,22 @@ function acKey(e){
   else if(e.key==='Escape'){ acClose(); }
 }
 function acInside(t){ var el=document.getElementById('acDrop'); return !!(el&&(t===el||(el.contains&&el.contains(t)))); }
-function acAttach(){
-  acClose();
-  var inp=document.getElementById('nrf-addr'); if(!inp)return;
-  _ac.inp=inp; inp.setAttribute('autocomplete','off');
-  inp.addEventListener('focus',acRender);
-  inp.addEventListener('click',function(){ if(!_ac.open)acRender(); });
-  inp.addEventListener('input',acRender);
-  inp.addEventListener('keydown',acKey);
-  var cs=document.getElementById('nrf-city'); if(cs)cs.addEventListener('change',function(){ if(_ac.open)acRender(); });
-  if(!_acGlob){ _acGlob=true;
-    // внешний скролл/ресайз — закрыть (fixed-список отвязался бы от поля); внутренний скролл списка НЕ закрывать
-    window.addEventListener('scroll',function(e){ if(_ac.open&&!acInside(e.target))acClose(); },true);
-    window.addEventListener('resize',function(){ if(_ac.open)acClose(); });
-    // закрываем только по клику вне поля и вне списка (клик по полосе прокрутки списка — внутри → не закрывать)
-    document.addEventListener('mousedown',function(e){ if(_ac.open&&e.target!==_ac.inp&&!acInside(e.target))acClose(); });
-  }
+function acIsAddr(t){ return !!(t&&t.classList&&t.classList.contains('ac-addr')); }
+// город для активного поля: из его же строки (select.ac-city), иначе — новая строка
+function acCity(){ var inp=_ac.inp; if(!inp)return ''; var tr=inp.closest?inp.closest('tr'):null; var cs=tr?tr.querySelector('.ac-city'):null; if(cs)return cs.value; var nc=document.getElementById('nrf-city'); return nc?nc.value:''; }
+// Единая делегированная привязка: подсказка работает и в «новой строке», и при правке адреса существующих строк (главный диспетчер + Nord)
+function acInit(){
+  if(_acGlob)return; _acGlob=true;
+  document.addEventListener('focusin',function(e){ if(acIsAddr(e.target)){ e.target.setAttribute('autocomplete','off'); _ac.inp=e.target; acRender(); } });
+  document.addEventListener('input',function(e){ if(e.target===_ac.inp&&acIsAddr(e.target)) acRender(); });
+  document.addEventListener('click',function(e){ if(e.target===_ac.inp&&acIsAddr(e.target)&&!_ac.open) acRender(); });
+  document.addEventListener('keydown',function(e){ if(e.target===_ac.inp&&acIsAddr(e.target)) acKey(e); });
+  document.addEventListener('change',function(e){ if(e.target&&e.target.classList&&e.target.classList.contains('ac-city')&&_ac.open) acRender(); });
+  // внешний скролл/ресайз — закрыть; внутренний скролл списка — НЕ закрывать
+  window.addEventListener('scroll',function(e){ if(_ac.open&&!acInside(e.target))acClose(); },true);
+  window.addEventListener('resize',function(){ if(_ac.open)acClose(); });
+  // закрытие только по клику вне поля и вне списка (клик по полосе прокрутки — внутри → не закрывать)
+  document.addEventListener('mousedown',function(e){ if(_ac.open&&e.target!==_ac.inp&&!acInside(e.target))acClose(); });
 }
 
 function dr(id){
@@ -1057,6 +1057,7 @@ function rtbl(){
   _rtblTimer=setTimeout(_rtblNow,200);
 }
 function _rtblNow(){
+  acInit(); if(_ac.open)acClose();
   var tb=document.getElementById('tb');
   if(!rows.length){tb.innerHTML='<tr><td colspan="14"><div class="empty">Нет строк — нажмите «+ строка»</div></td></tr>';return;}
   var today=isoD(0);
@@ -1129,23 +1130,23 @@ function _rtblNow(){
     var cityList=disp2Mode?CITIESC:CITIES;
     var co=cityList.map(function(city){return'<option value="'+xe(city)+'"'+(r.city===city?' selected':'')+'>'+xe(city)+'</option>';}).join('');
     var so2=STATS.map(function(s){return'<option value="'+xe(s)+'"'+(r.status===s?' selected':'')+'>'+xe(s)+'</option>';}).join('');
-    h+='<td style="width:110px">'+(isEditing?'<select onchange="ur(\''+r.id+'\',\'city\',this.value)">'+co+'</select>':'<span style="font-size:12px;padding:2px 4px;display:block">'+xe(r.city||'')+'</span>')+'</td>';
+    h+='<td style="width:110px">'+(isEditing?'<select class="ac-city" onchange="ur(\''+r.id+'\',\'city\',this.value)">'+co+'</select>':'<span style="font-size:12px;padding:2px 4px;display:block">'+xe(r.city||'')+'</span>')+'</td>';
     h+='<td style="width:70px">'+(isEditing?'<input type="time" value="'+(r.timeSlot||'')+'" onchange="ur(\''+r.id+'\',\'timeSlot\',this.value)">':'<span style="font-size:12px;padding:2px 4px;display:block;color:var(--mu)">'+xe(r.timeSlot||'—')+'</span>')+'</td>';
     // Address cell
     var addrCellHtml = '<td style="min-width:170px">';
     if (r.fromTech) {
       addrCellHtml += isEditing
-        ? '<input type="text" value="'+xe(r.addr)+'" placeholder="Улица, дом..." oninput="ur(\''+r.id+'\',\'addr\',this.value)" style="font-weight:600">'
+        ? '<input type="text" class="ac-addr" value="'+xe(r.addr)+'" placeholder="Улица, дом..." oninput="ur(\''+r.id+'\',\'addr\',this.value)" style="font-weight:600">'
         : '<div style="font-size:13px;padding:2px 4px;font-weight:600">'+xe(r.addr)+'</div>';
       addrCellHtml += '<div style="font-size:10px;color:#854F0B;font-weight:500">&#128295; '+xe(r.techName||'Техник')+(r.desiredDate?' · жел. '+r.desiredDate.slice(5):'')+' </div>';
     } else if (r.fromDriver) {
       addrCellHtml += isEditing
-        ? '<input type="text" value="'+xe(r.addr||'')+'" placeholder="Улица, дом..." oninput="ur(\''+r.id+'\',\'addr\',this.value)">'
+        ? '<input type="text" class="ac-addr" value="'+xe(r.addr||'')+'" placeholder="Улица, дом..." oninput="ur(\''+r.id+'\',\'addr\',this.value)">'
         : '<span style="font-size:13px;padding:2px 4px;display:block;color:'+(r.addr?'var(--tx)':'var(--mu)')+';font-style:'+(r.addr?'normal':'italic')+'">'+xe(r.addr||'— не указан —')+'</span>';
       addrCellHtml += '<div style="font-size:10px;color:#1856a0;font-weight:500;margin-top:1px">&#128666; Добавлено водителем</div>';
     } else {
       addrCellHtml += isEditing
-        ? '<input type="text" value="'+xe(r.addr)+'" placeholder="Улица, дом..." oninput="ur(\''+r.id+'\',\'addr\',this.value)">'
+        ? '<input type="text" class="ac-addr" value="'+xe(r.addr)+'" placeholder="Улица, дом..." oninput="ur(\''+r.id+'\',\'addr\',this.value)">'
         : '<span style="font-size:13px;font-weight:500;padding:2px 4px;display:block">'+xe(r.addr||'')+'</span>';
     }
     if(r.plannerName)addrCellHtml += '<div style="font-size:10px;color:#7a4a00;font-weight:600;margin-top:1px">&#128100; '+xe(r.plannerName)+'</div>';
@@ -1209,9 +1210,9 @@ function _rtblNow(){
     h+='<td><input type="checkbox" checked></td>';
     h+='<td><input id="nrf-date-inp" type="date" value="'+xe(nd.date)+'" onclick="event.stopPropagation()" style="border:1px solid #aec6ef;border-radius:5px;padding:5px 6px;font-size:12px;font-weight:600;color:#0c447c;background:#dce8fb;width:100%;cursor:pointer"></td>';
     h+='<td><select id="nrf-drv" style="border:1px solid #aec6ef;border-radius:5px;padding:4px;font-size:12px;width:100%;background:#dce8fb;font-weight:600;color:#0c447c">'+drvOpts+'</select></td>';
-    h+='<td><select id="nrf-city" style="border:1px solid #aec6ef;border-radius:5px;padding:4px;font-size:12px;width:100%;background:#dce8fb;font-weight:600;color:#0c447c">'+cityOpts+'</select></td>';
+    h+='<td><select id="nrf-city" class="ac-city" style="border:1px solid #aec6ef;border-radius:5px;padding:4px;font-size:12px;width:100%;background:#dce8fb;font-weight:600;color:#0c447c">'+cityOpts+'</select></td>';
     h+='<td><input id="nrf-time" type="time" value="'+xe(nd.timeSlot||'')+'" style="border:1px solid #aec6ef;border-radius:5px;padding:4px;font-size:12px;width:100%"></td>';
-    h+='<td><input id="nrf-addr" type="text" placeholder="Улица, дом..." style="border:1px solid #aec6ef;border-radius:5px;padding:5px 7px;font-size:13px;font-weight:600;width:100%"></td>';
+    h+='<td><input id="nrf-addr" class="ac-addr" type="text" placeholder="Улица, дом..." style="border:1px solid #aec6ef;border-radius:5px;padding:5px 7px;font-size:13px;font-weight:600;width:100%"></td>';
     h+='<td id="nrf-inv-cell"></td>';
     h+='<td><select id="nrf-status" style="border:1px solid #aec6ef;border-radius:5px;padding:4px;font-size:12px;width:100%">'+statOpts+'</select></td>';
     h+='<td><input id="nrf-comment" type="text" placeholder="..." style="border:1px solid #aec6ef;border-radius:5px;padding:4px;font-size:12px;width:100%"></td>';
@@ -1229,7 +1230,6 @@ function _rtblNow(){
   if(newRowDraft){
     var cell=document.getElementById('nrf-inv-cell');
     if(cell)renderNrfInvs(cell);
-    acAttach();
   }
 }
 
