@@ -913,9 +913,13 @@ function acCleanAddr(addr,city){
   s=s.replace(/\+/g,' ').replace(/\bE-?\s*Check\b/ig,' ').replace(/\bAsbest\b/ig,' ').replace(/\s{2,}/g,' ').trim();
   return s;
 }
+var PICKUPS=['Hornbach','ABEX']; // склады/магазины, откуда водители часто забирают товар — всегда в списке (добавлять сюда)
 function acList(city){
   city=(''+(city||'')).trim(); var seen={},out=[];
-  function add(addr,src){ var c=acCleanAddr(addr,city); if(!c)return; var k=c.toLowerCase(); if(seen[k])return; seen[k]=1; out.push({a:c,src:src}); }
+  var cityset={}; (CITIES||[]).concat(CITIESC||[]).forEach(function(c){ cityset[(''+c).trim().toLowerCase()]=1; });
+  function add(addr,src){ var c=acCleanAddr(addr,city); if(!c)return; var k=c.toLowerCase(); if(seen[k])return; if(cityset[k])return; seen[k]=1; out.push({a:c,src:src}); }
+  // склады — всегда сверху, независимо от города
+  PICKUPS.forEach(function(s){ s=(''+s).trim(); if(!s)return; var k=s.toLowerCase(); if(seen[k])return; seen[k]=1; out.push({a:s,src:'store'}); });
   Object.keys(incAll||{}).forEach(function(inv){ var r=incAll[inv]; if(r&&(''+(r.city||'')).trim()===city&&r.address) add(r.address,'inv'); });
   (rows||[]).forEach(function(r){ if(r&&(''+(r.city||'')).trim()===city&&r.addr&&(''+r.addr).trim()) add(r.addr,'plan'); });
   return out;
@@ -931,7 +935,7 @@ function acRender(){
   _ac.items=list; _ac.idx=-1;
   var el=acEl();
   if(!list.length){ el.innerHTML='<div class="ac-empty">Нет совпадений — вводится вручную</div>'; }
-  else { el.innerHTML=list.map(function(x,k){ return '<div class="ac-opt" data-k="'+k+'"><span class="ac-ic">'+(x.src==='inv'?'📄':'🚚')+'</span><span class="ac-tx">'+xe(x.a)+'</span></div>'; }).join(''); }
+  else { el.innerHTML=list.map(function(x,k){ return '<div class="ac-opt" data-k="'+k+'"><span class="ac-ic">'+(x.src==='inv'?'📄':(x.src==='store'?'🏬':'🚚'))+'</span><span class="ac-tx">'+xe(x.a)+'</span></div>'; }).join(''); }
   Array.prototype.forEach.call(el.querySelectorAll('.ac-opt'),function(o){ o.addEventListener('mousedown',function(e){ e.preventDefault(); acPick(+o.getAttribute('data-k')); }); });
   acPos(); el.style.display='block'; _ac.open=true;
 }
