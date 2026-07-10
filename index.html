@@ -249,6 +249,13 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .pos-code{font-size:10px;color:#a0a6ad;margin-top:1px}
 .pos-empty{padding:30px;text-align:center;color:#80786e}
 .pos-note{padding:8px 14px 12px;font-size:11px;color:#80786e}
+.ac-drop{position:fixed;z-index:9999;background:#fff;border:1px solid #c7d6ee;border-radius:10px;box-shadow:0 12px 26px rgba(18,40,80,.18);overflow:auto;max-height:264px;display:none}
+.ac-opt{display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;font-size:13px;font-weight:600;color:#123645;border-top:1px solid #eef2f9}
+.ac-opt:first-child{border-top:none}
+.ac-opt:hover,.ac-opt.hl{background:#eaf1fd}
+.ac-ic{font-size:13px;line-height:1;flex:none}
+.ac-tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-empty{padding:10px 11px;font-size:11.5px;color:#8a97ad;font-weight:500}
 </style>
 </head>
 <body>
@@ -625,7 +632,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
-var STATS=['—','вывоз мусора','самовывоз','перенесено','срочно','забрать товар'];
+var STATS=['—','вывоз мусора','срочно','забрать товар','перевезти инструмент','перевезти мастера'];
 var COORDS={Salzgitter:{a:52.094,o:10.370},Wolfsburg:{a:52.423,o:10.787},Braunschweig:{a:52.268,o:10.527},Hannover:{a:52.374,o:9.739},'Göttingen':{a:51.534,o:9.932},Aurich:{a:53.470,o:7.483},Wilhelmshaven:{a:53.529,o:8.104}};
 var DRV_KEYS=['L','R','C','V'];
 var DRV_PATHS={L:'lesha-app',R:'roma-app',C:'driver3-app',V:'valentyn-app'};
@@ -898,6 +905,59 @@ function renderNrfInvs(cell){
   cell.innerHTML=html;
 }
 
+// ── Подсказка адреса (компактный список под полем нового задания) ──
+// Источник: активные накладные (incAll) + план (rows, окно ±7 дн) выбранного города; дубли убраны, код квартиры сохранён.
+function acCleanAddr(addr,city){
+  var s=(''+(addr||'')).trim();
+  if(city){ try{ var re=new RegExp('[,\\s]+'+city.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*$','i'); s=s.replace(re,'').trim(); }catch(e){} }
+  s=s.replace(/\+/g,' ').replace(/\bE-?\s*Check\b/ig,' ').replace(/\bAsbest\b/ig,' ').replace(/\s{2,}/g,' ').trim();
+  return s;
+}
+function acList(city){
+  city=(''+(city||'')).trim(); var seen={},out=[];
+  function add(addr,src){ var c=acCleanAddr(addr,city); if(!c)return; var k=c.toLowerCase(); if(seen[k])return; seen[k]=1; out.push({a:c,src:src}); }
+  Object.keys(incAll||{}).forEach(function(inv){ var r=incAll[inv]; if(r&&(''+(r.city||'')).trim()===city&&r.address) add(r.address,'inv'); });
+  (rows||[]).forEach(function(r){ if(r&&(''+(r.city||'')).trim()===city&&r.addr&&(''+r.addr).trim()) add(r.addr,'plan'); });
+  return out;
+}
+var _ac={inp:null,open:false,idx:-1,items:[]},_acGlob=false;
+function acEl(){ var el=document.getElementById('acDrop'); if(!el){ el=document.createElement('div'); el.id='acDrop'; el.className='ac-drop'; document.body.appendChild(el); } return el; }
+function acPos(){ var inp=_ac.inp,el=document.getElementById('acDrop'); if(!inp||!el)return; var r=inp.getBoundingClientRect(); el.style.left=r.left+'px'; el.style.top=(r.bottom+4)+'px'; el.style.width=Math.max(r.width,180)+'px'; }
+function acRender(){
+  var inp=_ac.inp; if(!inp)return;
+  var cs=document.getElementById('nrf-city'); var city=cs?cs.value:'';
+  var all=acList(city); var qq=(inp.value||'').trim().toLowerCase();
+  var list=qq?all.filter(function(x){return x.a.toLowerCase().indexOf(qq)>-1;}):all;
+  _ac.items=list; _ac.idx=-1;
+  var el=acEl();
+  if(!list.length){ el.innerHTML='<div class="ac-empty">Нет совпадений — вводится вручную</div>'; }
+  else { el.innerHTML=list.map(function(x,k){ return '<div class="ac-opt" data-k="'+k+'"><span class="ac-ic">'+(x.src==='inv'?'📄':'🚚')+'</span><span class="ac-tx">'+xe(x.a)+'</span></div>'; }).join(''); }
+  Array.prototype.forEach.call(el.querySelectorAll('.ac-opt'),function(o){ o.addEventListener('mousedown',function(e){ e.preventDefault(); acPick(+o.getAttribute('data-k')); }); });
+  acPos(); el.style.display='block'; _ac.open=true;
+}
+function acPick(k){ var x=_ac.items[k]; if(!x)return; if(_ac.inp)_ac.inp.value=x.a; acClose(); }
+function acClose(){ var el=document.getElementById('acDrop'); if(el)el.style.display='none'; _ac.open=false; _ac.idx=-1; }
+function acKey(e){
+  if(!_ac.open)return;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); var n=_ac.items.length; if(!n)return;
+    _ac.idx=e.key==='ArrowDown'?Math.min(n-1,_ac.idx+1):Math.max(0,_ac.idx-1);
+    var el=document.getElementById('acDrop'); Array.prototype.forEach.call(el.querySelectorAll('.ac-opt'),function(o){ o.className='ac-opt'+((+o.getAttribute('data-k')===_ac.idx)?' hl':''); });
+    var t=el.querySelector('.ac-opt.hl'); if(t)t.scrollIntoView({block:'nearest'});
+  } else if(e.key==='Enter'){ if(_ac.idx>-1){ e.preventDefault(); acPick(_ac.idx); } }
+  else if(e.key==='Escape'){ acClose(); }
+}
+function acAttach(){
+  acClose();
+  var inp=document.getElementById('nrf-addr'); if(!inp)return;
+  _ac.inp=inp; inp.setAttribute('autocomplete','off');
+  inp.addEventListener('focus',acRender);
+  inp.addEventListener('input',acRender);
+  inp.addEventListener('keydown',acKey);
+  inp.addEventListener('blur',function(){ setTimeout(acClose,150); });
+  var cs=document.getElementById('nrf-city'); if(cs)cs.addEventListener('change',function(){ if(_ac.open)acRender(); });
+  if(!_acGlob){ _acGlob=true; window.addEventListener('scroll',function(){ if(_ac.open)acClose(); },true); window.addEventListener('resize',function(){ if(_ac.open)acClose(); }); }
+}
+
 function dr(id){
   var r=rows.find(function(x){return x.id===id;});
   if(r){ (r.invs||[]).forEach(function(inv){ inv=(''+(inv||'')).trim(); if(inv&&incPlaced[inv]&&incPlaced[inv].rowId===id) db.ref('1c/delivery/placed/'+inv).remove(); }); }
@@ -1158,6 +1218,7 @@ function _rtblNow(){
   if(newRowDraft){
     var cell=document.getElementById('nrf-inv-cell');
     if(cell)renderNrfInvs(cell);
+    acAttach();
   }
 }
 
