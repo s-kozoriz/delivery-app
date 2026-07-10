@@ -946,16 +946,23 @@ function acKey(e){
   } else if(e.key==='Enter'){ if(_ac.idx>-1){ e.preventDefault(); acPick(_ac.idx); } }
   else if(e.key==='Escape'){ acClose(); }
 }
+function acInside(t){ var el=document.getElementById('acDrop'); return !!(el&&(t===el||(el.contains&&el.contains(t)))); }
 function acAttach(){
   acClose();
   var inp=document.getElementById('nrf-addr'); if(!inp)return;
   _ac.inp=inp; inp.setAttribute('autocomplete','off');
   inp.addEventListener('focus',acRender);
+  inp.addEventListener('click',function(){ if(!_ac.open)acRender(); });
   inp.addEventListener('input',acRender);
   inp.addEventListener('keydown',acKey);
-  inp.addEventListener('blur',function(){ setTimeout(acClose,150); });
   var cs=document.getElementById('nrf-city'); if(cs)cs.addEventListener('change',function(){ if(_ac.open)acRender(); });
-  if(!_acGlob){ _acGlob=true; window.addEventListener('scroll',function(){ if(_ac.open)acClose(); },true); window.addEventListener('resize',function(){ if(_ac.open)acClose(); }); }
+  if(!_acGlob){ _acGlob=true;
+    // внешний скролл/ресайз — закрыть (fixed-список отвязался бы от поля); внутренний скролл списка НЕ закрывать
+    window.addEventListener('scroll',function(e){ if(_ac.open&&!acInside(e.target))acClose(); },true);
+    window.addEventListener('resize',function(){ if(_ac.open)acClose(); });
+    // закрываем только по клику вне поля и вне списка (клик по полосе прокрутки списка — внутри → не закрывать)
+    document.addEventListener('mousedown',function(e){ if(_ac.open&&e.target!==_ac.inp&&!acInside(e.target))acClose(); });
+  }
 }
 
 function dr(id){
