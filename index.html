@@ -256,6 +256,10 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .ac-ic{font-size:13px;line-height:1;flex:none}
 .ac-tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ac-empty{padding:10px 11px;font-size:11.5px;color:#8a97ad;font-weight:500}
+.odo-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.odo-tbl th{position:sticky;top:0;background:#f6f8fb;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
+.odo-tbl td{padding:8px 10px;border-bottom:1px solid #eef1f5;white-space:nowrap}
+.odo-tbl a{color:#1856a0;text-decoration:none;font-weight:600}
 </style>
 </head>
 <body>
@@ -300,6 +304,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <button class="tab" id="tabStat" onclick="sw('stat')">Статистика</button>
     <button class="tab" id="tabVoice" onclick="sw('voice')">Сообщения</button>
     <button class="tab" id="tabTabel" onclick="sw('tabel')">Табель</button>
+    <button class="tab" id="tabOdo" onclick="sw('odo')">Пробег</button>
     <button class="tab" id="tabCalib" onclick="sw('calib')">Калибровка</button>
     <button class="tab" id="tabInc" onclick="sw('inc')">Входящие 1С</button>
     <button class="tab" id="tabNordM" onclick="sw('nordm')" style="display:none">Nord</button>
@@ -427,6 +432,16 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
       <button class="tabel-seg" id="tabelSegLag" onclick="tabelSeg('lag')">Грузчики</button>
     </div>
     <div id="tabelBody"></div>
+  </div>
+</div>
+<div id="tOdo" style="display:none">
+  <div class="card">
+    <div class="ch">
+      <h2>Пробег (одометр)</h2>
+      <button class="btn btn-sm" onclick="odoCsv()">&#8681; CSV</button>
+    </div>
+    <div style="padding:0 14px 8px;font-size:12px;color:#80786e">Временное хранилище. Фото+цифры — для сверки с топливом (Zoll). Экспорт CSV для передачи.</div>
+    <div id="odoBody"></div>
   </div>
 </div>
 <div id="tcalib" style="display:none">
@@ -687,6 +702,31 @@ db.ref('sent').on('value',function(s){sent=s.val()||{};gm();rh();});
 db.ref('trips').on('value',function(s){tripStatus=s.val()||{};gm();});
 db.ref('worktime').on('value',function(s){wtAll=s.val()||{};wtDenied=false;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
+// ── Пробег (одометр) — временное хранилище для сверки с топливом (Zoll); фото уходит контролёру позже ──
+var odoAll={};
+db.ref('odometer').on('value',function(s){odoAll=s.val()||{};var t=document.getElementById('tOdo');if(t&&t.style.display!=='none')renderOdo();},function(){});
+function odoFmtD(d){var p=(''+(d||'')).split('-');return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):d;}
+function odoList(){var a=[];Object.keys(odoAll).forEach(function(drv){var bd=odoAll[drv]||{};Object.keys(bd).forEach(function(date){var r=bd[date]||{};a.push({drv:drv,date:date,s:r.start||{},e:r.end||{}});});});return a;}
+function renderOdo(){
+  var body=document.getElementById('odoBody');if(!body)return;
+  var rows=odoList();rows.sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0;});
+  if(!rows.length){body.innerHTML='<div class="tabel-empty">Нет данных о пробеге.</div>';return;}
+  var h='<div style="overflow-x:auto"><table class="odo-tbl"><thead><tr><th>Дата</th><th>Водитель</th><th>Старт</th><th>Конец</th><th>За день</th><th>Фото</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    var sk=(typeof r.s.km==='number')?r.s.km:null,ek=(typeof r.e.km==='number')?r.e.km:null;
+    var day=(sk!=null&&ek!=null&&ek>=sk)?(ek-sk):null;
+    var ph='';if(r.s.photo)ph+='<a href="'+xe(r.s.photo)+'" target="_blank">&#128247;старт</a> ';if(r.e.photo)ph+='<a href="'+xe(r.e.photo)+'" target="_blank">&#128247;конец</a>';
+    h+='<tr><td>'+odoFmtD(r.date)+'</td><td>'+xe(dname(r.drv)||r.drv)+'</td><td>'+(sk!=null?sk:'—')+'</td><td>'+(ek!=null?ek:'—')+'</td><td>'+(day!=null?(day+' км'):'—')+'</td><td>'+(ph||'—')+'</td></tr>';
+  });
+  h+='</tbody></table></div>';body.innerHTML=h;
+}
+function odoCsv(){
+  var out=[['Дата','Водитель','Старт км','Конец км','За день км']];
+  var a=odoList();a.sort(function(x,y){return x.date<y.date?-1:x.date>y.date?1:0;});
+  a.forEach(function(r){var sk=(typeof r.s.km==='number')?r.s.km:'',ek=(typeof r.e.km==='number')?r.e.km:'';var day=(sk!==''&&ek!==''&&ek>=sk)?(ek-sk):'';out.push([r.date,(dname(r.drv)||r.drv),sk,ek,day]);});
+  var csv=out.map(function(row){return row.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(';');}).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});var u=URL.createObjectURL(blob);var el=document.createElement('a');el.href=u;el.download='probeg_'+isoD(0)+'.csv';el.click();setTimeout(function(){URL.revokeObjectURL(u);},1000);
+}
 db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=document.getElementById('cs-nord');if(p&&p.style.display!=='none')renderNordPlanners();},function(){});
 db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
 db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
@@ -796,7 +836,7 @@ firebase.auth().onAuthStateChanged(function(user){
     if(role==='norden'){disp2Mode=true;enter(false);}
     else if(role==='lager'){disp2Mode=false;enter(true);}
     else{disp2Mode=false;enter(false);}
-    if(c.plannerId){ IS_PLANNER=true; PLANNER_ID=c.plannerId; PLANNER_NAME=c.plannerName||''; ['tabVoice','tabCalib'].forEach(function(id){var b=document.getElementById(id);if(b)b.style.display='none';}); }
+    if(c.plannerId){ IS_PLANNER=true; PLANNER_ID=c.plannerId; PLANNER_NAME=c.plannerName||''; ['tabVoice','tabCalib','tabOdo'].forEach(function(id){var b=document.getElementById(id);if(b)b.style.display='none';}); }
     if(role==='zentrum'){ var _tn=document.getElementById('tabNordM'); if(_tn)_tn.style.display=''; }
     __startDB();
   });
@@ -1831,12 +1871,12 @@ function swCfg(name){
 }
 
 function sw(n){
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo'};
   Object.keys(tabMap).forEach(function(t){
     var el=document.getElementById(tabMap[t]);
     if(el)el.style.display=t===n?'':'none';
   });
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег'};
   document.querySelectorAll('.tab').forEach(function(b){
     b.classList.toggle('on',b.textContent.trim()===(nameMap[n]||''));
   });
@@ -1852,6 +1892,7 @@ function sw(n){
   if(n==='calib')renderCalib();
   if(n==='inc')renderInc();
   if(n==='nordm')renderNordMirror();
+  if(n==='odo')renderOdo();
 }
 // Зеркало региона Nord (для zentrum): что планируют техники + правки + день водителя
 function renderNordMirror(){

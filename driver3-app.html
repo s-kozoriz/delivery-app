@@ -192,7 +192,8 @@ body{background:#f0f4fc;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
   <div class="hdr-top">
     <h1 id="dn">Водитель 3 <span class="sync" id="sync"></span></h1>
     <div class="hdr-actions">
-      <button class="wt-btn idle" id="wtBtn" onclick="openWtPanel()"><span class="wt-dot"></span>Смена</button>
+      <button class="wt-btn idle" id="wtBtn" onclick="wtBtnTap()"><span class="wt-dot"></span>Смена</button>
+      <button class="wt-btn" id="wtEndBtn" style="display:none;background:#c0392b" onclick="odoOpen('end')">&#9209; Конец</button>
       <button class="exit-btn" onclick="wtLogout()">Выход</button>
     </div>
   </div>
@@ -436,10 +437,18 @@ function wtFinishDay() { wtMutate(function (rec) { var L = wtSegs(rec); var i = 
 function renderWtBtn() {
   var b = document.getElementById('wtBtn'); if (!b) return;
   var rec = wtToday(); var st = wtState(rec); var w = wtWorkedMin(rec, true);
-  if (st === 'done') { b.className = 'wt-btn done'; b.innerHTML = '&#10003; ' + wtHoursDec(rec) + ' ч'; }
-  else if (st === 'run') { b.className = 'wt-btn run'; b.innerHTML = '<span class="wt-dot"></span>' + wtFmt(w); }
-  else if (st === 'pause') { b.className = 'wt-btn pause'; b.innerHTML = '<span class="wt-dot"></span>&#9208; ' + wtFmt(w); }
-  else { b.className = 'wt-btn idle'; b.innerHTML = '<span class="wt-dot"></span>Смена'; }
+  var eb = document.getElementById('wtEndBtn');
+  if (st === 'done') { b.className = 'wt-btn done'; b.innerHTML = '&#10003; ' + wtHoursDec(rec) + ' ч'; if(eb)eb.style.display='none'; }
+  else if (st === 'run') { b.className = 'wt-btn run'; b.innerHTML = '<span class="wt-dot"></span>&#9208; Пауза · ' + wtFmt(w); if(eb)eb.style.display=''; }
+  else if (st === 'pause') { b.className = 'wt-btn pause'; b.innerHTML = '<span class="wt-dot"></span>&#9654; Продолжить · ' + wtFmt(w); if(eb)eb.style.display=''; }
+  else { b.className = 'wt-btn idle'; b.innerHTML = '<span class="wt-dot"></span>Смена'; if(eb)eb.style.display='none'; }
+}
+function wtBtnTap() {
+  var st = wtState(wtToday());
+  if (st === 'run') wtPauseSeg();
+  else if (st === 'pause') wtStartSeg();
+  else if (st === 'idle') odoOpen('start');
+  else if (st === 'done') wtStartSeg();
 }
 function openWtPanel() { wtPanelMode = 'view'; document.getElementById('wtPanel').classList.add('on'); renderWtPanel(); }
 function closeWtPanel() { document.getElementById('wtPanel').classList.remove('on'); }
@@ -470,16 +479,16 @@ function renderWtPanel() {
   }
   var worked = wtWorkedMin(rec, true);
   if (st === 'idle') {
-    box.innerHTML = '<div class="wt-status">Смена ещё не начата</div>' +
-      '<button class="wt-main start" onclick="wtAsk(\'confirmStart\')">&#9654; Начать работу</button>';
+    box.innerHTML = '<div class="wt-status">День начинается с фиксации пробега</div>' +
+      '<button class="wt-main start" onclick="odoOpen(\'start\')">&#9654; Начать рабочий день</button>';
   } else if (st === 'run') {
     box.innerHTML = '<div class="wt-status">Идёт смена<br>сегодня отработано <b id="wtWtxt">' + wtFmt(worked) + '</b></div>' + wtSegLine(rec) +
       '<div class="wt-two"><button class="wt-main pause" onclick="wtPauseSeg()">&#9208; Перерыв</button>' +
-      '<button class="wt-main end" onclick="wtAsk(\'confirmFinish\')">&#9209; Завершить день</button></div>';
+      '<button class="wt-main end" onclick="odoOpen(\'end\')">&#9209; Завершить день</button></div>';
   } else if (st === 'pause') {
     box.innerHTML = '<div class="wt-status">Перерыв<br>отработано <b>' + wtFmt(worked) + '</b></div>' + wtSegLine(rec) +
       '<div class="wt-two"><button class="wt-main start" onclick="wtAsk(\'confirmStart\')">&#9654; Продолжить</button>' +
-      '<button class="wt-main end" onclick="wtAsk(\'confirmFinish\')">&#9209; Завершить день</button></div>';
+      '<button class="wt-main end" onclick="odoOpen(\'end\')">&#9209; Завершить день</button></div>';
   } else {
     box.innerHTML = '<div class="wt-status">День завершён<br><b>' + wtHoursDec(rec) + ' ч</b> &#10003;</div>' + wtSegLine(rec) +
       '<button class="wt-main start" onclick="wtAsk(\'confirmStart\')">&#9654; Возобновить работу</button>' +
@@ -651,6 +660,135 @@ function uploadPhotoWithQueue(file, rowId) {
     enqueuePhoto(file, rowId, path, localId, ts);
   }
 }
+
+// ===================== ОДОМЕТР (пробег) — гейт старта/конца дня =====================
+// Хранение: odometer/{DRV}/{date} = { start:{km,photo,ts}, end:{km,photo,ts} }
+var odoData = {}, _odoGateChecked = false, odoMode = null, odoPhotoFile = null;
+db.ref('odometer/' + DRV).on('value', function (s) { odoData = s.val() || {}; });
+function odoRec() { return odoData[wtDate()] || {}; }
+(function () {
+  var css = '#odoGate{position:fixed;inset:0;z-index:9000;background:#0d1520;display:none;flex-direction:column;color:#eaf0f8;font-family:inherit}'
+    + '#odoGate.on{display:flex}'
+    + '#odoGate .ohd{padding:18px 18px 4px;font-size:18px;font-weight:800;text-align:center}'
+    + '#odoGate .osub{font-size:12.5px;color:#9fb0c8;text-align:center;padding:0 20px 10px}'
+    + '#odoGate .ocam{flex:1;display:flex;align-items:center;justify-content:center;background:#0a0e14;overflow:hidden}'
+    + '#odoGate .ocam img{max-width:88%;max-height:100%;border-radius:12px;border:2px solid #263346}'
+    + '#odoGate .ohint{color:#7c8aa0;font-size:14px;text-align:center;padding:24px;font-weight:600}'
+    + '#odoGate .oform{padding:14px 16px 20px;display:flex;flex-direction:column;gap:11px}'
+    + '#odoGate .oshot{width:100%;border:2px dashed #3a5a86;background:none;color:#8fb4e6;border-radius:12px;padding:15px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
+    + '#odoGate .oshot.done{border-style:solid;border-color:#1a7a40;color:#8ef0b0;background:#0f2417}'
+    + '#odoGate .okm{display:flex;align-items:center;gap:10px;background:#131c28;border:1px solid #2a3a50;border-radius:12px;padding:9px 12px}'
+    + '#odoGate .okm label{font-size:13px;font-weight:700;color:#d0a94e;white-space:nowrap}'
+    + '#odoGate .okm input{flex:1;background:#0a0e14;border:1px solid #3a4a60;border-radius:8px;padding:12px;font-size:19px;font-weight:800;color:#ffd24a;text-align:center;letter-spacing:.05em;width:100%;font-family:inherit}'
+    + '#odoGate .ogo{width:100%;border:none;border-radius:12px;padding:16px;font-size:17px;font-weight:800;color:#fff;background:#1a7a40;cursor:pointer;font-family:inherit}'
+    + '#odoGate .ogo:disabled{background:#2f3d4e;color:#7c8aa0}'
+    + '#odoGate .opeek{background:none;border:none;color:#8ea3c4;font-size:13px;font-weight:700;cursor:pointer;padding:8px;text-decoration:underline;font-family:inherit}'
+    + '#odoBanner{display:none;align-items:center;justify-content:space-between;gap:8px;background:#b23b2e;color:#fff;padding:10px 12px;font-size:13px;font-weight:800}'
+    + '#odoBanner.on{display:flex}'
+    + '#odoBanner button{background:#fff;color:#b23b2e;border:none;border-radius:8px;padding:7px 13px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}';
+  var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  var g = document.createElement('div'); g.id = 'odoGate';
+  g.innerHTML = '<div class="ohd" id="odoHd"></div><div class="osub" id="odoSub"></div>'
+    + '<div class="ocam" id="odoCam"></div>'
+    + '<div class="oform"><button class="oshot" id="odoShot" onclick="odoShoot()">&#128247; Сфотографировать пробег</button>'
+    + '<div class="okm"><label>Пробег, км</label><input id="odoKm" type="number" inputmode="numeric" placeholder="напр. 123456" oninput="odoValidate()"></div>'
+    + '<button class="ogo" id="odoGo" disabled onclick="odoSave()"></button>'
+    + '<button class="opeek" id="odoPeek" onclick="odoPeek()">Только посмотреть маршрут</button></div>';
+  document.body.appendChild(g);
+  var inp = document.createElement('input'); inp.id = 'odoInput'; inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment'); inp.style.display = 'none';
+  inp.addEventListener('change', odoOnFile); document.body.appendChild(inp);
+  var ban = document.createElement('div'); ban.id = 'odoBanner';
+  ban.innerHTML = '<span>&#9888; Пробег не зафиксирован</span><button onclick="odoOpen(\'start\')">Начать день</button>';
+  var app = document.getElementById('driverApp'); if (app) app.insertBefore(ban, app.firstChild);
+})();
+function odoOpen(mode) {
+  odoMode = mode; odoPhotoFile = null;
+  var end = mode === 'end';
+  document.getElementById('odoHd').textContent = end ? 'Конец дня — пробег' : 'Начало дня — пробег';
+  document.getElementById('odoSub').textContent = 'Сфотографируйте одометр и впишите км' + (end ? ', чтобы завершить день.' : ', чтобы начать день.');
+  document.getElementById('odoGo').textContent = end ? 'Завершить день' : 'Начать рабочий день';
+  document.getElementById('odoPeek').style.display = end ? 'none' : '';
+  var sh = document.getElementById('odoShot'); sh.className = 'oshot'; sh.innerHTML = '&#128247; Сфотографировать пробег';
+  document.getElementById('odoCam').innerHTML = '<div class="ohint">Нажмите «Сфотографировать пробег»</div>';
+  document.getElementById('odoKm').value = '';
+  document.getElementById('odoBanner').classList.remove('on');
+  odoValidate();
+  document.getElementById('odoGate').classList.add('on');
+}
+function odoShoot() { var i = document.getElementById('odoInput'); i.value = ''; i.click(); }
+function odoOnFile(e) {
+  var f = e.target.files[0]; if (!f) return;
+  odoPhotoFile = f;
+  document.getElementById('odoCam').innerHTML = '<img src="' + URL.createObjectURL(f) + '">';
+  var sh = document.getElementById('odoShot'); sh.className = 'oshot done'; sh.textContent = '✓ Фото есть · переснять';
+  e.target.value = ''; odoValidate();
+}
+function odoValidate() {
+  var km = (document.getElementById('odoKm').value || '').trim();
+  document.getElementById('odoGo').disabled = !(odoPhotoFile && km.length > 0);
+}
+function odoPeek() {
+  document.getElementById('odoGate').classList.remove('on');
+  if (wtState(wtToday()) === 'idle') document.getElementById('odoBanner').classList.add('on');
+}
+function odoSave() {
+  var kmv = (document.getElementById('odoKm').value || '').trim(); var km = Number(kmv);
+  if (!odoPhotoFile || kmv === '' || !(km >= 0)) return;
+  var mode = odoMode, date = wtDate(), ts = Date.now();
+  if (mode === 'end') wtFinishDay(); else wtStartSeg();
+  odoWriteKm(date, mode, km, ts);
+  odoUploadPhoto(odoPhotoFile, date, mode, ts);
+  document.getElementById('odoGate').classList.remove('on');
+  document.getElementById('odoBanner').classList.remove('on');
+  showToast(mode === 'end' ? 'День завершён ✓' : 'Рабочий день начат ✓');
+  if (navigator.vibrate) navigator.vibrate(60);
+}
+var odoQ = JSON.parse(localStorage.getItem('odoQ_' + DRV) || '[]');
+function saveOdoQ() { localStorage.setItem('odoQ_' + DRV, JSON.stringify(odoQ)); }
+function odoUploadPhoto(file, date, mode, ts) {
+  var path = 'odometer/' + DRV + '/' + date + '/' + mode + '_' + ts + '.jpg';
+  if (navigator.onLine) {
+    storage.ref(path).put(file).then(function (sn) { return sn.ref.getDownloadURL(); })
+      .then(function (url) { db.ref('odometer/' + DRV + '/' + date + '/' + mode + '/photo').set(url); })
+      .catch(function () { odoEnqueue(file, path, date, mode, ts); });
+  } else { odoEnqueue(file, path, date, mode, ts); }
+}
+function odoEnqueue(file, path, date, mode, ts) {
+  var rd = new FileReader();
+  rd.onload = function (e) { try { odoQ.push({ path: path, b64: e.target.result, date: date, mode: mode, ts: ts }); saveOdoQ(); showToast('Слабая сеть — фото пробега загрузится само'); setTimeout(odoProcessQ, 1500); } catch (er) { showToast('Нет места для фото'); } };
+  rd.readAsDataURL(file);
+}
+function odoProcessQ() {
+  if (!odoQ.length) return; var it = odoQ[0]; if (it._p) return; it._p = true;
+  var bs = atob(it.b64.split(',')[1]); var mime = it.b64.split(';')[0].split(':')[1];
+  var ab = new ArrayBuffer(bs.length), ia = new Uint8Array(ab); for (var i = 0; i < bs.length; i++) ia[i] = bs.charCodeAt(i);
+  storage.ref(it.path).put(new Blob([ab], { type: mime })).then(function (sn) { return sn.ref.getDownloadURL(); })
+    .then(function (url) { return db.ref('odometer/' + DRV + '/' + it.date + '/' + it.mode + '/photo').set(url); })
+    .then(function () { odoQ.shift(); saveOdoQ(); setTimeout(odoProcessQ, 1000); })
+    .catch(function () { it._p = false; setTimeout(odoProcessQ, 15000); });
+}
+window.addEventListener('online', function () { setTimeout(odoProcessQ, 2500); });
+setTimeout(odoProcessQ, 4000);
+setInterval(function () { if (odoQ.length && navigator.onLine) odoProcessQ(); }, 30000);
+// число «км» — своя надёжная очередь (localStorage), чтобы не потерять при слабой сети / закрытии приложения
+var odoKmQ = JSON.parse(localStorage.getItem('odoKmQ_' + DRV) || '[]');
+function saveOdoKmQ() { localStorage.setItem('odoKmQ_' + DRV, JSON.stringify(odoKmQ)); }
+function odoWriteKm(date, mode, km, ts) { odoKmQ.push({ date: date, mode: mode, km: km, ts: ts }); saveOdoKmQ(); odoFlushKm(); }
+function odoFlushKm() {
+  odoKmQ.slice().forEach(function (it) {
+    db.ref('odometer/' + DRV + '/' + it.date + '/' + it.mode).update({ km: it.km, ts: it.ts }).then(function () {
+      var i = odoKmQ.indexOf(it); if (i > -1) { odoKmQ.splice(i, 1); saveOdoKmQ(); }
+    }).catch(function () {});
+  });
+}
+window.addEventListener('online', function () { setTimeout(odoFlushKm, 2500); });
+setTimeout(odoFlushKm, 4000);
+setInterval(function () { if (odoKmQ.length && navigator.onLine) odoFlushKm(); }, 30000);
+function odoMaybeGate() {
+  if (_odoGateChecked) return; _odoGateChecked = true;
+  if (wtState(wtToday()) === 'idle') odoOpen('start');
+}
+// ===================== /ОДОМЕТР =====================
 
 // ── END OFFLINE QUEUE ────────────────────────────────────────
 
@@ -905,6 +1043,7 @@ db.ref('worktime/' + DRV).on('value', function(snap) {
   wtData = snap.val() || {};
   renderWtBtn();
   if (document.getElementById('wtPanel') && document.getElementById('wtPanel').classList.contains('on')) renderWtPanel();
+  odoMaybeGate();
 });
 flushWtQueue();
 renderWtBtn();
