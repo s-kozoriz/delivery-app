@@ -2308,6 +2308,15 @@ function incThF(label,field,fkey,list){
 }
 function incFmtDate(d){ if(!d)return ''; var p=(''+d).split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):(''+d); }
 function incDistinct(arr,field){ var set={},out=[]; arr.forEach(function(r){var v=((r[field]||'')+'').trim(); if(v&&!set[v]){set[v]=1;out.push(v);}}); out.sort(); return out; }
+// Фильтр «Состояние»: всегда полный набор статусов 1С (в порядке процесса), даже если сейчас 0 видимых;
+// + любые ДРУГИЕ фактически пришедшие статусы (напр. когда рапер начнёт слать новые). Так «К сборке» и т.п. не пропадают из фильтра.
+function incStateList(all){
+  var order=['Заказ','Принято','Резерв','К сборке','Собрано'];
+  var seen={},out=[];
+  order.forEach(function(s){ seen[s]=1; out.push(s); });
+  incDistinct(all,'ready_status').forEach(function(s){ if(s&&!seen[s]){ seen[s]=1; out.push(s); } });
+  return out;
+}
 function incMatches(r){
   if(incFilter.state){ if(incFilter.state==='__ready__'){ if(!incReady(r))return false; } else if((r.ready_status||'')!==incFilter.state)return false; }
   if(incFilter.city && (r.city||'')!==incFilter.city)return false;
@@ -2327,7 +2336,7 @@ function renderInc(){
   var reset=incFilterActive()?'<button class="inc-h-reset" title="сбросить фильтры" onclick="incClearFilters()">&times;</button>':'';
   var h='<table class="inc-tbl"><thead><tr>'+
     '<th class="inc-h-cb">'+reset+'</th>'+
-    incThF('Состояние','ready_status','state',incDistinct(all,'ready_status'))+
+    incThF('Состояние','ready_status','state',incStateList(all))+
     incThF('Накладная','invoice','')+
     incThF('Склад','warehouse','wh',incDistinct(all,'warehouse'))+
     incThF('Город','city','city',incDistinct(all,'city'))+
