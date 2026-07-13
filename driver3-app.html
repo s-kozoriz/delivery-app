@@ -273,6 +273,10 @@ body{background:#f0f4fc;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
   </div>
   <div class="add-form-body">
     <div class="add-form-hint" id="addFormHint"></div>
+    <div class="add-form-label">Город</div>
+    <select class="add-form-input ac-city" id="addFormCity"></select>
+    <div class="add-form-label">Адрес</div>
+    <input type="text" class="add-form-input ac-addr" id="addFormAddr" autocomplete="off" placeholder="Улица, дом… (или из списка)">
     <div class="add-photo-zone" id="addPhotoZone" onclick="addFormPickPhoto()">
       <div class="add-photo-zone-icon">📷</div>
       <div class="add-photo-zone-text">Сделать фото</div>
@@ -1104,13 +1108,16 @@ function openAddForm(type){
   document.getElementById('addSheet').classList.remove('on');
   var title = type==='delivery' ? '📦 Доставка материала' : '🗑 Вывоз мусора';
   var hint = type==='delivery'
-    ? 'Сфотографируйте накладную (можно несколько фото). Диспетчер дозаполнит адрес и номер.'
-    : 'Сфотографируйте место загрузки. Диспетчер дозаполнит адрес.';
+    ? 'Выберите город и адрес, сфотографируйте накладную (можно несколько фото).'
+    : 'Выберите город и адрес, сфотографируйте место загрузки.';
   document.getElementById('addFormTitle').textContent = title;
   document.getElementById('addFormHint').textContent = hint;
   document.getElementById('addFormComment').value = '';
   document.getElementById('addPhotoPreview').innerHTML = '';
   document.getElementById('addFormSend').disabled = true;
+  var _cs=document.getElementById('addFormCity');
+  if(_cs){ _cs.innerHTML=(((cfg&&cfg.cities)||[]).map(function(c){return '<option>'+(''+c).replace(/</g,'&lt;')+'</option>';}).join('')); }
+  var _ca=document.getElementById('addFormAddr'); if(_ca)_ca.value='';
   document.getElementById('addForm').classList.add('on');
 }
 function closeAddForm(){
@@ -1145,6 +1152,66 @@ function rmAddPhoto(i){
   _addPhotos.splice(i,1);
   renderAddPhotos();
 }
+
+// ── Подсказка адреса в форме «+» (город + автодополнение, как у диспетчера) ──
+// Источник адресов: план (rows, все водители) выбранного города + склады. Нет совпадения → ручной ввод.
+function acCleanAddr(addr,city){
+  var s=(''+(addr||'')).trim();
+  if(city){ try{ var re=new RegExp('[,\\s]+'+city.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*$','i'); s=s.replace(re,'').trim(); }catch(e){} }
+  s=s.replace(/\+/g,' ').replace(/\bE-?\s*Check\b/ig,' ').replace(/\bAsbest\b/ig,' ').replace(/\s{2,}/g,' ').trim();
+  return s;
+}
+var PICKUPS=['Hornbach','ABEX'];
+function _acx(s){return(''+(s||'')).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+function acList(city){
+  city=(''+(city||'')).trim(); var seen={},out=[];
+  var cityset={}; ((cfg&&cfg.cities)||[]).forEach(function(c){ cityset[(''+c).trim().toLowerCase()]=1; });
+  PICKUPS.forEach(function(s){ s=(''+s).trim(); if(!s)return; var k=s.toLowerCase(); if(seen[k])return; seen[k]=1; out.push({a:s,src:'store'}); });
+  (rows||[]).forEach(function(r){ if(r&&(''+(r.city||'')).trim()===city&&r.addr&&(''+r.addr).trim()){ var c=acCleanAddr(r.addr,city); if(!c)return; var k=c.toLowerCase(); if(seen[k]||cityset[k])return; seen[k]=1; out.push({a:c,src:'plan'}); } });
+  return out;
+}
+var _ac={inp:null,open:false,idx:-1,items:[]},_acGlob=false;
+function acEl(){ var el=document.getElementById('acDrop'); if(!el){ el=document.createElement('div'); el.id='acDrop'; el.className='ac-drop'; document.body.appendChild(el); } return el; }
+function acPos(){ var inp=_ac.inp,el=document.getElementById('acDrop'); if(!inp||!el)return; var r=inp.getBoundingClientRect(); el.style.left=r.left+'px'; el.style.top=(r.bottom+4)+'px'; el.style.width=Math.max(r.width,180)+'px'; }
+function acCity(){ var cs=document.getElementById('addFormCity'); return cs?cs.value:''; }
+function acRender(){
+  var inp=_ac.inp; if(!inp)return;
+  var all=acList(acCity()); var qq=(inp.value||'').trim().toLowerCase();
+  var list=qq?all.filter(function(x){return x.a.toLowerCase().indexOf(qq)>-1;}):all;
+  _ac.items=list; _ac.idx=-1;
+  var el=acEl();
+  if(!list.length){ el.innerHTML='<div class="ac-empty">Нет совпадений — вводится вручную</div>'; }
+  else { el.innerHTML=list.map(function(x,k){ return '<div class="ac-opt" data-k="'+k+'"><span class="ac-ic">'+(x.src==='store'?'🏬':'🚚')+'</span><span class="ac-tx">'+_acx(x.a)+'</span></div>'; }).join(''); }
+  Array.prototype.forEach.call(el.querySelectorAll('.ac-opt'),function(o){ o.addEventListener('mousedown',function(e){ e.preventDefault(); acPick(+o.getAttribute('data-k')); }); });
+  acPos(); el.style.display='block'; _ac.open=true;
+}
+function acPick(k){ var x=_ac.items[k]; if(!x)return; if(_ac.inp)_ac.inp.value=x.a; acClose(); }
+function acClose(){ var el=document.getElementById('acDrop'); if(el)el.style.display='none'; _ac.open=false; _ac.idx=-1; }
+function acKey(e){
+  if(!_ac.open)return;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); var n=_ac.items.length; if(!n)return;
+    _ac.idx=e.key==='ArrowDown'?Math.min(n-1,_ac.idx+1):Math.max(0,_ac.idx-1);
+    var el=document.getElementById('acDrop'); Array.prototype.forEach.call(el.querySelectorAll('.ac-opt'),function(o){ o.className='ac-opt'+((+o.getAttribute('data-k')===_ac.idx)?' hl':''); });
+    var t=el.querySelector('.ac-opt.hl'); if(t)t.scrollIntoView({block:'nearest'});
+  } else if(e.key==='Enter'){ if(_ac.idx>-1){ e.preventDefault(); acPick(_ac.idx); } }
+  else if(e.key==='Escape'){ acClose(); }
+}
+function acInside(t){ var el=document.getElementById('acDrop'); return !!(el&&(t===el||(el.contains&&el.contains(t)))); }
+function acIsAddr(t){ return !!(t&&t.classList&&t.classList.contains('ac-addr')); }
+function acInit(){
+  if(_acGlob)return; _acGlob=true;
+  var st=document.createElement('style'); st.textContent='.ac-drop{position:fixed;z-index:99999;background:#fff;border:1px solid #c7d6ee;border-radius:10px;box-shadow:0 12px 26px rgba(18,40,80,.22);overflow:auto;max-height:260px;display:none}.ac-opt{display:flex;align-items:center;gap:9px;padding:12px 12px;cursor:pointer;font-size:14px;font-weight:600;color:#123645;border-top:1px solid #eef2f9}.ac-opt:first-child{border-top:none}.ac-opt:active,.ac-opt.hl{background:#eaf1fd}.ac-ic{font-size:14px;line-height:1;flex:none}.ac-tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ac-empty{padding:12px;font-size:12.5px;color:#8a97ad;font-weight:500}';
+  document.head.appendChild(st);
+  document.addEventListener('focusin',function(e){ if(acIsAddr(e.target)){ e.target.setAttribute('autocomplete','off'); _ac.inp=e.target; acRender(); } });
+  document.addEventListener('input',function(e){ if(e.target===_ac.inp&&acIsAddr(e.target)) acRender(); });
+  document.addEventListener('click',function(e){ if(e.target===_ac.inp&&acIsAddr(e.target)&&!_ac.open) acRender(); });
+  document.addEventListener('keydown',function(e){ if(e.target===_ac.inp&&acIsAddr(e.target)) acKey(e); });
+  document.addEventListener('change',function(e){ if(e.target&&e.target.id==='addFormCity'&&_ac.open) acRender(); });
+  window.addEventListener('scroll',function(e){ if(_ac.open&&!acInside(e.target))acClose(); },true);
+  window.addEventListener('resize',function(){ if(_ac.open)acClose(); });
+  document.addEventListener('mousedown',function(e){ if(_ac.open&&e.target!==_ac.inp&&!acInside(e.target))acClose(); });
+}
+acInit();
 function submitAddTask(){
   if(_addPhotos.length === 0){ showToast('Добавьте хотя бы одно фото'); return; }
   var btn = document.getElementById('addFormSend');
@@ -1172,8 +1239,8 @@ function submitAddTask(){
       id: rowId,
       date: curD,
       drv: DRV,
-      city: '',
-      addr: '',
+      city: (document.getElementById('addFormCity')?document.getElementById('addFormCity').value:''),
+      addr: (document.getElementById('addFormAddr')?document.getElementById('addFormAddr').value.trim():''),
       invs: [''],
       status: status,
       comment: comment,
