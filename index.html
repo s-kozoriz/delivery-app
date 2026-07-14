@@ -260,6 +260,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .odo-tbl th{position:sticky;top:0;background:#f6f8fb;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
 .odo-tbl td{padding:8px 10px;border-bottom:1px solid #eef1f5;white-space:nowrap}
 .odo-tbl a{color:#1856a0;text-decoration:none;font-weight:600}
+.odo-thumb{width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #dfe4ea;vertical-align:middle;margin-right:5px;cursor:pointer;background:#f6f8fb}
 </style>
 </head>
 <body>
@@ -715,7 +716,7 @@ function renderOdo(){
   rows.forEach(function(r){
     var sk=(typeof r.s.km==='number')?r.s.km:null,ek=(typeof r.e.km==='number')?r.e.km:null;
     var day=(sk!=null&&ek!=null&&ek>=sk)?(ek-sk):null;
-    var ph='';if(r.s.photo)ph+='<a href="'+xe(r.s.photo)+'" target="_blank">&#128247;старт</a> ';if(r.e.photo)ph+='<a href="'+xe(r.e.photo)+'" target="_blank">&#128247;конец</a>';
+    var ph='';if(r.s.photo)ph+='<a href="'+xe(r.s.photo)+'" target="_blank" title="старт '+(sk!=null?sk:'')+'"><img class="odo-thumb" src="'+xe(r.s.photo)+'" loading="lazy"></a>';if(r.e.photo)ph+='<a href="'+xe(r.e.photo)+'" target="_blank" title="конец '+(ek!=null?ek:'')+'"><img class="odo-thumb" src="'+xe(r.e.photo)+'" loading="lazy"></a>';
     h+='<tr><td>'+odoFmtD(r.date)+'</td><td>'+xe(dname(r.drv)||r.drv)+'</td><td>'+(sk!=null?sk:'—')+'</td><td>'+(ek!=null?ek:'—')+'</td><td>'+(day!=null?(day+' км'):'—')+'</td><td>'+(ph||'—')+'</td></tr>';
   });
   h+='</tbody></table></div>';body.innerHTML=h;
