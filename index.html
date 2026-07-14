@@ -208,6 +208,8 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 #tabInc{position:relative}
 #tabInc.has-new::after{content:'';position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:#e24b4a}
 .inc-badge{font-size:13px;color:#e24b4a;font-weight:700;margin-left:6px}
+.inc-fresh{display:block;font-size:11px;color:#80786e;margin-top:2px}
+.inc-ret{display:inline-block;font-size:10px;font-weight:700;color:#9a3d00;background:#ffe8d6;border:1px solid #ffcfa8;border-radius:8px;padding:0 6px;margin-left:4px;white-space:nowrap;cursor:help}
 .inc-empty{padding:26px;text-align:center;color:#80786e}
 .inc-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
@@ -470,7 +472,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 </div>
 <div id="tinc" style="display:none">
   <div class="card">
-    <div class="ch"><h2>Входящие из 1С <span id="incCount" class="inc-badge"></span></h2></div>
+    <div class="ch"><h2>Входящие из 1С <span id="incCount" class="inc-badge"></span></h2><span id="incFresh" class="inc-fresh"></span></div>
     <div id="incBody" style="overflow-x:auto"></div>
     <div class="inc-bar" id="incBar"></div>
     <div id="incTaken"></div>
@@ -719,7 +721,8 @@ db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=docum
 db.ref('odometer').on('value',function(s){odoAll=s.val()||{};var t=document.getElementById('tOdo');if(t&&t.style.display!=='none')renderOdo();},function(){});
 db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=document.getElementById('cs-nord');if(p&&p.style.display!=='none')renderNordPlanners();},function(){});
 db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
-db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
+db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incTrackFresh();incCleanReturned();incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
+db.ref('1c/delivery/returned').on('value',function(s){incReturned=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
 db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
 __startTechsListener();
@@ -1026,7 +1029,7 @@ function acInit(){
 
 function dr(id){
   var r=rows.find(function(x){return x.id===id;});
-  if(r){ (r.invs||[]).forEach(function(inv){ inv=(''+(inv||'')).trim(); if(inv&&incPlaced[inv]&&incPlaced[inv].rowId===id) db.ref('1c/delivery/placed/'+inv).remove(); }); }
+  if(r){ (r.invs||[]).forEach(function(inv){ inv=(''+(inv||'')).trim(); if(inv&&incPlaced[inv]&&incPlaced[inv].rowId===id) incUnplace(inv); }); }
   db.ref('rows/'+id).remove();
 }
 function toggleDone(id,val){
@@ -1089,7 +1092,7 @@ function di(id,i){
   if(inv.length===1){inv[0]='';}else{inv.splice(i,1);}
   r.invs=inv;
   db.ref('rows/'+id+'/invs').set(inv);
-  if(removed&&incPlaced[removed]&&incPlaced[removed].rowId===id) db.ref('1c/delivery/placed/'+removed).remove();
+  if(removed&&incPlaced[removed]&&incPlaced[removed].rowId===id) incUnplace(removed);
   rtbl();
 }
 function ui(id,i,v){
@@ -1099,7 +1102,7 @@ function ui(id,i,v){
   var old=(''+(inv[i]||'')).trim();
   inv[i]=v;
   db.ref('rows/'+id+'/invs').set(inv);
-  if(old && old!==(''+(v||'')).trim() && incPlaced[old] && incPlaced[old].rowId===id) db.ref('1c/delivery/placed/'+old).remove();
+  if(old && old!==(''+(v||'')).trim() && incPlaced[old] && incPlaced[old].rowId===id) incUnplace(old);
 }
 
 function xe(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
@@ -2308,19 +2311,39 @@ var incAll={};        // /1c/delivery/incoming/{invoice}
 var incSel={};        // {invoice:true} — отмеченные
 var incPlaced={};     // /1c/delivery/placed/{invoice} — реестр «взято в план» (raper НЕ трогает)
 var incShowTaken=false;
-function incList(){ return Object.keys(incAll).map(function(k){return incAll[k];}).filter(function(r){return r&&r.invoice;}); }
+var incReturned={};    // /1c/delivery/returned/{invoice} — снятые с плана, которых рапер уже НЕ шлёт (наш оверлей, чтобы «вернуть» всегда работало)
+function incRec(inv){ return incAll[inv]||incReturned[inv]||null; }
+function incList(){
+  var out=Object.keys(incAll).map(function(k){return incAll[k];}).filter(function(r){return r&&r.invoice;});
+  Object.keys(incReturned).forEach(function(k){ var r=incReturned[k]; if(r&&r.invoice&&!incAll[r.invoice]){ out.push(r); } });
+  return out;
+}
+// снять накладную с плана: если рапер её уже не шлёт — сохранить копию в returned (чтобы вернулась во «Входящие»), затем убрать из placed
+function incUnplace(inv){
+  inv=(''+(inv||'')).trim(); if(!inv)return;
+  var p=incPlaced[inv];
+  if(p&&p.snap&&!incAll[inv]){ var cp={}; for(var kk in p.snap){cp[kk]=p.snap[kk];} cp._returned=true; cp.returned_at=Date.now(); db.ref('1c/delivery/returned/'+inv).set(cp); }
+  db.ref('1c/delivery/placed/'+inv).remove();
+}
+// когда рапер снова присылает накладную — наш оверлей-копия больше не нужен
+function incCleanReturned(){ Object.keys(incReturned).forEach(function(k){ if(incAll[k]) db.ref('1c/delivery/returned/'+k).remove(); }); }
+// свежесть: отмечаем, когда данные incoming в последний раз МЕНЯЛИСЬ (в этом браузере)
+function incSignature(){ var keys=Object.keys(incAll).sort(); var h=keys.length; for(var i=0;i<keys.length;i++){ var r=incAll[keys[i]]||{}; var s=keys[i]+'|'+(r.ready_status||'')+'|'+(r.ship_date||''); for(var j=0;j<s.length;j++){ h=(h*31+s.charCodeAt(j))|0; } } return keys.length+'#'+h; }
+function incTrackFresh(){ try{ var sig=incSignature(); var prev=localStorage.getItem('incSig'); if(prev===null){ localStorage.setItem('incSig',sig); } else if(prev!==sig){ localStorage.setItem('incSig',sig); localStorage.setItem('incFreshAt',''+Date.now()); } }catch(e){} incRenderFresh(); }
+function incRenderFresh(){ var el=document.getElementById('incFresh'); if(!el)return; var at=0; try{ at=Number(localStorage.getItem('incFreshAt')||0); }catch(e){ return; } if(!at){ el.textContent=''; return; } var m=Math.floor((Date.now()-at)/60000); var txt=m<1?'только что':(m<60?(m+' мин назад'):(Math.floor(m/60)+' ч '+(m%60)+' мин назад')); el.textContent='обновлялось '+txt; }
+setInterval(incRenderFresh,60000);
 // самолечение реестра: любая накладная, уже присутствующая в строке плана, помечается placed
 function incReconcile(){
   if(!rows||!rows.length)return;
   rows.forEach(function(r){ if(!r||!r.invs)return;
     (r.invs||[]).forEach(function(inv){ inv=(''+(inv||'')).trim();
-      if(inv&&!incPlaced[inv]){ db.ref('1c/delivery/placed/'+inv).set({rowId:r.id,date:r.date||'',invoice:inv,address:r.addr||'',city:r.city||'',ts:Date.now()}); }
+      if(inv&&!incPlaced[inv]){ db.ref('1c/delivery/placed/'+inv).set({rowId:r.id,date:r.date||'',invoice:inv,address:r.addr||'',city:r.city||'',ts:Date.now(),snap:(incRec(inv)||null)}); }
     });
   });
 }
 function incReady(r){ var s=(r.ready_status||'').trim(); if(!s)return true; return s.indexOf('Собран')===0||s.indexOf('К сбор')===0; }
 function incColor(r){ var s=(r.ready_status||'').trim(); if(!s)return ''; if(s.indexOf('Собран')===0)return 'inc-ready'; if(s.indexOf('К сбор')===0)return 'inc-tosb'; if(s.indexOf('Заказ')===0)return 'inc-order'; return 'inc-reserve'; }
-function incSelWeight(){ var t=0; Object.keys(incSel).forEach(function(inv){ var r=incAll[inv]; if(r&&incSel[inv]&&typeof r.weight_kg==='number')t+=r.weight_kg; }); return Math.round(t*100)/100; }
+function incSelWeight(){ var t=0; Object.keys(incSel).forEach(function(inv){ var r=incRec(inv); if(r&&incSel[inv]&&typeof r.weight_kg==='number')t+=r.weight_kg; }); return Math.round(t*100)/100; }
 function incBadge(){ var l=incList().filter(function(r){return !incPlaced[r.invoice];}); if(disp2Mode){l=l.filter(function(r){return CITIESC.indexOf((r.city||''))!==-1;});} var n=l.length; var t=document.getElementById('tabInc'); if(t)t.classList.toggle('has-new',n>0); var c=document.getElementById('incCount'); if(c)c.textContent=n?('('+n+')'):''; }
 function incToggle(inv,cb){ if(cb.checked)incSel[inv]=true; else delete incSel[inv]; incUpdateBar(); }
 function incUpdateBar(){
@@ -2374,7 +2397,7 @@ function incMatches(r){
 function renderInc(){
   incBadge();
   var body=document.getElementById('incBody'); if(!body)return;
-  Object.keys(incSel).forEach(function(inv){ if(!incAll[inv]||incPlaced[inv])delete incSel[inv]; });
+  Object.keys(incSel).forEach(function(inv){ if(!incRec(inv)||incPlaced[inv])delete incSel[inv]; });
   var all=incList().filter(function(r){return !incPlaced[r.invoice];});
   if(disp2Mode){ all=all.filter(function(r){ return CITIESC.indexOf((r.city||''))!==-1; }); }
   if(!all.length){ body.innerHTML='<div class="inc-empty">'+(disp2Mode?'Нет входящих по городам вашего региона.':'Нет входящих накладных из 1С.')+'</div>'; incUpdateBar(); renderIncTaken(); return; }
@@ -2398,7 +2421,7 @@ function renderInc(){
     var w=(typeof r.weight_kg==='number')?wkg(r.weight_kg):'—';
     h+='<tr class="'+incColor(r)+'">'+
       '<td>'+cb+'</td>'+
-      '<td>'+xe(r.ready_status||'')+'</td>'+
+      '<td>'+xe(r.ready_status||'')+(r._returned?' <span class="inc-ret" title="Снята с плана; из 1С сейчас не приходит — проверьте актуальность в 1С">&#8617;проверить</span>':'')+'</td>'+
       '<td><span class="inc-invlink" onclick="incShowPos(\''+r.invoice+'\')" title="Показать состав накладной">'+xe(r.invoice)+'</span></td>'+
       '<td>'+xe(r.warehouse||'—')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
@@ -2412,10 +2435,10 @@ function renderInc(){
   body.innerHTML=h; incUpdateBar(); renderIncTaken();
 }
 function incAccept(){
-  var invs=Object.keys(incSel).filter(function(inv){ var r=incAll[inv]; return r&&!incPlaced[inv]; });
+  var invs=Object.keys(incSel).filter(function(inv){ var r=incRec(inv); return r&&!incPlaced[inv]; });
   if(!invs.length){ toast('Отметьте накладные галочкой'); return; }
   var groups={};
-  invs.forEach(function(inv){ var r=incAll[inv]; var edate=(r.ship_date||'').trim(); var key=(r.city||'')+'|'+(r.address||'')+'|'+edate; (groups[key]=groups[key]||[]).push(r); });
+  invs.forEach(function(inv){ var r=incRec(inv); var edate=(r.ship_date||'').trim(); var key=(r.city||'')+'|'+(r.address||'')+'|'+edate; (groups[key]=groups[key]||[]).push(r); });
   var maxOrder=0; rows.forEach(function(x){ if(x.order!=null&&x.order>maxOrder)maxOrder=x.order; });
   var madeRows=0;
   Object.keys(groups).forEach(function(key){
@@ -2433,7 +2456,7 @@ function incAccept(){
       plannerId:(IS_PLANNER?PLANNER_ID:null), plannerName:(IS_PLANNER?PLANNER_NAME:null), nord:((disp2Mode||CITIESC.indexOf(first.city||'')!==-1)?true:null)
     };
     db.ref('rows/'+row.id).set(row);
-    g.forEach(function(r){ db.ref('1c/delivery/placed/'+r.invoice).set({rowId:row.id,date:row.date,invoice:r.invoice,address:r.address||'',city:r.city||'',ts:Date.now()}); });
+    g.forEach(function(r){ db.ref('1c/delivery/placed/'+r.invoice).set({rowId:row.id,date:row.date,invoice:r.invoice,address:r.address||'',city:r.city||'',ts:Date.now(),snap:(r||null)}); db.ref('1c/delivery/returned/'+r.invoice).remove(); });
     madeRows++;
   });
   incSel={};
@@ -2452,7 +2475,7 @@ function renderIncTaken(){
   }).join('');
 }
 function incReturn(inv,rowId){
-  db.ref('1c/delivery/placed/'+inv).remove();
+  incUnplace(inv);
   if(rowId){
     db.ref('rows/'+rowId+'/invs').once('value').then(function(s){
       var iv=(s.val()||[]).filter(function(x){return (''+(x||'')).trim()&&x!==inv;});
