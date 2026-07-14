@@ -723,6 +723,7 @@ db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=do
 db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
 db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incTrackFresh();incCleanReturned();incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
 db.ref('1c/delivery/returned').on('value',function(s){incReturned=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
+db.ref('1c/delivery/meta').on('value',function(s){incMeta=s.val()||{};incRenderFresh();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
 db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
 __startTechsListener();
@@ -2335,9 +2336,22 @@ function incUnplace(inv){
 function incCleanReturned(){ Object.keys(incReturned).forEach(function(k){ if(incAll[k]) db.ref('1c/delivery/returned/'+k).remove(); }); }
 // свежесть: отмечаем, когда данные incoming в последний раз МЕНЯЛИСЬ (в этом браузере)
 function incSignature(){ var keys=Object.keys(incAll).sort(); var h=keys.length; for(var i=0;i<keys.length;i++){ var r=incAll[keys[i]]||{}; var s=keys[i]+'|'+(r.ready_status||'')+'|'+(r.ship_date||''); for(var j=0;j<s.length;j++){ h=(h*31+s.charCodeAt(j))|0; } } return keys.length+'#'+h; }
-function incTrackFresh(){ try{ var sig=incSignature(); var prev=localStorage.getItem('incSig'); if(prev===null){ localStorage.setItem('incSig',sig); } else if(prev!==sig){ localStorage.setItem('incSig',sig); localStorage.setItem('incFreshAt',''+Date.now()); } }catch(e){} incRenderFresh(); }
-function incRenderFresh(){ var el=document.getElementById('incFresh'); if(!el)return; var at=0; try{ at=Number(localStorage.getItem('incFreshAt')||0); }catch(e){ return; } if(!at){ el.textContent=''; return; } var m=Math.floor((Date.now()-at)/60000); var txt=m<1?'только что':(m<60?(m+' мин назад'):(Math.floor(m/60)+' ч '+(m%60)+' мин назад')); el.textContent='обновлялось '+txt; }
-setInterval(incRenderFresh,60000);
+var incMeta={};       // /1c/delivery/meta — общая метка «когда данные incoming в последний раз менялись»
+function incTrackFresh(){
+  var sig=incSignature(); var prev=null; try{ prev=localStorage.getItem('incSig'); }catch(e){}
+  var changed=(prev!==null&&prev!==sig);
+  try{ localStorage.setItem('incSig',sig); }catch(e){}
+  if(changed){ db.ref('1c/delivery/meta/seen_at').set(Date.now()); }          // данные изменились — ставим общую метку времени
+  else if(!(incMeta&&incMeta.seen_at)){ db.ref('1c/delivery/meta/seen_at').set(Date.now()); } // самая первая базовая точка
+  incRenderFresh();
+}
+function incRenderFresh(){
+  var el=document.getElementById('incFresh'); if(!el)return;
+  var at=(incMeta&&incMeta.seen_at)?Number(incMeta.seen_at):0;
+  if(!at){ el.textContent=''; return; }
+  var d=new Date(at); function p2(n){return (n<10?'0':'')+n;}
+  el.textContent='обновлено '+p2(d.getDate())+'.'+p2(d.getMonth()+1)+'.'+d.getFullYear()+' '+p2(d.getHours())+':'+p2(d.getMinutes());
+}
 // самолечение реестра: любая накладная, уже присутствующая в строке плана, помечается placed
 function incReconcile(){
   if(!rows||!rows.length)return;
