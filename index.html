@@ -691,6 +691,7 @@ function __startDB(){
 db.ref('rows').orderByChild('date').startAt(_fromD).endAt(_toD).on('value',function(s){
   rows=s.val()?Object.values(s.val()):[];
   _applyPending();
+  _autoNordTrash();
   if(Date.now()-_lastEdit>1500){rtbl();incReconcile();}
   gm();rh();
   var _tnm=document.getElementById('tnordm');if(_tnm&&_tnm.style.display!=='none')renderNordMirror();
@@ -1118,6 +1119,7 @@ function _rtblNow(){
   var visible=rows.filter(function(r){
     if(r.done && r.date<today)return false;
     if(disp2Mode && !isNordRow(r)) return false;
+    if(_hideZentrum(r)) return false; // Норд-сміття техніка → в план Виталика (Nord), а не в основной диспетчер
     return true;
   });
   var sorted=visible.slice().sort(function(a,b){
@@ -1290,7 +1292,19 @@ function _rtblNow(){
 // Водители региона Nord: фиксированный C (Виталик) + динамические с nord:true
 function nordDrvKeys(){ var b=['C']; Object.keys(cfg.drivers||{}).forEach(function(k){ if(b.indexOf(k)===-1 && cfg.drivers[k] && cfg.drivers[k].dyn===true && cfg.drivers[k].nord===true) b.push(k); }); return b; }
 // Строка относится к региону Nord: Nord-водитель ИЛИ заказ в Nord-городе; НО ад-хок задача (fromDriver) чужого водителя -> в главный диспетчер
-function isNordRow(r){ var nd=nordDrvKeys().indexOf(r.drv||'')!==-1; if(r.fromDriver && !nd) return false; return nd || CITIESC.indexOf(r.city||'')!==-1; }
+function isNordRow(r){ var nd=nordDrvKeys().indexOf(r.drv||'')!==-1; if(r.fromDriver && !nd) return false; return nd || r.nord===true || CITIESC.indexOf(r.city||'')!==-1; }
+// Норд-сміття техніка (мітка nord від станції) НЕ показуємо в основном (Zentrum) диспетчере — воно в плане водителя Виталика (Nord)
+function _hideZentrum(r){ return !disp2Mode && r.fromTech && r.nord===true; }
+// Норд-сміття зі станції → одразу водію Виталику (C): в его плане, а не в общем диспетчере. Один запис на рядок за сесію (без шторму при відмові прав)
+var _nordAssignTried={};
+function _autoNordTrash(){
+  if(viewOnly)return;
+  rows.forEach(function(r){
+    if(r&&r.fromTech&&r.nord===true&&r.source==='lk-station'&&(!r.drv||r.drv==='')&&!_nordAssignTried[r.id]){
+      _nordAssignTried[r.id]=1; r.drv='C'; db.ref('rows/'+r.id+'/drv').set('C').catch(function(){});
+    }
+  });
+}
 // Второй (наш) водитель, назначенный на Nord-заказы текущего дня (или '' если нет)
 function secondNordDrv(){ var prim=nordDrvKeys(); var f=''; rows.forEach(function(r){ if(r.date===curD && r.drv && prim.indexOf(r.drv)===-1 && isNordRow(r) && r.addr && r.addr.trim()) f=r.drv; }); return f; }
 function activeDrvs(){
@@ -1298,7 +1312,7 @@ function activeDrvs(){
   return DRV_KEYS;
 }
 function drows(d){
-  return rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false&&(!disp2Mode||isNordRow(r));});
+  return rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false&&(!disp2Mode||isNordRow(r))&&!_hideZentrum(r);});
 }
 
 function bp(d){
@@ -1445,7 +1459,7 @@ function gm(){
       tsEl.innerHTML=tsHtml;
     }
   });
-  var tot=rows.filter(function(r){return r.date===curD&&r.addr&&r.addr.trim()&&r.inRoute!==false;}).length;
+  var tot=rows.filter(function(r){return r.date===curD&&r.addr&&r.addr.trim()&&r.inRoute!==false&&!_hideZentrum(r);}).length;
   document.getElementById('fc').textContent=tot?tot+' адр. на этот день':'';
   // Восстановление бейджей дороги/выгрузки/времени с Firebase для текущего дня
   drvs.forEach(function(d){
