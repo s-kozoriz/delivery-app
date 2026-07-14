@@ -483,7 +483,7 @@ function renderWtPanel() {
   }
   var worked = wtWorkedMin(rec, true);
   if (st === 'idle') {
-    box.innerHTML = '<div class="wt-status">День начинается с фиксации пробега</div>' +
+    box.innerHTML = '<div class="wt-status">' + (valMode === 'loader' ? 'Начните рабочий день' : 'День начинается с фиксации пробега') + '</div>' +
       '<button class="wt-main start" onclick="odoOpen(\'start\')">&#9654; Начать рабочий день</button>';
   } else if (st === 'run') {
     box.innerHTML = '<div class="wt-status">Идёт смена<br>сегодня отработано <b id="wtWtxt">' + wtFmt(worked) + '</b></div>' + wtSegLine(rec) +
@@ -706,6 +706,7 @@ function odoRec() { return odoData[wtDate()] || {}; }
   var app = document.getElementById('driverApp'); if (app) app.insertBefore(ban, app.firstChild);
 })();
 function odoOpen(mode) {
+  if (valMode === 'loader') { if (mode === 'end') wtFinishDay(); else wtStartSeg(); return; } // грузчик — без одометра, только учёт времени
   odoMode = mode; odoPhotoFile = null;
   var end = mode === 'end';
   document.getElementById('odoHd').textContent = end ? 'Конец дня — пробег' : 'Начало дня — пробег';
@@ -790,9 +791,66 @@ setTimeout(odoFlushKm, 4000);
 setInterval(function () { if (odoKmQ.length && navigator.onLine) odoFlushKm(); }, 30000);
 function odoMaybeGate() {
   if (_odoGateChecked) return; _odoGateChecked = true;
+  if (valMode === 'loader') return; // грузчик — без авто-гейта пробега
   if (wtState(wtToday()) === 'idle') odoOpen('start');
 }
 // ===================== /ОДОМЕТР =====================
+
+// ── РОЛЬ НА ДЕНЬ (только Валентин): водитель / грузчик — авторизация НЕ трогается ──
+var valMode = null, _valAsked = false, _valPendingCb = null;
+(function () {
+  var css = '#valPick{position:fixed;inset:0;z-index:9500;background:#0d1520;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#eaf0f8;font-family:inherit;padding:24px}'
+    + '#valPick.on{display:flex}'
+    + '#valPick .vhd{font-size:22px;font-weight:800;text-align:center}'
+    + '#valPick .vsub{font-size:13.5px;color:#9fb0c8;text-align:center;line-height:1.5;margin-top:-6px}'
+    + '#valPick .vbtn{width:100%;max-width:340px;border:none;border-radius:16px;padding:22px;font-size:20px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit}'
+    + '#valPick .vdrv{background:#1856a0}'
+    + '#valPick .vloa{background:#b06a12}'
+    + '.val-badge{background:rgba(255,255,255,.92);color:#1a2a44;border:none;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;cursor:pointer;font-family:inherit;white-space:nowrap}';
+  var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  var g = document.createElement('div'); g.id = 'valPick';
+  g.innerHTML = '<div class="vhd">Кто ты сегодня?</div>'
+    + '<div class="vsub">Водитель — с фиксацией пробега (фото + км).<br>Грузчик — только учёт рабочего времени.</div>'
+    + '<button class="vbtn vdrv" onclick="valSetRole(\'driver\')">&#128666; Водитель</button>'
+    + '<button class="vbtn vloa" onclick="valSetRole(\'loader\')">&#128230; Грузчик</button>';
+  document.body.appendChild(g);
+})();
+function valModeKey() { return 'valMode_V_' + wtDate(); }
+function valOpenPicker() { var p = document.getElementById('valPick'); if (p) p.classList.add('on'); }
+function valBadge() {
+  var el = document.getElementById('valBadge');
+  if (!el) {
+    var acts = document.querySelector('.hdr-actions'); if (!acts) return;
+    el = document.createElement('button'); el.id = 'valBadge'; el.type = 'button'; el.className = 'val-badge'; el.title = 'Сменить режим'; el.onclick = valSwitch;
+    acts.insertBefore(el, acts.firstChild);
+  }
+  el.innerHTML = (valMode === 'loader') ? '&#128230; Грузчик' : '&#128666; Водитель';
+}
+function valEnsureRole(cb) {
+  if (valMode) { if (cb) cb(); return; }
+  var saved = localStorage.getItem(valModeKey());
+  if (saved === 'driver' || saved === 'loader') { valMode = saved; valBadge(); if (cb) cb(); return; }
+  if (cb) _valPendingCb = cb;
+  if (_valAsked) return;
+  _valAsked = true; valOpenPicker();
+}
+function valSetRole(m) {
+  valMode = m; _valAsked = false;
+  try { localStorage.setItem(valModeKey(), m); } catch (e) {}
+  var p = document.getElementById('valPick'); if (p) p.classList.remove('on');
+  if (m === 'loader') { // на случай гонки: закрыть одометр, если он успел открыться до выбора роли
+    var og = document.getElementById('odoGate'); if (og) og.classList.remove('on');
+    var ob = document.getElementById('odoBanner'); if (ob) ob.classList.remove('on');
+  }
+  valBadge();
+  var f = _valPendingCb; _valPendingCb = null; if (f) f();
+}
+function valSwitch() {
+  valMode = null; _valAsked = false; _odoGateChecked = false;
+  try { localStorage.removeItem(valModeKey()); } catch (e) {}
+  valEnsureRole(odoMaybeGate);
+}
+// ===================== /РОЛЬ =====================
 
 // ── END OFFLINE QUEUE ────────────────────────────────────────
 
@@ -1047,7 +1105,7 @@ db.ref('worktime/' + DRV).on('value', function(snap) {
   wtData = snap.val() || {};
   renderWtBtn();
   if (document.getElementById('wtPanel') && document.getElementById('wtPanel').classList.contains('on')) renderWtPanel();
-  odoMaybeGate();
+  valEnsureRole(odoMaybeGate);
 });
 flushWtQueue();
 renderWtBtn();
