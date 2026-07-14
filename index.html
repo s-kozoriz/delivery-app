@@ -704,8 +704,18 @@ db.ref('trips').on('value',function(s){tripStatus=s.val()||{};gm();});
 db.ref('worktime').on('value',function(s){wtAll=s.val()||{};wtDenied=false;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 // ── Пробег (одометр) — временное хранилище для сверки с топливом (Zoll); фото уходит контролёру позже ──
-var odoAll={};
 db.ref('odometer').on('value',function(s){odoAll=s.val()||{};var t=document.getElementById('tOdo');if(t&&t.style.display!=='none')renderOdo();},function(){});
+db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=document.getElementById('cs-nord');if(p&&p.style.display!=='none')renderNordPlanners();},function(){});
+db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
+db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
+db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
+db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
+__startTechsListener();
+__startVoiceListener();
+}
+
+// ── Пробег (одометр) — глобальные функции (вызов из sw() и onclick) ──
+var odoAll={};
 function odoFmtD(d){var p=(''+(d||'')).split('-');return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):d;}
 function odoList(){var a=[];Object.keys(odoAll).forEach(function(drv){var bd=odoAll[drv]||{};Object.keys(bd).forEach(function(date){var r=bd[date]||{};a.push({drv:drv,date:date,s:r.start||{},e:r.end||{}});});});return a;}
 function renderOdo(){
@@ -727,14 +737,6 @@ function odoCsv(){
   a.forEach(function(r){var sk=(typeof r.s.km==='number')?r.s.km:'',ek=(typeof r.e.km==='number')?r.e.km:'';var day=(sk!==''&&ek!==''&&ek>=sk)?(ek-sk):'';out.push([r.date,(dname(r.drv)||r.drv),sk,ek,day]);});
   var csv=out.map(function(row){return row.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(';');}).join('\r\n');
   var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});var u=URL.createObjectURL(blob);var el=document.createElement('a');el.href=u;el.download='probeg_'+isoD(0)+'.csv';el.click();setTimeout(function(){URL.revokeObjectURL(u);},1000);
-}
-db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=document.getElementById('cs-nord');if(p&&p.style.display!=='none')renderNordPlanners();},function(){});
-db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
-db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
-db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
-db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
-__startTechsListener();
-__startVoiceListener();
 }
 
 function pp(d){
