@@ -2322,7 +2322,13 @@ function incList(){
 function incUnplace(inv){
   inv=(''+(inv||'')).trim(); if(!inv)return;
   var p=incPlaced[inv];
-  if(p&&p.snap&&!incAll[inv]){ var cp={}; for(var kk in p.snap){cp[kk]=p.snap[kk];} cp._returned=true; cp.returned_at=Date.now(); db.ref('1c/delivery/returned/'+inv).set(cp); }
+  if(p&&!incAll[inv]){
+    var cp;
+    if(p.snap){ cp={}; for(var kk in p.snap){cp[kk]=p.snap[kk];} }
+    else { cp={invoice:inv,address:(p.address||''),city:(p.city||''),ship_date:(p.date||''),ready_status:''}; } // старые записи без копии — минимальная карточка, чтобы не исчезали
+    cp._returned=true; cp.returned_at=Date.now();
+    db.ref('1c/delivery/returned/'+inv).set(cp);
+  }
   db.ref('1c/delivery/placed/'+inv).remove();
 }
 // когда рапер снова присылает накладную — наш оверлей-копия больше не нужен
