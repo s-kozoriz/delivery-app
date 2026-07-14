@@ -210,6 +210,17 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .inc-badge{font-size:13px;color:#e24b4a;font-weight:700;margin-left:6px}
 .inc-fresh{display:block;font-size:11px;color:#80786e;margin-top:2px}
 .inc-ret{display:inline-block;font-size:10px;font-weight:700;color:#9a3d00;background:#ffe8d6;border:1px solid #ffcfa8;border-radius:8px;padding:0 6px;margin-left:4px;white-space:nowrap;cursor:help}
+.deliv-mismatch{background:#fff4f4;border:1px solid #f3b0b0;border-left:5px solid #d0342c;border-radius:10px;margin:0 0 14px;padding:10px 12px}
+.dm-hd{font-size:14px;font-weight:800;color:#a51e14}
+.dm-sub{font-size:11.5px;color:#8a5a55;margin:2px 0 8px}
+.dm-scroll{overflow-x:auto}
+.dm-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.dm-tbl td{padding:5px 8px;border-bottom:1px solid #f3dede;vertical-align:middle;white-space:nowrap}
+.dm-tbl tr:last-child td{border-bottom:none}
+.dm-bad{background:#d0342c;color:#fff;font-weight:700;border-radius:8px;padding:1px 7px;font-size:11px}
+.dm-ok{background:#eaf3ff;color:#1856a0;font-weight:600;border-radius:8px;padding:1px 7px;font-size:11px}
+.dm-ret{border:1px solid #d0342c;background:#fff;color:#d0342c;border-radius:7px;padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.dm-ret:hover{background:#d0342c;color:#fff}
 .inc-empty{padding:26px;text-align:center;color:#80786e}
 .inc-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
@@ -319,6 +330,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
   </div>
 </div>
 <div class="wrap">
+  <div id="delivMismatch" class="deliv-mismatch" style="display:none"></div>
 
 <div id="tp">
   <div class="card">
@@ -695,7 +707,7 @@ db.ref('rows').orderByChild('date').startAt(_fromD).endAt(_toD).on('value',funct
   _applyPending();
   _autoNordTrash();
   if(Date.now()-_lastEdit>1500){rtbl();incReconcile();}
-  gm();rh();
+  gm();rh();renderDelivMismatch();
   var _tnm=document.getElementById('tnordm');if(_tnm&&_tnm.style.display!=='none')renderNordMirror();
   document.getElementById('sync').className='sync ok';
 },function(){document.getElementById('sync').className='sync err';});
@@ -721,7 +733,7 @@ db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=docum
 db.ref('odometer').on('value',function(s){odoAll=s.val()||{};var t=document.getElementById('tOdo');if(t&&t.style.display!=='none')renderOdo();},function(){});
 db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=document.getElementById('cs-nord');if(p&&p.style.display!=='none')renderNordPlanners();},function(){});
 db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
-db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incTrackFresh();incCleanReturned();incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
+db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incTrackFresh();incCleanReturned();incBadge();renderDelivMismatch();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
 db.ref('1c/delivery/returned').on('value',function(s){incReturned=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
 db.ref('1c/delivery/meta').on('value',function(s){incMeta=s.val()||{};incRenderFresh();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
@@ -2423,6 +2435,37 @@ function incAcceptedMatching(){
     if(incMatches(r))n++;
   });
   return n;
+}
+// СВЕРКА ДОСТАВОК: строки «доставлено», но 1С ещё шлёт накладную как активную → возможно ошибочная/ложная отметка водителя. Работает по ВСЕМ городам.
+function incDeliveredMismatch(){
+  var out=[],seen={};
+  (rows||[]).forEach(function(r){
+    if(!r||r.done!==true)return;
+    if(disp2Mode && CITIESC.indexOf((r.city||''))===-1)return;
+    (r.invs||[]).forEach(function(iv){ iv=(''+(iv||'')).trim();
+      var rec=iv&&incAll[iv];
+      if(rec&&!seen[iv]){ seen[iv]=1; out.push({inv:iv,city:(r.city||rec.city||''),addr:(r.addr||''),drv:(r.drv||''),date:(r.date||''),st:(rec.ready_status||''),rowId:r.id}); }
+    });
+  });
+  return out;
+}
+function incUnDone(rowId){ db.ref('rows/'+rowId+'/done').set(false); toast('Возвращено в маршрут — отметка доставки снята'); }
+function renderDelivMismatch(){
+  var el=document.getElementById('delivMismatch'); if(!el)return;
+  var list=incDeliveredMismatch();
+  if(!list.length){ el.style.display='none'; el.innerHTML=''; return; }
+  list.sort(function(a,b){ var ai=((a.st||'').indexOf('Собран')!==0)?0:1, bi=((b.st||'').indexOf('Собран')!==0)?0:1; if(ai!==bi)return ai-bi; return (b.date||'').localeCompare(a.date||''); });
+  var h='<div class="dm-hd">&#9888; Отмечены доставленными, но в 1С ещё активны — проверьте ('+list.length+')</div>'
+    +'<div class="dm-sub">Возможно, водитель отметил доставку по ошибке. Если статус в 1С не «Собрано» — доставить точно не могли.</div>'
+    +'<div class="dm-scroll"><table class="dm-tbl">';
+  list.forEach(function(m){
+    var bad=((m.st||'').indexOf('Собран')!==0);
+    h+='<tr><td>'+xe(m.city||'')+'</td><td>'+xe(m.addr||'')+'</td><td>'+xe(dname(m.drv)||m.drv||'')+'</td><td>'+incFmtDate(m.date)+'</td>'
+      +'<td><span class="'+(bad?'dm-bad':'dm-ok')+'">1С: '+xe(m.st||'—')+'</span></td>'
+      +'<td><button class="dm-ret" onclick="incUnDone(\''+m.rowId+'\')">вернуть в маршрут</button></td></tr>';
+  });
+  h+='</table></div>';
+  el.innerHTML=h; el.style.display='';
 }
 function renderInc(){
   incBadge();
