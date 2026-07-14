@@ -472,7 +472,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 </div>
 <div id="tinc" style="display:none">
   <div class="card">
-    <div class="ch"><h2>Входящие из 1С <span id="incCount" class="inc-badge"></span></h2><span id="incFresh" class="inc-fresh"></span></div>
+    <div class="ch"><h2>Входящие из 1С <span id="incCount" class="inc-badge"></span></h2><span id="incFresh" class="inc-fresh"></span><span id="incRecon" class="inc-fresh"></span></div>
     <div id="incBody" style="overflow-x:auto"></div>
     <div class="inc-bar" id="incBar"></div>
     <div id="incTaken"></div>
@@ -2414,6 +2414,16 @@ function incMatches(r){
   if(incFilter.wh && (r.warehouse||'')!==incFilter.wh)return false;
   return true;
 }
+// сколько накладных под текущим фильтром УЖЕ приняты (в маршруте) — для сверки с 1С, чтобы «пропавшие» не пугали
+function incAcceptedMatching(){
+  var n=0;
+  Object.keys(incPlaced).forEach(function(inv){
+    var r=incAll[inv]||(incPlaced[inv]&&incPlaced[inv].snap); if(!r)return;
+    if(disp2Mode && CITIESC.indexOf((r.city||''))===-1)return;
+    if(incMatches(r))n++;
+  });
+  return n;
+}
 function renderInc(){
   incBadge();
   var body=document.getElementById('incBody'); if(!body)return;
@@ -2423,6 +2433,7 @@ function renderInc(){
   if(!all.length){ body.innerHTML='<div class="inc-empty">'+(disp2Mode?'Нет входящих по городам вашего региона.':'Нет входящих накладных из 1С.')+'</div>'; incUpdateBar(); renderIncTaken(); return; }
   var arr=all.filter(incMatches);
   arr.sort(incCmp);
+  var _re=document.getElementById('incRecon'); if(_re){ var _acc=incAcceptedMatching(); if(_acc<=0){ _re.textContent=''; } else if(incFilterActive()){ _re.textContent='показано '+arr.length+' · уже в маршруте '+_acc+' · всего в 1С '+(arr.length+_acc); } else { _re.textContent='уже в маршруте: '+_acc; } }
   var reset=incFilterActive()?'<button class="inc-h-reset" title="сбросить фильтры" onclick="incClearFilters()">&times;</button>':'';
   var h='<table class="inc-tbl"><thead><tr>'+
     '<th class="inc-h-cb">'+reset+'</th>'+
