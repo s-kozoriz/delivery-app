@@ -223,6 +223,8 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .dm-ret:hover{background:#d0342c;color:#fff}
 .lag-susp-hd{background:#d0342c;color:#fff;font-weight:800;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:12px}
 .lag-flag{background:#fff4f4;border-left:3px solid #d0342c;color:#a51e14;font-size:11.5px;font-weight:600;padding:5px 9px;margin:0 0 8px;border-radius:0 6px 6px 0}
+.lag-fix{margin-left:8px;border:1px solid #d0342c;background:#fff;color:#d0342c;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+.lag-fix:hover{background:#d0342c;color:#fff}
 .inc-empty{padding:26px;text-align:center;color:#80786e}
 .inc-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
@@ -2042,6 +2044,7 @@ function tWorked(rec){var L=tSegs(rec),t=0;L.forEach(function(g){if(g&&g.s&&g.e)
 function wtHrs(rec){var L=tSegs(rec);if(!L.length)return null;return Math.round(tWorked(rec)/6)/10;}
 // ── Контроль переработки грузчиков: таймер выключен намного позже последнего водителя своего региона (порог 30 мин) ──
 var LAG_OT_MIN=30;
+var LAG_BUFFER_MIN=20;
 function _hm2m(s){s=(''+(s||''));var p=s.split(':');if(p.length<2)return null;var h=+p[0],m=+p[1];if(isNaN(h)||isNaN(m))return null;return h*60+m;}
 function _m2hm(m){if(m==null)return '—';var h=Math.floor(m/60),mm=m%60;return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm;}
 function _gapTxt(m){var h=Math.floor(m/60),mm=m%60;return h>0?(h+'ч '+(mm<10?'0':'')+mm+'м'):(mm+' мин');}
@@ -2064,6 +2067,15 @@ function lagOvertimeGap(st,loaderId,d,rec){
   if(baseMin==null)return null;
   var gap=lm-baseMin; if(gap<=LAG_OT_MIN)return null;
   return {gap:gap,loaderEnd:le,drvEndMin:baseMin,drv:baseDrv,hard:hard,paired:paired};
+}
+function lagFixTime(id,date,cm){
+  var rec=(wtAll[id]||{})[date]||{}; var segs=tSegs(rec); if(!segs.length){toast('Нет сегментов');return;}
+  var last=segs[segs.length-1]; if(last&&last.s&&_hm2m(last.s)!=null&&cm<=_hm2m(last.s)){toast('Коррекция раньше начала сегмента — исправьте вручную');return;}
+  var newE=_m2hm(cm);
+  if(!confirm('Обрезать конец грузчика до '+newE+' за '+odoFmtD(date)+'?\nРабочее время грузчика будет изменено.'))return;
+  segs=segs.map(function(g){return {s:g.s||'',e:g.e||''};});
+  segs[segs.length-1].e=newE;
+  db.ref('worktime/'+id+'/'+date+'/seg').set(segs).then(function(){toast('Исправлено ✓');}).catch(function(){toast('Нет прав / ошибка');});
 }
 function tabelMonthName(ym){var mn=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];var p=ym.split('-');return mn[(parseInt(p[1],10)||1)-1]+' '+p[0];}
 function tabelShift(d){var p=tabelMonth.split('-');var dt=new Date(parseInt(p[0],10),(parseInt(p[1],10)-1)+d,1);tabelMonth=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');tabelEdit=null;renderTabel();}
@@ -2174,7 +2186,9 @@ function renderTabelLag(){
       if(ot){suspTotal++;
         var _who=ot.drv?('водитель '+xe(dname(ot.drv)||ot.drv)):'последний водитель';
         var _basis=ot.paired?(ot.hard?'по фото одометра':'по кнопке'):(ot.hard?'позже ВСЕХ (одометр)':'позже ВСЕХ');
-        html+='<div class="lag-flag">&#9888; на '+_gapTxt(ot.gap)+' позже, чем '+_who+' ('+_m2hm(ot.drvEndMin)+' · '+_basis+') · грузчик до '+xe(ot.loaderEnd)+'</div>';
+        var _corr=ot.drvEndMin+LAG_BUFFER_MIN;
+        var _fix=(_hm2m(ot.loaderEnd)>_corr)?(' <button class="lag-fix" onclick="lagFixTime(\''+id+'\',\''+d+'\','+_corr+')">обрезать до '+_m2hm(_corr)+'</button>'):'';
+        html+='<div class="lag-flag">&#9888; на '+_gapTxt(ot.gap)+' позже, чем '+_who+' ('+_m2hm(ot.drvEndMin)+' · '+_basis+') · грузчик до '+xe(ot.loaderEnd)+_fix+'</div>';
       }
     });
     if(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw)html+=tabelEditForm();
@@ -2192,6 +2206,7 @@ function tabelAddLoader(){
   var nord=confirm('Работает в регионе Nord? (ОК = да, Отмена = нет)');
   var id='lg'+Date.now().toString(36);
   db.ref('lager_staff/'+id).set({name:name,pin:pin,nord:nord}).then(function(){toast('Грузчик добавлен');}).catch(function(){toast('Нет прав. Войдите главным диспетчером (Zentrum).');});
+  db.ref('loaders_pub/'+id).set({name:name,nord:nord}); // PIN-free зеркало для приложений водителей (пары)
 }
 function tabelEditLoader(id){
   var st=lagerStaff[id]||{};
@@ -2200,11 +2215,13 @@ function tabelEditLoader(id){
   if(tabelLagDup(pin,id)){toast('Такой PIN уже у другого грузчика');return;}
   var nord=confirm('Работает в регионе Nord? (ОК = да, Отмена = нет). Сейчас: '+(st.nord?'да':'нет'));
   db.ref('lager_staff/'+id).update({name:name,pin:pin,nord:nord}).then(function(){toast('Сохранено');}).catch(function(){toast('Нет прав. Войдите главным диспетчером (Zentrum).');});
+  db.ref('loaders_pub/'+id).set({name:name,nord:nord});
 }
 function tabelDelLoader(id){
   var st=lagerStaff[id]||{};
   if(!confirm('Удалить грузчика '+(st.name||'')+'? Отметки времени в базе останутся.'))return;
   db.ref('lager_staff/'+id).remove().then(function(){toast('Удалён');}).catch(function(){toast('Нет прав. Войдите главным диспетчером (Zentrum).');});
+  db.ref('loaders_pub/'+id).remove();
 }
 
 // ─── ПЛАНИРОВЩИКИ NORD (доступ; техники сами планируют регион Nord) ──

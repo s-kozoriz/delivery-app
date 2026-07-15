@@ -746,6 +746,7 @@ function odoSave() {
   document.getElementById('odoBanner').classList.remove('on');
   showToast(mode === 'end' ? 'День завершён ✓' : 'Рабочий день начат ✓');
   if (navigator.vibrate) navigator.vibrate(60);
+  if (mode === 'end') setTimeout(function(){ pairAsk(date); }, 350);
 }
 var odoQ = JSON.parse(localStorage.getItem('odoQ_' + DRV) || '[]');
 function saveOdoQ() { localStorage.setItem('odoQ_' + DRV, JSON.stringify(odoQ)); }
@@ -793,6 +794,66 @@ function odoMaybeGate() {
   if (wtState(wtToday()) === 'idle') odoOpen('start');
 }
 // ===================== /ОДОМЕТР =====================
+
+// ── ПАРА «водитель↔грузчик»: кто ездил со мной сегодня (для честного учёта времени грузчика) ──
+var loadersPub={}, pairsMine={};
+db.ref('loaders_pub').on('value',function(s){loadersPub=s.val()||{};},function(){});
+db.ref('pairs').on('value',function(s){pairsMine=s.val()||{};},function(){});
+(function(){
+  var css='#pairGate{position:fixed;inset:0;z-index:9200;background:#0d1520;display:none;flex-direction:column;color:#eaf0f8;font-family:inherit;padding:22px}'
+    +'#pairGate.on{display:flex}'
+    +'#pairGate .phd{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}'
+    +'#pairGate .psub{font-size:13px;color:#9fb0c8;text-align:center;line-height:1.5;margin-bottom:16px}'
+    +'#pairGate .plist{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px}'
+    +'#pairGate .prow{display:flex;align-items:center;gap:12px;background:#131c28;border:1px solid #2a3a50;border-radius:12px;padding:15px 16px;font-size:17px;font-weight:700;cursor:pointer}'
+    +'#pairGate .prow.on{background:#0f2417;border-color:#1a7a40;color:#8ef0b0}'
+    +'#pairGate .pck{width:26px;height:26px;border-radius:7px;border:2px solid #3a4a60;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px}'
+    +'#pairGate .prow.on .pck{background:#1a7a40;border-color:#1a7a40;color:#fff}'
+    +'#pairGate .pgo{border:none;border-radius:12px;padding:16px;font-size:17px;font-weight:800;color:#fff;background:#1a7a40;cursor:pointer;margin-top:12px;font-family:inherit}'
+    +'#pairGate .pskip{background:none;border:none;color:#8ea3c4;font-size:13px;font-weight:700;cursor:pointer;padding:10px;text-decoration:underline;font-family:inherit}';
+  var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+  var g=document.createElement('div');g.id='pairGate';
+  g.innerHTML='<div class="phd">Кто ездил с тобой сегодня?</div>'
+    +'<div class="psub">Отметь грузчиков, которые работали с тобой. Это нужно для честного учёта их рабочего времени.</div>'
+    +'<div class="plist" id="pairList"></div>'
+    +'<button class="pgo" onclick="pairSave()">Сохранить</button>'
+    +'<button class="pskip" onclick="pairSkip()">Никого / пропустить</button>';
+  document.body.appendChild(g);
+})();
+var _pairDate=null,_pairSel={};
+function pairRegionIds(){ var mine=(DRV==='C'); return Object.keys(loadersPub).filter(function(id){var n=!!(loadersPub[id]&&loadersPub[id].nord);return n===mine;}); }
+function pairAsk(date){
+  _pairDate=date; _pairSel={};
+  var ids=pairRegionIds(); if(!ids.length)return;
+  var last=[]; try{ last=JSON.parse(localStorage.getItem('pairLast_'+DRV)||'[]'); }catch(e){}
+  var todays=(pairsMine[date])||{}; var hasToday=Object.keys(todays).some(function(id){return todays[id]&&todays[id].drv===DRV;});
+  ids.forEach(function(id){
+    if(todays[id]&&todays[id].drv===DRV)_pairSel[id]=true;
+    else if(!hasToday && last.indexOf(id)!==-1)_pairSel[id]=true;
+  });
+  pairRender(ids);
+  document.getElementById('pairGate').classList.add('on');
+}
+function pairRender(ids){
+  document.getElementById('pairList').innerHTML=ids.map(function(id){
+    var nm=(loadersPub[id]&&loadersPub[id].name)||'грузчик'; var on=!!_pairSel[id];
+    return '<div class="prow'+(on?' on':'')+'" onclick="pairTog(\''+id+'\')"><div class="pck">'+(on?'&#10003;':'')+'</div>'+xe(nm)+'</div>';
+  }).join('');
+}
+function pairTog(id){ _pairSel[id]=!_pairSel[id]; pairRender(pairRegionIds()); }
+function pairSave(){
+  var date=_pairDate; if(!date){pairClose();return;}
+  var todays=(pairsMine[date])||{}; var sel=[];
+  pairRegionIds().forEach(function(id){
+    if(_pairSel[id]){ db.ref('pairs/'+date+'/'+id).set({drv:DRV,ts:Date.now()}); sel.push(id); }
+    else if(todays[id]&&todays[id].drv===DRV){ db.ref('pairs/'+date+'/'+id).remove(); }
+  });
+  try{ localStorage.setItem('pairLast_'+DRV, JSON.stringify(sel)); }catch(e){}
+  pairClose(); showToast('Записано ✓');
+}
+function pairSkip(){ pairClose(); }
+function pairClose(){ var g=document.getElementById('pairGate'); if(g)g.classList.remove('on'); _pairDate=null; _pairSel={}; }
+// ===================== /ПАРА =====================
 
 // ── END OFFLINE QUEUE ────────────────────────────────────────
 
