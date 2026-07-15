@@ -221,6 +221,8 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .dm-ok{background:#eaf3ff;color:#1856a0;font-weight:600;border-radius:8px;padding:1px 7px;font-size:11px}
 .dm-ret{border:1px solid #d0342c;background:#fff;color:#d0342c;border-radius:7px;padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 .dm-ret:hover{background:#d0342c;color:#fff}
+.lag-susp-hd{background:#d0342c;color:#fff;font-weight:800;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:12px}
+.lag-flag{background:#fff4f4;border-left:3px solid #d0342c;color:#a51e14;font-size:11.5px;font-weight:600;padding:5px 9px;margin:0 0 8px;border-radius:0 6px 6px 0}
 .inc-empty{padding:26px;text-align:center;color:#80786e}
 .inc-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
@@ -728,6 +730,8 @@ db.ref('sent').on('value',function(s){sent=s.val()||{};gm();rh();});
 db.ref('trips').on('value',function(s){tripStatus=s.val()||{};gm();});
 db.ref('worktime').on('value',function(s){wtAll=s.val()||{};wtDenied=false;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
+var pairsAll={};
+db.ref('pairs').on('value',function(s){pairsAll=s.val()||{};var tt2=document.getElementById('ttab');if(tt2&&tt2.style.display!=='none')renderTabel();},function(){});
 // ── Пробег (одометр) — временное хранилище для сверки с топливом (Zoll); фото уходит контролёру позже ──
 db.ref('odometer').on('value',function(s){odoAll=s.val()||{};var t=document.getElementById('tOdo');if(t&&t.style.display!=='none')renderOdo();},function(){});
 db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=document.getElementById('cs-nord');if(p&&p.style.display!=='none')renderNordPlanners();},function(){});
@@ -744,17 +748,18 @@ __startVoiceListener();
 // ── Пробег (одометр) — глобальные функции (вызов из sw() и onclick) ──
 var odoAll={};
 function odoFmtD(d){var p=(''+(d||'')).split('-');return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):d;}
+function odoFmtT(ts){if(typeof ts!=='number')return '';var d=new Date(ts);return (d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();}
 function odoList(){var a=[];Object.keys(odoAll).forEach(function(drv){var bd=odoAll[drv]||{};Object.keys(bd).forEach(function(date){var r=bd[date]||{};a.push({drv:drv,date:date,s:r.start||{},e:r.end||{}});});});return a;}
 function renderOdo(){
   var body=document.getElementById('odoBody');if(!body)return;
   var rows=odoList();rows.sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0;});
   if(!rows.length){body.innerHTML='<div class="tabel-empty">Нет данных о пробеге.</div>';return;}
-  var h='<div style="overflow-x:auto"><table class="odo-tbl"><thead><tr><th>Дата</th><th>Водитель</th><th>Старт</th><th>Конец</th><th>За день</th><th>Фото</th></tr></thead><tbody>';
+  var h='<div style="overflow-x:auto"><table class="odo-tbl"><thead><tr><th>Дата</th><th>Водитель</th><th>Старт</th><th>Конец</th><th>За день</th><th>Время (старт&#8594;конец)</th><th>Фото</th></tr></thead><tbody>';
   rows.forEach(function(r){
     var sk=(typeof r.s.km==='number')?r.s.km:null,ek=(typeof r.e.km==='number')?r.e.km:null;
     var day=(sk!=null&&ek!=null&&ek>=sk)?(ek-sk):null;
     var ph='';if(r.s.photo)ph+='<a href="'+xe(r.s.photo)+'" target="_blank" title="старт '+(sk!=null?sk:'')+'"><img class="odo-thumb" src="'+xe(r.s.photo)+'" loading="lazy"></a>';if(r.e.photo)ph+='<a href="'+xe(r.e.photo)+'" target="_blank" title="конец '+(ek!=null?ek:'')+'"><img class="odo-thumb" src="'+xe(r.e.photo)+'" loading="lazy"></a>';
-    h+='<tr><td>'+odoFmtD(r.date)+'</td><td>'+xe(dname(r.drv)||r.drv)+'</td><td>'+(sk!=null?sk:'—')+'</td><td>'+(ek!=null?ek:'—')+'</td><td>'+(day!=null?(day+' км'):'—')+'</td><td>'+(ph||'—')+'</td></tr>';
+    h+='<tr><td>'+odoFmtD(r.date)+'</td><td>'+xe(dname(r.drv)||r.drv)+'</td><td>'+(sk!=null?sk:'—')+'</td><td>'+(ek!=null?ek:'—')+'</td><td>'+(day!=null?(day+' км'):'—')+'</td><td>'+((odoFmtT(r.s.ts)||'—')+' &#8594; '+(odoFmtT(r.e.ts)||'—'))+'</td><td>'+(ph||'—')+'</td></tr>';
   });
   h+='</tbody></table></div>';body.innerHTML=h;
 }
@@ -2035,6 +2040,31 @@ function wtHm(s){var p=(s||'0:0').split(':');return (parseInt(p[0],10)||0)*60+(p
 function tSegs(rec){var s=rec&&rec.seg;if(!s){if(rec&&rec.start)return [{s:rec.start,e:rec.end||''}];return [];}return Array.isArray(s)?s.slice():Object.keys(s).map(function(k){return s[k];});}
 function tWorked(rec){var L=tSegs(rec),t=0;L.forEach(function(g){if(g&&g.s&&g.e){var d=wtHm(g.e)-wtHm(g.s);if(d<0)d+=1440;t+=d;}});return t;}
 function wtHrs(rec){var L=tSegs(rec);if(!L.length)return null;return Math.round(tWorked(rec)/6)/10;}
+// ── Контроль переработки грузчиков: таймер выключен намного позже последнего водителя своего региона (порог 30 мин) ──
+var LAG_OT_MIN=30;
+function _hm2m(s){s=(''+(s||''));var p=s.split(':');if(p.length<2)return null;var h=+p[0],m=+p[1];if(isNaN(h)||isNaN(m))return null;return h*60+m;}
+function _m2hm(m){if(m==null)return '—';var h=Math.floor(m/60),mm=m%60;return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm;}
+function _gapTxt(m){var h=Math.floor(m/60),mm=m%60;return h>0?(h+'ч '+(mm<10?'0':'')+mm+'м'):(mm+' мин');}
+function wtDayEnd(rec){var s=tSegs(rec);if(!s.length)return null;var e=s[s.length-1].e;return e?e:null;}
+function latestDriverEnd(keys,date){var best=null;keys.forEach(function(k){var e=wtDayEnd((wtAll[k]||{})[date]);if(e){var m=_hm2m(e);if(m!=null&&(best===null||m>best))best=m;}});return best;}
+function hardDriverEnd(drv,date){var o=(odoAll[drv]||{})[date];if(o&&o.end&&typeof o.end.ts==='number'){var dt=new Date(o.end.ts);return dt.getHours()*60+dt.getMinutes();}return null;}
+function lagOvertimeGap(st,loaderId,d,rec){
+  var le=wtDayEnd(rec); if(!le)return null; var lm=_hm2m(le); if(lm==null)return null;
+  var baseMin=null,baseDrv=null,hard=false,paired=false;
+  var pdrv=(pairsAll[d]&&pairsAll[d][loaderId]&&pairsAll[d][loaderId].drv)||null; // конкретный водитель этого грузчика в этот день (пара)
+  if(pdrv){ var h=hardDriverEnd(pdrv,d); if(h!=null){baseMin=h;baseDrv=pdrv;hard=true;paired=true;} else { var e=wtDayEnd((wtAll[pdrv]||{})[d]); if(e){var m=_hm2m(e); if(m!=null){baseMin=m;baseDrv=pdrv;paired=true;}} } }
+  if(baseMin==null){ // фолбэк: по каждому водителю берём ЛУЧШИЙ доступный конец (одометр если есть, иначе кнопка), затем МАКСИМУМ (не смешиваем)
+    var keys=(st&&st.nord)?['C']:DRV_KEYS.filter(function(k){return k!=='C';});
+    keys.forEach(function(k){
+      var h2=hardDriverEnd(k,d),m2,hd;
+      if(h2!=null){m2=h2;hd=true;}else{var e2=wtDayEnd((wtAll[k]||{})[d]);m2=e2?_hm2m(e2):null;hd=false;}
+      if(m2!=null&&(baseMin==null||m2>baseMin)){baseMin=m2;baseDrv=k;hard=hd;}
+    });
+  }
+  if(baseMin==null)return null;
+  var gap=lm-baseMin; if(gap<=LAG_OT_MIN)return null;
+  return {gap:gap,loaderEnd:le,drvEndMin:baseMin,drv:baseDrv,hard:hard,paired:paired};
+}
 function tabelMonthName(ym){var mn=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];var p=ym.split('-');return mn[(parseInt(p[1],10)||1)-1]+' '+p[0];}
 function tabelShift(d){var p=tabelMonth.split('-');var dt=new Date(parseInt(p[0],10),(parseInt(p[1],10)-1)+d,1);tabelMonth=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');tabelEdit=null;renderTabel();}
 function tabelSeg(s){tabelView=s;tabelEdit=null;renderTabel();}
@@ -2128,7 +2158,7 @@ function renderTabel(){
 }
 
 function renderTabelLag(){
-  var html='';var ids=IS_PLANNER?Object.keys(lagerStaff).filter(function(id){return (lagerStaff[id]||{}).nord===true;}):Object.keys(lagerStaff);
+  var html='';var suspTotal=0;var ids=IS_PLANNER?Object.keys(lagerStaff).filter(function(id){return (lagerStaff[id]||{}).nord===true;}):Object.keys(lagerStaff);
   ids.forEach(function(id){
     var st=lagerStaff[id]||{};var nm=st.name||'без имени';
     var days=wtAll[id]||{};
@@ -2137,11 +2167,21 @@ function renderTabelLag(){
     html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span></div>';
     if(!IS_PLANNER)html+='<div class="lag-meta">PIN: '+xe(String(st.pin||'—'))+(st.nord?' &middot; <b style="color:#1a7a40">Nord</b>':'')+'<button class="lag-edit" onclick="tabelEditLoader(\''+id+'\')">изменить</button><button class="lag-del" onclick="tabelDelLoader(\''+id+'\')">удалить</button></div>';
     if(!dates.length&&!(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
-    dates.forEach(function(d){if(tabelEdit&&tabelEdit.drv===id&&!tabelEdit.nw&&tabelEdit.date===d)html+=tabelEditForm();else html+=tabelRow(id,d,days[d]);});
+    dates.forEach(function(d){
+      if(tabelEdit&&tabelEdit.drv===id&&!tabelEdit.nw&&tabelEdit.date===d){html+=tabelEditForm();return;}
+      html+=tabelRow(id,d,days[d]);
+      var ot=lagOvertimeGap(st,id,d,days[d]);
+      if(ot){suspTotal++;
+        var _who=ot.drv?('водитель '+xe(dname(ot.drv)||ot.drv)):'последний водитель';
+        var _basis=ot.paired?(ot.hard?'по фото одометра':'по кнопке'):(ot.hard?'позже ВСЕХ (одометр)':'позже ВСЕХ');
+        html+='<div class="lag-flag">&#9888; на '+_gapTxt(ot.gap)+' позже, чем '+_who+' ('+_m2hm(ot.drvEndMin)+' · '+_basis+') · грузчик до '+xe(ot.loaderEnd)+'</div>';
+      }
+    });
     if(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw)html+=tabelEditForm();
     html+=(IS_PLANNER?'':'<button class="tabel-add" onclick="tabelAddDay(\''+id+'\')">+ добавить день</button>')+'</div>';
   });
   if(!IS_PLANNER)html+='<button class="lag-addbtn" onclick="tabelAddLoader()">+ добавить грузчика</button>';
+  if(suspTotal>0)html='<div class="lag-susp-hd">&#9888; Подозрительная переработка за месяц: '+suspTotal+' дн. — таймер выключен намного позже последнего водителя</div>'+html;
   return html;
 }
 function tabelLagDup(pin,exceptId){return Object.keys(lagerStaff).some(function(x){return x!==exceptId&&String((lagerStaff[x]||{}).pin)===pin;});}
