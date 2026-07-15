@@ -863,7 +863,7 @@ function lockNonCRows(){
   });
 }
 // Auth gate (Варіант A): роль береться з custom-token claim; кожна сторінка звіряє СВОЮ роль
-function pageFor(c){c=c||{};var r=c.role;if(r==='zentrum'||r==='norden'||r==='lager')return 'index.html';if(r==='driver')return ({L:'lesha-app.html',R:'roma-app.html',C:'driver3-app.html',V:'valentyn-app.html'})[c.drv]||'login.html';if(r==='tech')return 'tech-app.html';if(r==='loader')return 'lager-app.html';return 'login.html';}
+function pageFor(c){c=c||{};var r=c.role;if(r==='zentrum'||r==='norden'||r==='lager')return 'index.html';if(r==='driver')return ({L:'lesha-app.html',R:'roma-app.html',C:'driver3-app.html',V:'valentyn-app.html'})[c.drv]||(c.drv?('driver.html?drv='+encodeURIComponent(c.drv)):'login.html');if(r==='tech')return 'tech-app.html';if(r==='loader')return 'lager-app.html';return 'login.html';}
 firebase.auth().onAuthStateChanged(function(user){
   if(!user){ location.replace('login.html'); return; }
   user.getIdTokenResult().then(function(res){
@@ -2057,7 +2057,7 @@ function lagOvertimeGap(st,loaderId,d,rec){
   var pdrv=(pairsAll[d]&&pairsAll[d][loaderId]&&pairsAll[d][loaderId].drv)||null; // конкретный водитель этого грузчика в этот день (пара)
   if(pdrv){ var h=hardDriverEnd(pdrv,d); if(h!=null){baseMin=h;baseDrv=pdrv;hard=true;paired=true;} else { var e=wtDayEnd((wtAll[pdrv]||{})[d]); if(e){var m=_hm2m(e); if(m!=null){baseMin=m;baseDrv=pdrv;paired=true;}} } }
   if(baseMin==null){ // фолбэк: по каждому водителю берём ЛУЧШИЙ доступный конец (одометр если есть, иначе кнопка), затем МАКСИМУМ (не смешиваем)
-    var keys=(st&&st.nord)?['C']:DRV_KEYS.filter(function(k){return k!=='C';});
+    var keys=DRV_KEYS.filter(function(k){var isN=(k==='C'||(cfg.drivers&&cfg.drivers[k]&&cfg.drivers[k].nord));return (st&&st.nord)?isN:!isN;});
     keys.forEach(function(k){
       var h2=hardDriverEnd(k,d),m2,hd;
       if(h2!=null){m2=h2;hd=true;}else{var e2=wtDayEnd((wtAll[k]||{})[d]);m2=e2?_hm2m(e2):null;hd=false;}

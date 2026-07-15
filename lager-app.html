@@ -138,7 +138,7 @@ function startLager(){
   renderCard();
 }
 
-function pageFor(c){c=c||{};var r=c.role;if(r==='zentrum'||r==='norden'||r==='lager')return 'index.html';if(r==='driver')return ({L:'lesha-app.html',R:'roma-app.html',C:'driver3-app.html',V:'valentyn-app.html'})[c.drv]||'login.html';if(r==='tech')return 'tech-app.html';if(r==='loader')return 'lager-app.html';return 'login.html';}
+function pageFor(c){c=c||{};var r=c.role;if(r==='zentrum'||r==='norden'||r==='lager')return 'index.html';if(r==='driver')return ({L:'lesha-app.html',R:'roma-app.html',C:'driver3-app.html',V:'valentyn-app.html'})[c.drv]||(c.drv?('driver.html?drv='+encodeURIComponent(c.drv)):'login.html');if(r==='tech')return 'tech-app.html';if(r==='loader')return 'lager-app.html';return 'login.html';}
 firebase.auth().onAuthStateChanged(function(user){
   if(!user){ location.replace('login.html'); return; }
   user.getIdTokenResult().then(function(res){
