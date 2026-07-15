@@ -752,23 +752,166 @@ var odoAll={};
 function odoFmtD(d){var p=(''+(d||'')).split('-');return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):d;}
 function odoFmtT(ts){if(typeof ts!=='number')return '';var d=new Date(ts);return (d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();}
 function odoList(){var a=[];Object.keys(odoAll).forEach(function(drv){var bd=odoAll[drv]||{};Object.keys(bd).forEach(function(date){var r=bd[date]||{};a.push({drv:drv,date:date,s:r.start||{},e:r.end||{}});});});return a;}
-function renderOdo(){
-  var body=document.getElementById('odoBody');if(!body)return;
-  var rows=odoList();rows.sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0;});
-  if(!rows.length){body.innerHTML='<div class="tabel-empty">Нет данных о пробеге.</div>';return;}
-  var h='<div style="overflow-x:auto"><table class="odo-tbl"><thead><tr><th>Дата</th><th>Водитель</th><th>Старт</th><th>Конец</th><th>За день</th><th>Время (старт&#8594;конец)</th><th>Фото</th></tr></thead><tbody>';
-  rows.forEach(function(r){
-    var sk=(typeof r.s.km==='number')?r.s.km:null,ek=(typeof r.e.km==='number')?r.e.km:null;
-    var day=(sk!=null&&ek!=null&&ek>=sk)?(ek-sk):null;
-    var ph='';if(r.s.photo)ph+='<a href="'+xe(r.s.photo)+'" target="_blank" title="старт '+(sk!=null?sk:'')+'"><img class="odo-thumb" src="'+xe(r.s.photo)+'" loading="lazy"></a>';if(r.e.photo)ph+='<a href="'+xe(r.e.photo)+'" target="_blank" title="конец '+(ek!=null?ek:'')+'"><img class="odo-thumb" src="'+xe(r.e.photo)+'" loading="lazy"></a>';
-    h+='<tr><td>'+odoFmtD(r.date)+'</td><td>'+xe(dname(r.drv)||r.drv)+'</td><td>'+(sk!=null?sk:'—')+'</td><td>'+(ek!=null?ek:'—')+'</td><td>'+(day!=null?(day+' км'):'—')+'</td><td>'+((odoFmtT(r.s.ts)||'—')+' &#8594; '+(odoFmtT(r.e.ts)||'—'))+'</td><td>'+(ph||'—')+'</td></tr>';
+/* ==== Пробег (одометр): кластеризация показаний по МАШИНАМ (display-only) ====
+   Абсолютный одометр принадлежит МАШИНЕ, а не водителю (водители меняются машинами).
+   Показания раскладываются по машинам ПО ЗНАЧЕНИЮ (реестр из 3 якорей), а не по тому кто снял.
+   Ничего не пишет в базу; хранилище per-driver — hardDriverEnd()/lagOvertimeGap() работают как есть. */
+var ODO_TOL_BACK=60, ODO_SAME_DAY_CAP=900, ODO_DAY_KM=1500, ODO_HARD_MAX=30000, ODO_BAND=60000, ODO_SOFT_RATE=800, ODO_REBASE_TOL=400;
+function odoMachines(){
+  if(cfg&&cfg.machines&&typeof cfg.machines==='object'){
+    var out=[];
+    Object.keys(cfg.machines).forEach(function(id){var m=cfg.machines[id]||{};out.push({id:id,label:(m.label||('Машина '+id)),region:(m.region==='nord'?'nord':'main'),seed:(+m.seed||0)});});
+    if(out.length)return out;
+  }
+  return [{id:'A',label:'Машина A',region:'main',seed:637700},{id:'B',label:'Машина B',region:'main',seed:321500},{id:'C',label:'Машина C',region:'nord',seed:469800}];
+}
+function odoIsNordDrv(k){ if(k==='C')return true; var o=cfg&&cfg.drivers&&cfg.drivers[k]; return !!(o&&o.nord===true); }
+function odoDayNum(date){ var p=(''+(date||'')).split('-'); if(p.length!==3)return 0; return Date.UTC(+p[0],+p[1]-1,+p[2])/86400000; }
+function odoTsEff(x,date,m){ if(x&&typeof x.ts==='number'&&x.ts>0)return x.ts; var base=Date.parse(date+'T00:00:00Z'); if(isNaN(base))base=0; return base+(m==='start'?8:17)*3600000; }
+function odoEvents(){
+  var a=[];
+  Object.keys(odoAll||{}).forEach(function(drv){
+    var bd=odoAll[drv]||{};
+    Object.keys(bd).forEach(function(date){
+      var r=bd[date]||{};
+      ['start','end'].forEach(function(m){
+        var x=r[m];
+        if(x&&typeof x.km==='number'&&!isNaN(x.km)){ a.push({drv:drv,date:date,m:m,km:x.km,tsEff:odoTsEff(x,date,m),noTs:!(typeof x.ts==='number'&&x.ts>0),photo:(x.photo||''),drvNord:odoIsNordDrv(drv)}); }
+      });
+    });
   });
-  h+='</tbody></table></div>';body.innerHTML=h;
+  a.sort(function(x,y){ if(x.tsEff!==y.tsEff)return x.tsEff-y.tsEff; if(x.date!==y.date)return x.date<y.date?-1:1; return x.m===y.m?0:(x.m==='start'?-1:1); });
+  return a;
+}
+function odoCluster(){
+  var evs=odoEvents(); var vans=odoMachines();
+  vans.forEach(function(v){ v.cur=null; v.lastDate=null; v.evs=[]; v.sf=null; });
+  var unknown=[];
+  evs.forEach(function(e){
+    var best=null,bd=Infinity;
+    vans.forEach(function(v){ var d=Math.abs(e.km-v.seed); if(d<bd){ bd=d; best=v; } });
+    if(!best||bd>ODO_BAND){ e.flag='unknown'; unknown.push(e); return; }
+    var v=best; e.vanId=v.id; e.vanRegion=v.region; e.cross=((v.region==='nord')!==e.drvNord);
+    if(v.cur===null){ v.cur=e.km; v.lastDate=e.date; e.clean=true; e.flag='first'; e.delta=null; e.gap=0; e.ref=e.km; v.evs.push(e); return; }
+    var gap=e.km-v.cur, el=Math.max(1,odoDayNum(e.date)-odoDayNum(v.lastDate)), sd=(e.date===v.lastDate);
+    var fw=sd?ODO_SAME_DAY_CAP:ODO_DAY_KM*el; e.gap=gap; e.ref=v.cur;
+    if(gap>=-ODO_TOL_BACK && gap<=fw && gap<=ODO_HARD_MAX){
+      e.clean=true;
+      if(gap>0){ e.delta=gap; e.flag=((gap/el)>ODO_SOFT_RATE)?'hi':'ok'; if(!sd)e.carry=true; v.cur=e.km; v.lastDate=e.date; v.sf=null; }
+      else { e.delta=0; e.flag='dup'; v.lastDate=e.date; }
+    } else {
+      e.clean=false; e.delta=null;
+      if(gap<-ODO_TOL_BACK){ e.flag='typo_low'; }
+      else { e.flag='big_fwd'; if(v.sf!==null && Math.abs(e.km-v.sf)<=ODO_REBASE_TOL){ v.cur=Math.min(e.km,v.sf); v.lastDate=e.date; v.sf=null; e.clean=true; e.delta=0; e.flag='rebase'; } else { v.sf=e.km; } }
+    }
+    v.evs.push(e);
+  });
+  return {vans:vans,unknown:unknown};
+}
+function odoNote(e){
+  if(e.flag==='typo_low')return '&#9888; опечатка? введено '+e.km+', ожидалось ~'+e.ref+' ('+(e.gap>=0?'+':'')+e.gap+') — сверьте фото';
+  if(e.flag==='big_fwd')return '&#9888; слишком большой прирост (+'+e.gap+') — накоплено за дни или новая машина? проверьте';
+  if(e.flag==='rebase')return '&#9888; сброс отсчёта (пропущены дни?) — проверьте';
+  if(e.flag==='dup')return '&#128257; дубль/перенос — совпадает с прошлым показанием';
+  if(e.flag==='hi')return '&#9888; большой пробег за день — проверьте';
+  if(e.flag==='first')return 'первое показание';
+  if(e.flag==='unknown')return '&#9940; неизвестная машина — не отнесено';
+  return '';
+}
+function odoML(m){ return m==='start'?'старт':'конец'; }
+function odoPhotoCell(e){
+  if(e.photo)return '<a href="'+xe(e.photo)+'" target="_blank"><img class="odo-thumb" src="'+xe(e.photo)+'" loading="lazy"></a>';
+  return '<span title="фото отсутствует">&#128247; нет</span>';
+}
+function renderOdo(){
+  var body=document.getElementById('odoBody'); if(!body)return;
+  if(!odoAll||!Object.keys(odoAll).length){ body.innerHTML='<div class="tabel-empty">Нет данных о пробеге.</div>'; return; }
+  var cl=odoCluster(), vans=cl.vans, unknown=cl.unknown;
+  var driverDay={}; var review=[]; var h='';
+  ['main','nord'].forEach(function(region){
+    var rgVans=vans.filter(function(v){ return v.region===region && v.evs.length; });
+    if(!rgVans.length)return;
+    h+='<h3 style="margin:16px 14px 4px;font-size:14px">'+(region==='nord'?'Норд':'Основной регион')+'</h3>';
+    rgVans.forEach(function(v){
+      var curTh=Math.round((v.cur||v.seed)/1000);
+      h+='<div style="padding:2px 14px 2px;font-weight:600">'+xe(v.label)+' &middot; ~'+curTh+' тыс. км</div>';
+      var days={},orderD=[];
+      v.evs.forEach(function(e){ if(!days[e.date]){ days[e.date]=[]; orderD.push(e.date); } days[e.date].push(e); });
+      orderD.sort();
+      var vanTotal=0;
+      h+='<div style="overflow-x:auto"><table class="odo-tbl"><thead><tr><th>Дата</th><th>Статус дня</th><th>Показания</th><th>Проехал</th><th>Кто ехал</th><th>Фото</th><th>Примечание</th></tr></thead><tbody>';
+      orderD.forEach(function(date){
+        var list=days[date];
+        var dsum=0,endDrv=null,startDrv=null,hasEnd=false,hasStart=false,susp=false,noPhoto=false,carry=false,droveSeq=[];
+        list.forEach(function(e){
+          if(e.m==='end'){ hasEnd=true; endDrv=e.drv; }
+          if(e.m==='start'){ hasStart=true; startDrv=e.drv; }
+          if(e.clean&&e.delta>0){ dsum+=e.delta; driverDay[e.drv]=driverDay[e.drv]||{}; driverDay[e.drv][date]=(driverDay[e.drv][date]||0)+e.delta; droveSeq.push(e.drv); if(!e.photo)noPhoto=true; if(e.carry)carry=true; }
+          if(!e.clean){ susp=true; }
+          if(!e.clean||(e.clean&&e.delta>0&&!e.photo)||e.cross||e.flag==='hi'){ review.push({v:v.label,e:e}); }
+        });
+        vanTotal+=dsum;
+        var droveDistinct=[]; droveSeq.forEach(function(d){ if(droveDistinct.indexOf(d)===-1)droveDistinct.push(d); });
+        var who=droveDistinct.length?droveDistinct[droveDistinct.length-1]:(endDrv||startDrv);
+        var handover=(droveDistinct.length>=2)?('<div style="font-size:11px;color:#666">&#8644; передача '+droveDistinct.map(function(d){return xe(dname(d)||d);}).join('&#8594;')+'</div>'):'';
+        var status=(hasStart&&hasEnd)?'&#10003; полный':(hasStart?'&#9940; только старт (нет финиша)':'&#9940; только финиш (нет старта)');
+        var dayNotes=[];
+        if(susp||noPhoto)dayNotes.push('&#9888; предварительно');
+        if(carry)dayNotes.push('нет чистого старта в этот день');
+        var readCells='';
+        list.forEach(function(e){
+          var d=(e.delta!=null)?((e.delta>=0?'+':'')+e.delta):'—';
+          var nt=odoNote(e); if(e.cross)nt=(nt?nt+' · ':'')+'&#9888; похоже на др. регион — проверьте водителя';
+          readCells+='<tr class="odo-sub"><td style="font-size:11px;color:#888">'+odoML(e.m)+'</td><td></td><td>'+e.km+(e.photo?'':' <span style="font-size:10px">(нет фото)</span>')+'</td><td>'+d+'</td><td>'+xe(dname(e.drv)||e.drv)+'</td><td>'+odoPhotoCell(e)+'</td><td style="font-size:11px">'+nt+'</td></tr>';
+        });
+        h+='<tr style="border-top:2px solid #e5ddd0"><td style="font-weight:600">'+odoFmtD(date)+'</td><td style="font-size:11px">'+status+'</td><td colspan="2" style="font-weight:600">'+(dsum>0?('+'+dsum+' км'):(susp?'&#8212; (проверьте)':((hasStart&&hasEnd)?'0 км (не ехала)':'—')))+'</td><td>'+(who?xe(dname(who)||who):'—')+handover+'</td><td></td><td style="font-size:11px">'+dayNotes.join(' · ')+'</td></tr>';
+        h+=readCells;
+      });
+      h+='</tbody></table></div>';
+      h+='<div style="padding:2px 14px 12px;font-weight:600">Итого по машине: '+vanTotal+' км</div>';
+    });
+  });
+  if(unknown.length){
+    h+='<h3 style="margin:16px 14px 4px;font-size:14px;color:#b00">&#9940; Неизвестные машины (проверьте)</h3><div style="overflow-x:auto"><table class="odo-tbl"><thead><tr><th>Дата</th><th>Водитель</th><th>Показание</th><th>Фото</th></tr></thead><tbody>';
+    unknown.forEach(function(e){ h+='<tr><td>'+odoFmtD(e.date)+' '+odoML(e.m)+'</td><td>'+xe(dname(e.drv)||e.drv)+'</td><td>'+e.km+'</td><td>'+odoPhotoCell(e)+'</td></tr>'; });
+    h+='</tbody></table></div>';
+  }
+  var drvKeys=Object.keys(driverDay);
+  if(drvKeys.length){
+    h+='<h3 style="margin:16px 14px 4px;font-size:14px">Пробег по водителям</h3><div style="overflow-x:auto"><table class="odo-tbl"><thead><tr><th>Водитель</th><th>По дням</th><th>Всего</th></tr></thead><tbody>';
+    drvKeys.forEach(function(drv){
+      var dd=driverDay[drv],dts=Object.keys(dd).sort(),tot=0,parts=[];
+      dts.forEach(function(dt){ tot+=dd[dt]; parts.push(odoFmtD(dt)+': '+dd[dt]); });
+      h+='<tr><td>'+xe(dname(drv)||drv)+'</td><td style="font-size:12px">'+parts.join(' &middot; ')+'</td><td style="font-weight:600">'+tot+' км</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  if(review.length){
+    h+='<h3 style="margin:16px 14px 4px;font-size:14px;color:#b00">&#9888; Требует проверки</h3><div style="overflow-x:auto"><table class="odo-tbl"><thead><tr><th>Машина</th><th>Дата</th><th>Водитель</th><th>Показание</th><th>Что не так</th><th>Фото</th></tr></thead><tbody>';
+    review.forEach(function(it){
+      var e=it.e, nt=odoNote(e);
+      if(e.cross)nt=(nt?nt+' · ':'')+'&#9888; похоже на др. регион';
+      if(e.clean&&e.delta>0&&!e.photo)nt=(nt?nt+' · ':'')+'&#128247; засчитано без фото — не подтверждено';
+      h+='<tr><td>'+xe(it.v)+'</td><td>'+odoFmtD(e.date)+' '+odoML(e.m)+'</td><td>'+xe(dname(e.drv)||e.drv)+'</td><td>'+e.km+'</td><td style="font-size:11px">'+nt+'</td><td>'+odoPhotoCell(e)+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  body.innerHTML=h||'<div class="tabel-empty">Нет данных о пробеге.</div>';
 }
 function odoCsv(){
-  var out=[['Дата','Водитель','Старт км','Конец км','За день км']];
-  var a=odoList();a.sort(function(x,y){return x.date<y.date?-1:x.date>y.date?1:0;});
-  a.forEach(function(r){var sk=(typeof r.s.km==='number')?r.s.km:'',ek=(typeof r.e.km==='number')?r.e.km:'';var day=(sk!==''&&ek!==''&&ek>=sk)?(ek-sk):'';out.push([r.date,(dname(r.drv)||r.drv),sk,ek,day]);});
+  var cl=odoCluster();
+  var out=[['Регион','Машина','Дата','Время','Водитель','Показание км','Проехал км','Статус']];
+  ['main','nord'].forEach(function(region){
+    cl.vans.filter(function(v){return v.region===region&&v.evs.length;}).forEach(function(v){
+      var rt=(region==='nord'?'Норд':'Основной');
+      v.evs.forEach(function(e){
+        var d=(e.clean&&e.delta>0)?e.delta:'';
+        var st = e.flag==='typo_low' ? 'опечатка?' : e.flag==='big_fwd' ? 'большой прирост' : e.flag==='rebase' ? 'сброс отсчёта' : e.flag==='dup' ? 'дубль' : e.flag==='hi' ? 'большой пробег' : (e.clean&&e.delta>0&&!e.photo) ? 'без фото' : '';
+        out.push([rt,v.label,e.date,(odoFmtT(e.tsEff)||''),(dname(e.drv)||e.drv),e.km,d,st]);
+      });
+    });
+  });
+  cl.unknown.forEach(function(e){ out.push(['?','НЕИЗВЕСТНАЯ',e.date,(odoFmtT(e.tsEff)||''),(dname(e.drv)||e.drv),e.km,'','не отнесено']); });
   var csv=out.map(function(row){return row.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(';');}).join('\r\n');
   var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});var u=URL.createObjectURL(blob);var el=document.createElement('a');el.href=u;el.download='probeg_'+isoD(0)+'.csv';el.click();setTimeout(function(){URL.revokeObjectURL(u);},1000);
 }
