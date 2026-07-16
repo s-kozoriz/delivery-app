@@ -145,6 +145,16 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .wt-main.pause{background:#e8902e}
 .wt-seglist{font-size:13px;color:#5a7060;margin:-6px 0 14px;line-height:1.7}
 .hdr-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.today-b{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;font-size:11px;font-weight:700;padding:0 10px;border-radius:9px;flex-shrink:0;cursor:pointer;height:36px}
+.wt-line{display:flex;align-items:center;gap:8px;color:#fff;font-size:13.5px;font-weight:700;margin-top:10px;min-height:18px}
+.wt-line .sd{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.wt-line .sd.go{background:#7df0a6}.wt-line .sd.br{background:#ffce7a}.wt-line .sd.off{background:rgba(255,255,255,.55)}
+.wt-line .tm{font-variant-numeric:tabular-nums}
+.wt-3{display:flex;gap:8px;margin-top:8px}
+.wt3{flex:1;border:none;border-radius:12px;font-size:14px;font-weight:800;padding:12px 6px;color:#fff;display:flex;align-items:center;justify-content:center;gap:5px;line-height:1;cursor:pointer;white-space:nowrap}
+.wt3:active{transform:scale(.97)}
+.wt3.go{background:#15a34a}.wt3.pause{background:#d67e12}.wt3.end{background:#c0392b}.wt3.wheel{background:#1856a0}
+.wt3.dim{background:rgba(255,255,255,.12);color:rgba(255,255,255,.42);cursor:default}
 .exit-btn{border:none;background:rgba(255,255,255,.16);color:#fff;border-radius:10px;padding:0 12px;height:36px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0}
 .exit-btn:active{background:rgba(255,255,255,.3)}
 .wt-panel{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:20px}
@@ -192,8 +202,6 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
   <div class="hdr-top">
     <h1 id="dn">Лёша <span class="sync" id="sync"></span></h1>
     <div class="hdr-actions">
-      <button class="wt-btn idle" id="wtBtn" onclick="wtBtnTap()"><span class="wt-dot"></span>Смена</button>
-      <button class="wt-btn" id="wtEndBtn" style="display:none;background:#c0392b" onclick="openWtPanel();wtAsk('confirmFinish')">&#9209; Конец</button>
       <button class="exit-btn" onclick="wtLogout()">Выход</button>
     </div>
   </div>
@@ -201,7 +209,10 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
     <button id="prev">&#8249;</button>
     <div class="lbl" id="dl">загрузка...</div>
     <button id="next">&#8250;</button>
+    <button class="today-b" id="todayB" onclick="goToday()">Сегодня</button>
   </div>
+  <div class="wt-line" id="wtLine">&nbsp;</div>
+  <div id="wt3"></div>
   <div class="prg" id="prg" style="display:none">
     <div class="pb"><div class="pf" id="pf"></div></div>
     <div class="pt" id="pt"></div>
@@ -435,14 +446,33 @@ function wtStartSeg() { wtMutate(function (rec) { var L = wtSegs(rec); L.push({ 
 function wtPauseSeg() { wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; }); if (navigator.vibrate) navigator.vibrate(40); }
 function wtFinishDay() { wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; rec.done = true; }); if (navigator.vibrate) navigator.vibrate([60, 40, 60]); }
 
+function wtPauseDur(rec) { var L = wtSegs(rec); if (!L.length) return 0; var last = L[L.length - 1]; if (!last || !last.e) return 0; var p = (''+last.e).split(':'); var em = (+p[0]) * 60 + (+p[1]); if (isNaN(em)) return 0; var n = new Date(); var m = (n.getHours() * 60 + n.getMinutes()) - em; if (m < 0) m += 1440; return m; }
+function goToday() { curD = isoD(0); render(); }
 function renderWtBtn() {
-  var b = document.getElementById('wtBtn'); if (!b) return;
+  var box = document.getElementById('wt3'); var line = document.getElementById('wtLine');
+  if (!box) return;
   var rec = wtToday(); var st = wtState(rec); var w = wtWorkedMin(rec, true);
-  var eb = document.getElementById('wtEndBtn');
-  if (st === 'done') { b.className = 'wt-btn done'; b.innerHTML = '&#10003; ' + wtHoursDec(rec) + ' ч'; if(eb)eb.style.display='none'; }
-  else if (st === 'run') { b.className = 'wt-btn run'; b.innerHTML = '<span class="wt-dot"></span>&#9208; Пауза · ' + wtFmt(w); if(eb)eb.style.display=''; }
-  else if (st === 'pause') { b.className = 'wt-btn pause'; b.innerHTML = '<span class="wt-dot"></span>&#9654; Продолжить · ' + wtFmt(w); if(eb)eb.style.display=''; }
-  else { b.className = 'wt-btn idle'; b.innerHTML = '<span class="wt-dot"></span>Смена'; if(eb)eb.style.display='none'; }
+  if (line) {
+    if (st === 'idle') line.innerHTML = '<span class="sd off"></span>Смена не начата';
+    else if (st === 'run') line.innerHTML = '<span class="sd go"></span>Смена идёт &middot; <span class="tm">' + wtFmt(w) + '</span>';
+    else if (st === 'pause') line.innerHTML = '<span class="sd br"></span>Пауза &middot; <span class="tm">' + wtFmt(wtPauseDur(rec)) + '</span>';
+    else line.innerHTML = '<span class="sd off"></span>Смена завершена &middot; ' + wtHoursDec(rec) + ' ч';
+  }
+  var END = 'onclick="openWtPanel();wtAsk(\'confirmFinish\')"';
+  var b1, b2, b3;
+  if (st === 'idle') { b1 = '<button class="wt3 go" onclick="wtStartSeg()">&#9654; Начать</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
+  else if (st === 'run') { b1 = '<button class="wt3 dim">&#9654; Начать</button>'; b2 = '<button class="wt3 pause" onclick="wtPauseSeg()">&#9208; Перерыв</button>'; b3 = '<button class="wt3 end" ' + END + '>&#9209; Конец</button>'; }
+  else if (st === 'pause') { b1 = '<button class="wt3 go" onclick="wtStartSeg()">&#9654; Продолжить</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 end" ' + END + '>&#9209; Конец</button>'; }
+  else { b1 = '<button class="wt3 go" onclick="wtStartSeg()">&#9654; Возобновить</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
+  var html = '<div class="wt-3">' + b1 + b2 + b3 + '</div>';
+  var isDrv = (typeof valMode === 'undefined') || valMode !== 'loader';
+  var driving = isDrv && (typeof odoDriving === 'function') && odoDriving();
+  if (isDrv && typeof odoOpen === 'function' && !(st === 'done' && !driving)) {
+    html += driving
+      ? '<button class="wt3 wheel" style="width:100%;margin-top:8px;background:#b06a12" onclick="odoOpen(\'end\')">&#127359;&#65039; Сдать руль (пробег)</button>'
+      : '<button class="wt3 wheel" style="width:100%;margin-top:8px" onclick="odoOpen(\'start\')">&#128666; Взять руль (пробег)</button>';
+  }
+  box.innerHTML = html;
 }
 function wtBtnTap() {
   var st = wtState(wtToday());
@@ -519,12 +549,9 @@ function flushWtQueue() {
 }
 window.addEventListener('online', function () { setTimeout(flushWtQueue, 2500); });
 setInterval(function () {
-  var rec = wtToday();
-  if (wtState(rec) === 'run') {
-    renderWtBtn();
-    var el = document.getElementById('wtWtxt'); if (el) el.textContent = wtFmt(wtWorkedMin(rec, true));
-  }
-}, 30000);
+  var st = wtState(wtToday());
+  if (st === 'run' || st === 'pause') { renderWtBtn(); wtRepanel(); }
+}, 20000);
 
 // PHOTO
 function triggerPhoto(rowId) {
