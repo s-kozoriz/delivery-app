@@ -206,11 +206,6 @@ body{background:#f0f4fc;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
     <div class="pb"><div class="pf" id="pf"></div></div>
     <div class="pt" id="pt"></div>
   </div>
-  <div class="trip-bar">
-    <button class="trip-btn" id="btnStart" onclick="tripStart()">&#9654; Маршрут начат</button>
-    <button class="trip-btn" id="btnEnd" onclick="tripEnd()">&#9632; Вернулся на склад</button>
-  </div>
-  <div class="trip-status" id="tripStatus"></div>
 </div>
 <div class="wrap" id="wrap"></div>
 <div class="lb" id="lb" style="display:none">
@@ -426,12 +421,13 @@ function wtMutate(fn) {
   db.ref('worktime/' + DRV + '/' + date).set(rec).then(function () {
     if (wtQueue[date] && JSON.stringify(wtQueue[date]) === JSON.stringify(rec)) { delete wtQueue[date]; saveWtQueue(); }
   }).catch(function () {
-    if (navigator.onLine) {
-      delete wtQueue[date]; saveWtQueue();
-      if (prev) wtData[date] = prev; else delete wtData[date];
-      renderWtBtn(); wtRepanel();
-      showToast('Не сохранилось — войдите своим логином водителя');
-    }
+    if (!navigator.onLine) return; // офлайн — останется в очереди, долетит позже
+    function _rollback(msg){ if (JSON.stringify(wtData[date]) !== JSON.stringify(rec)) return; delete wtQueue[date]; saveWtQueue(); if (prev) wtData[date] = prev; else delete wtData[date]; renderWtBtn(); wtRepanel(); showToast(msg); }
+    var u = firebase.auth().currentUser;
+    if (!u) { _rollback('Сессия истекла — Выход и войдите заново'); return; }
+    u.getIdToken(true).then(function(){ return db.ref('worktime/' + DRV + '/' + date).set(rec); }).then(function(){
+      if (wtQueue[date] && JSON.stringify(wtQueue[date]) === JSON.stringify(rec)) { delete wtQueue[date]; saveWtQueue(); }
+    }).catch(function(){ _rollback('Сессия истекла — Выход и войдите заново'); });
   });
 }
 function wtStartSeg() { wtMutate(function (rec) { var L = wtSegs(rec); L.push({ s: nowTime() }); rec.seg = L; rec.done = null; }); if (navigator.vibrate) navigator.vibrate(60); }
@@ -1149,6 +1145,11 @@ firebase.auth().onAuthStateChanged(function(user){
     __startDB();
   });
 });
+// Самолечение сессии: мобильные браузеры усыпляют фоновую вкладку → токен устаревает → записи молча падают (кнопки «не работают»).
+function _refreshAuth(){ var u=firebase.auth().currentUser; if(u)u.getIdToken(true).catch(function(){}); }
+document.addEventListener('visibilitychange', function(){ if(!document.hidden)_refreshAuth(); });
+window.addEventListener('online', _refreshAuth);
+setInterval(function(){ if(!document.hidden)_refreshAuth(); }, 1500000);
 // Update PIN name when cfg loads
 var _origCfgListener = null;
 

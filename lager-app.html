@@ -94,7 +94,11 @@ function wtMutate(fn){
   var date=wtDate(); var prev=wtClone(wtData[date]); var rec=wtClone(wtData[date])||{}; fn(rec);
   wtData[date]=rec; wtQueue[date]=rec; saveWtQueue(); renderCard();
   db.ref('worktime/'+DRV+'/'+date).set(rec).then(function(){ if(wtQueue[date]&&JSON.stringify(wtQueue[date])===JSON.stringify(rec)){ delete wtQueue[date]; saveWtQueue(); } }).catch(function(){
-    if(navigator.onLine){ delete wtQueue[date]; saveWtQueue(); if(prev)wtData[date]=prev; else delete wtData[date]; renderCard(); showToast('Не сохранилось — войдите своим PIN'); }
+    if(!navigator.onLine)return; // офлайн — останется в очереди
+    function _rollback(msg){ if(JSON.stringify(wtData[date])!==JSON.stringify(rec))return; delete wtQueue[date]; saveWtQueue(); if(prev)wtData[date]=prev; else delete wtData[date]; renderCard(); showToast(msg); }
+    var u=firebase.auth().currentUser;
+    if(!u){ _rollback('Сессия истекла — Выход и войдите заново'); return; }
+    u.getIdToken(true).then(function(){ return db.ref('worktime/'+DRV+'/'+date).set(rec); }).then(function(){ if(wtQueue[date]&&JSON.stringify(wtQueue[date])===JSON.stringify(rec)){ delete wtQueue[date]; saveWtQueue(); } }).catch(function(){ _rollback('Сессия истекла — Выход и войдите заново'); });
   });
 }
 function lgStart(){ wtMutate(function(rec){ var L=wtSegs(rec); L.push({s:nowTime()}); rec.seg=L; rec.done=null; }); if(navigator.vibrate)navigator.vibrate(60); }
@@ -150,6 +154,11 @@ firebase.auth().onAuthStateChanged(function(user){
     startLager();
   });
 });
+// Самолечение сессии: мобильные браузеры усыпляют фоновую вкладку → токен устаревает → записи молча падают (кнопки «не работают»).
+function _refreshAuth(){ var u=firebase.auth().currentUser; if(u)u.getIdToken(true).catch(function(){}); }
+document.addEventListener('visibilitychange', function(){ if(!document.hidden)_refreshAuth(); });
+window.addEventListener('online', _refreshAuth);
+setInterval(function(){ if(!document.hidden)_refreshAuth(); }, 1500000);
 </script>
 </body>
 </html>
