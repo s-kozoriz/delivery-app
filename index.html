@@ -1481,7 +1481,9 @@ function activeDrvs(){
   // Норд = ОДНА машина (слот C): одна колонка «Норд» (имя того, кто вошёл водителем), а не по колонке на каждого Норд-водителя.
   if(disp2Mode)return ['C'].concat([secondNordDrv()||'2nd']); // слот Норд + всегда «второе поле» (2-я/партнёрская машина)
   var dr=(cfg&&cfg.drivers)||{};
-  return DRV_KEYS.filter(function(k){ return k==='C' || !(dr[k]&&dr[k].dyn===true&&dr[k].nord===true); });
+  // основной регион слева (L/R/V + не-Норд динамические), Норд-машина (C) — крайней справа для быстрой визуальной идентификации
+  var main=DRV_KEYS.filter(function(k){ return k!=='C' && !(dr[k]&&dr[k].dyn===true&&dr[k].nord===true); });
+  return main.concat(['C']);
 }
 function drows(d){
   return rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false&&(!disp2Mode||isNordRow(r))&&!_hideZentrum(r);});
