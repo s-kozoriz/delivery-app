@@ -1387,7 +1387,7 @@ function acCleanAddr(addr,city){
   s=s.replace(/\+/g,' ').replace(/\bE-?\s*Check\b/ig,' ').replace(/\bAsbest\b/ig,' ').replace(/\s{2,}/g,' ').trim();
   return s;
 }
-var PICKUPS=['Hornbach','ABEX'];
+var PICKUPS=['Hornbach','ABEX','Mega','Mülldeponie'];
 function _acx(s){return(''+(s||'')).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
 function acList(city){
   city=(''+(city||'')).trim(); var seen={},out=[];

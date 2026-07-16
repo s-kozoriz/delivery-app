@@ -677,7 +677,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
-var STATS=['—','вывоз мусора','срочно','забрать товар','перевезти инструмент','перевезти мастера'];
+var STATS=['—','вывоз мусора','срочно','забрать товар','доставка материала','перевезти инструмент','перевезти мастера'];
 var DRV_KEYS=['L','R','C','V'];
 var DRV_PATHS={L:'lesha-app',R:'roma-app',C:'driver3-app',V:'valentyn-app'};
 var PIN_DEFAULT='1234';
@@ -1138,7 +1138,7 @@ function acCleanAddr(addr,city){
   s=s.replace(/\+/g,' ').replace(/\bE-?\s*Check\b/ig,' ').replace(/\bAsbest\b/ig,' ').replace(/\s{2,}/g,' ').trim();
   return s;
 }
-var PICKUPS=['Hornbach','ABEX']; // склады/магазины, откуда водители часто забирают товар — всегда в списке (добавлять сюда)
+var PICKUPS=['Hornbach','ABEX','Mega','Mülldeponie']; // склады/магазины/точки, откуда водители часто забирают/куда везут — всегда в списке (добавлять сюда)
 function acList(city){
   city=(''+(city||'')).trim(); var seen={},out=[];
   var cityset={}; (CITIES||[]).concat(CITIESC||[]).forEach(function(c){ cityset[(''+c).trim().toLowerCase()]=1; });
