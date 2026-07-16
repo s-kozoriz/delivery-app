@@ -145,13 +145,13 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .wt-main.pause{background:#e8902e}
 .wt-seglist{font-size:13px;color:#5a7060;margin:-6px 0 14px;line-height:1.7}
 .hdr-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.today-b{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;font-size:11px;font-weight:700;padding:0 10px;border-radius:9px;flex-shrink:0;cursor:pointer;height:36px}
+.nav .today-b{width:auto;background:transparent;border:1px solid rgba(255,255,255,.45);color:#fff;font-size:11px;font-weight:700;padding:0 10px;border-radius:9px;flex-shrink:0;cursor:pointer;height:36px}
 .wt-line{display:flex;align-items:center;gap:8px;color:#fff;font-size:13.5px;font-weight:700;margin-top:10px;min-height:18px}
 .wt-line .sd{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .wt-line .sd.go{background:#7df0a6}.wt-line .sd.br{background:#ffce7a}.wt-line .sd.off{background:rgba(255,255,255,.55)}
 .wt-line .tm{font-variant-numeric:tabular-nums}
-.wt-3{display:flex;gap:8px;margin-top:8px}
-.wt3{flex:1;border:none;border-radius:12px;font-size:14px;font-weight:800;padding:12px 6px;color:#fff;display:flex;align-items:center;justify-content:center;gap:5px;line-height:1;cursor:pointer;white-space:nowrap}
+.wt-3{display:flex;gap:6px;margin-top:8px}
+.wt3{flex:1 1 0;min-width:0;border:none;border-radius:12px;font-size:12px;font-weight:800;padding:11px 2px;color:#fff;display:flex;align-items:center;justify-content:center;gap:4px;line-height:1.15;cursor:pointer;white-space:nowrap;overflow:hidden}
 .wt3:active{transform:scale(.97)}
 .wt3.go{background:#15a34a}.wt3.pause{background:#d67e12}.wt3.end{background:#c0392b}.wt3.wheel{background:#1856a0}
 .wt3.dim{background:rgba(255,255,255,.12);color:rgba(255,255,255,.42);cursor:default}
@@ -929,7 +929,7 @@ function valBadge() {
 function valEnsureRole(cb) {
   if (valMode) { if (cb) cb(); return; }
   var saved = localStorage.getItem(valModeKey());
-  if (saved === 'driver' || saved === 'loader') { valMode = saved; valBadge(); if (cb) cb(); return; }
+  if (saved === 'driver' || saved === 'loader') { valMode = saved; valBadge(); renderWtBtn(); if (cb) cb(); return; }
   if (cb) _valPendingCb = cb;
   if (_valAsked) return;
   _valAsked = true; valOpenPicker();
@@ -944,6 +944,7 @@ function valSetRole(m) {
     var ob = document.getElementById('odoBanner'); if (ob) ob.classList.remove('on');
   }
   valBadge();
+  renderWtBtn(); // сразу обновить кнопки/руль под выбранную роль (иначе руль у грузчика висит до интервала)
   var f = _valPendingCb; _valPendingCb = null; if (f) f();
 }
 function valSwitch() {
