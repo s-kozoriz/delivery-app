@@ -178,6 +178,41 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .wt-cancel:active,.wt-yes:active{transform:scale(.97)}
 .wt-done-note{font-size:12px;color:#80786e;margin-top:6px}
 .wt-close{margin-top:14px;background:none;border:none;color:#80786e;font-size:14px;cursor:pointer;padding:6px}
+
+/* ===== Шапка — Вариант 1 «Спокойный воздух» (дизайн-пас). Переопределяет ранние правила по каскаду. Фон .hdr остаётся per-driver. ===== */
+.hdr{padding:16px 18px 18px;position:sticky;top:0;z-index:10}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hdr h1{margin:0;min-width:0;color:#fff;font-size:18px;font-weight:700;line-height:1.2;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.45);display:inline-block;margin-left:8px;vertical-align:middle}
+.sync.ok{background:#fff}
+.hdr-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.hdr-actions .val-badge{height:36px;padding:0 14px;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.95);color:#2a2431;border:none;border-radius:999px;font-family:inherit;font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer}
+.hdr-actions .val-badge:active{background:#fff}
+.exit-btn{height:36px;padding:0 14px;display:inline-flex;align-items:center;background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:12px;font-family:inherit;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;flex-shrink:0}
+.exit-btn:active{background:rgba(255,255,255,.26)}
+.nav{display:flex;align-items:center;gap:8px;margin-top:14px}
+.nav button{width:36px;height:36px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:12px;font-size:22px;line-height:1;cursor:pointer}
+.nav button:active{background:rgba(255,255,255,.26)}
+.lbl{flex:1;min-width:0;text-align:center;color:#fff;font-size:15px;font-weight:600;letter-spacing:.2px;background:transparent;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav .today-b{width:auto;height:36px;padding:0 14px;flex-shrink:0;display:inline-flex;align-items:center;background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:12px;font-family:inherit;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer}
+.nav .today-b:active{background:rgba(255,255,255,.26)}
+.wt-line{display:flex;align-items:center;gap:8px;margin-top:12px;min-height:20px;color:#fff;font-size:14px;font-weight:600}
+.wt-line .sd{width:10px;height:10px;border-radius:50%;flex-shrink:0;animation:none}
+.wt-line .sd.go{background:#7df0a6}
+.wt-line .sd.br{background:#ffce7a}
+.wt-line .sd.off{background:rgba(255,255,255,.55)}
+.wt-line .tm{font-variant-numeric:tabular-nums;font-weight:700}
+#wt3{margin-top:10px}
+.wt-3{display:flex;gap:6px;margin-top:0}
+.wt3{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:4px;padding:14px 4px;border:none;border-radius:14px;color:#fff;font-family:inherit;font-size:13.5px;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;cursor:pointer}
+.wt3:active{transform:scale(.98)}
+.wt3.go{background:#15a34a}
+.wt3.pause{background:#d67e12}
+.wt3.end{background:#c0392b}
+.wt3.wheel{width:100%;margin-top:6px;background:#1856a0}
+.wt3.wheel.rel{background:#b06a12}
+.wt3.dim{background:rgba(255,255,255,.12);color:rgba(255,255,255,.45);cursor:default}
+.wt3.dim:active{transform:none}
 </style>
 </head>
 <body>
@@ -466,11 +501,19 @@ function renderWtBtn() {
   else { b1 = '<button class="wt3 go" onclick="wtStartSeg()">&#9654; Продолжить</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
   var html = '<div class="wt-3">' + b1 + b2 + b3 + '</div>';
   var isDrv = (typeof valMode === 'undefined') || valMode !== 'loader';
-  var driving = isDrv && (typeof odoDriving === 'function') && odoDriving();
-  if (isDrv && typeof odoOpen === 'function' && !(st === 'done' && !driving)) {
-    html += driving
-      ? '<button class="wt3 wheel" style="width:100%;margin-top:8px;background:#b06a12" onclick="odoOpen(\'end\')">&#127359;&#65039; Сдать руль (пробег)</button>'
-      : '<button class="wt3 wheel" style="width:100%;margin-top:8px" onclick="odoOpen(\'start\')">&#128666; Взять руль (пробег)</button>';
+  if (isDrv && typeof odoOpen === 'function') {
+    if (isNordDrv()) {
+      // Общий руль Норд-машины: свободен → «Взять» (активна), у меня → «Сдать» (активна), у другого → неактивна «Руль у …»
+      var holder = nordWheel && nordWheel.drv;
+      if (!holder) html += '<button class="wt3 wheel" onclick="odoOpen(\'start\')">&#128666; Взять руль (пробег)</button>';
+      else if (holder === DRV) html += '<button class="wt3 wheel rel" onclick="odoOpen(\'end\')">&#127359;&#65039; Сдать руль (пробег)</button>';
+      else html += '<button class="wt3 wheel dim" disabled>&#128663; Руль у ' + xe(nordWheel.name || holder) + '</button>';
+    } else {
+      var driving = (typeof odoDriving === 'function') && odoDriving();
+      if (!(st === 'done' && !driving)) html += driving
+        ? '<button class="wt3 wheel rel" onclick="odoOpen(\'end\')">&#127359;&#65039; Сдать руль (пробег)</button>'
+        : '<button class="wt3 wheel" onclick="odoOpen(\'start\')">&#128666; Взять руль (пробег)</button>';
+    }
   }
   box.innerHTML = html;
 }
@@ -703,7 +746,7 @@ function uploadPhotoWithQueue(file, rowId) {
 
 // ===================== ОДОМЕТР (пробег) — гейт старта/конца дня =====================
 // Хранение: odometer/{DRV}/{date} = { start:{km,photo,ts}, end:{km,photo,ts} }
-var odoData = {}, _odoGateChecked = false, odoMode = null, odoPhotoFile = null;
+var odoData = {}, _odoGateChecked = false, odoMode = null, odoPhotoFile = null, nordWheel = null;
 db.ref('odometer/' + DRV).on('value', function (s) { odoData = s.val() || {}; });
 function odoRec() { return odoData[wtDate()] || {}; }
 (function () {
@@ -743,6 +786,8 @@ function odoRec() { return odoData[wtDate()] || {}; }
 })();
 function odoOpen(mode) {
   if (valMode === 'loader') return; // грузчик не за рулём — одометр не открываем
+  if (mode === 'start' && isNordDrv() && nordWheel && nordWheel.drv && nordWheel.drv !== DRV) { showToast('Руль сейчас у ' + xe(nordWheel.name || nordWheel.drv)); return; } // общий руль Норд-машины занят другим
+  if (mode === 'end' && isNordDrv() && !(nordWheel && nordWheel.drv === DRV)) { showToast('Руль уже не за вами'); return; } // нельзя сдать руль, который уже не у меня (устаревшая панель)
   odoMode = mode; odoPhotoFile = null;
   var end = mode === 'end';
   document.getElementById('odoHd').textContent = end ? 'Конец дня — пробег' : 'Начало дня — пробег';
@@ -772,13 +817,14 @@ function odoPeek() {
   document.getElementById('odoGate').classList.remove('on');
   if (wtState(wtToday()) === 'idle') document.getElementById('odoBanner').classList.add('on');
 }
-function odoDriving(){ try { return localStorage.getItem('odoDrv_' + DRV + '_' + wtDate()) === '1'; } catch(e){ return false; } }
+function odoDriving(){ if (isNordDrv()) return !!(nordWheel && nordWheel.drv === DRV); try { return localStorage.getItem('odoDrv_' + DRV + '_' + wtDate()) === '1'; } catch(e){ return false; } }
 function odoSave() {
   var kmv = (document.getElementById('odoKm').value || '').trim(); var km = Number(kmv);
   if (!odoPhotoFile || kmv === '' || !(km >= 0)) return;
   var mode = odoMode, date = wtDate(), ts = Date.now();
   if (mode === 'start' && wtState(wtToday()) === 'idle') wtStartSeg(); // взял руль в начале дня = ещё и клок-ин; «сдать руль» день НЕ завершает
   try { if (mode === 'start') localStorage.setItem('odoDrv_' + DRV + '_' + date, '1'); else localStorage.removeItem('odoDrv_' + DRV + '_' + date); } catch (e) {}
+  if (isNordDrv()) { try { if (mode === 'start') db.ref('nord_wheel/' + date).set({ drv: DRV, name: myName(), ts: ts }); else db.ref('nord_wheel/' + date).remove(); } catch (e) {} } // общий руль Норд-машины: взял/сдал
   odoWriteKm(date, mode, km, ts);
   odoUploadPhoto(odoPhotoFile, date, mode, ts);
   document.getElementById('odoGate').classList.remove('on');
@@ -1222,6 +1268,7 @@ db.ref('worktime/' + DRV).on('value', function(snap) {
   if (document.getElementById('wtPanel') && document.getElementById('wtPanel').classList.contains('on')) renderWtPanel();
   valEnsureRole(odoMaybeGate);
 });
+db.ref('nord_wheel').on('value', function(snap) { var all = snap.val() || {}; nordWheel = all[wtDate()] || null; renderWtBtn(); wtRepanel(); }, function(){}); // общий руль Норд-машины (весь узел → не устаревает за полночь; wtRepanel обновляет и открытую панель)
 flushWtQueue();
 renderWtBtn();
 
