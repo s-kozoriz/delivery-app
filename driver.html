@@ -909,6 +909,7 @@ function valEnsureRole(cb) {
 }
 function valSetRole(m) {
   valMode = m; _valAsked = false;
+  nordPtr(m); // Норд: отметить/снять «водитель дня» для колонки «Норд» в диспетчере
   try { localStorage.setItem(valModeKey(), m); } catch (e) {}
   var p = document.getElementById('valPick'); if (p) p.classList.remove('on');
   if (m === 'loader') { // на случай гонки: закрыть одометр, если он успел открыться до выбора роли
@@ -1088,10 +1089,22 @@ function renderRow(r, num) {
   return h;
 }
 
+// Норд-водитель водит ОДНУ машину (слот C): читает и ведёт маршрут Норда (drv='C'), а не свой ключ.
+// Смена/пробег/пары остаются под своим ключом (зарплата). Кто вошёл водителем — пишем в nord_driver для колонки «Норд».
+function isNordDrv(){ return DRV === 'C' || (cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].nord === true); }
+function routeDrv(){ return isNordDrv() ? 'C' : DRV; }
+function myName(){ return (cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].name) || DRV; }
+function nordPtr(m){
+  if (!isNordDrv()) return;
+  try {
+    if (m === 'driver') db.ref('nord_driver/' + wtDate()).set({ drv: DRV, name: myName(), ts: Date.now() });
+    else db.ref('nord_driver/' + wtDate()).once('value', function(s){ var v = s.val(); if (v && v.drv === DRV) db.ref('nord_driver/' + wtDate()).remove(); });
+  } catch (e) {}
+}
 function render() {
   document.getElementById('dl').textContent = fmt(curD);
   var dr = rows.filter(function(r) {
-    return r.date === curD && r.drv === DRV && r.inRoute !== false && ((r.addr && r.addr.trim()) || r.fromDriver);
+    return r.date === curD && r.drv === routeDrv() && r.inRoute !== false && ((r.addr && r.addr.trim()) || r.fromDriver);
   });
   var tot = dr.length, dn = dr.filter(function(r) { return r.done; }).length;
   var prg = document.getElementById('prg');
@@ -1166,6 +1179,7 @@ db.ref('cfg').on('value', function(snap) {
     cfg = snap.val();
     document.getElementById('dn').innerHTML = driverName() + ' <span class="sync ok" id="sync"></span>';
     if(document.getElementById('driverPinName'))document.getElementById('driverPinName').textContent='Маршрут — '+driverName();
+    render(); // cfg влияет на routeDrv() (Норд-водитель читает маршрут C) — перерисовать после загрузки cfg, даже если rows пришли раньше
   }
 });
 
@@ -1375,7 +1389,7 @@ function submitAddTask(){
     var row = {
       id: rowId,
       date: curD,
-      drv: DRV,
+      drv: routeDrv(),
       city: (document.getElementById('addFormCity')?document.getElementById('addFormCity').value:''),
       addr: (document.getElementById('addFormAddr')?document.getElementById('addFormAddr').value.trim():''),
       invs: [''],

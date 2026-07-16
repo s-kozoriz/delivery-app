@@ -736,6 +736,7 @@ var pairsAll={};
 db.ref('pairs').on('value',function(s){pairsAll=s.val()||{};var tt2=document.getElementById('ttab');if(tt2&&tt2.style.display!=='none')renderTabel();},function(){});
 // ── Пробег (одометр) — временное хранилище для сверки с топливом (Zoll); фото уходит контролёру позже ──
 db.ref('odometer').on('value',function(s){odoAll=s.val()||{};var t=document.getElementById('tOdo');if(t&&t.style.display!=='none')renderOdo();},function(){});
+db.ref('nord_driver').on('value',function(s){nordDriver=s.val()||{};gm();},function(){});
 db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=document.getElementById('cs-nord');if(p&&p.style.display!=='none')renderNordPlanners();},function(){});
 db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
 db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incTrackFresh();incCleanReturned();incBadge();renderDelivMismatch();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
@@ -749,6 +750,10 @@ __startVoiceListener();
 
 // ── Пробег (одометр) — глобальные функции (вызов из sw() и onclick) ──
 var odoAll={};
+// nord_driver/{date} = {drv,name} — кто из Норд-водителей вошёл водителем сегодня (для колонки «Норд»)
+var nordDriver={};
+function nordColName(){ var nd=nordDriver[curD]; return (nd&&nd.name)?nd.name:'Норд'; }
+function dcolName(d){ return d==='C' ? nordColName() : dname(d); }
 function odoFmtD(d){var p=(''+(d||'')).split('-');return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):d;}
 function odoFmtT(ts){if(typeof ts!=='number')return '';var d=new Date(ts);return (d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();}
 function odoList(){var a=[];Object.keys(odoAll).forEach(function(drv){var bd=odoAll[drv]||{};Object.keys(bd).forEach(function(date){var r=bd[date]||{};a.push({drv:drv,date:date,s:r.start||{},e:r.end||{}});});});return a;}
@@ -1341,11 +1346,11 @@ function _rtblNow(){
     if(isEditing){
       var sel='<td style="width:80px"><select onchange="ur(\''+r.id+'\',\'drv\',this.value)" style="'+dc+'">';
       sel+='<option value=""'+((!r.drv||r.drv==='')?' selected':'')+'>— назначить —</option>';
-      DRV_KEYS.forEach(function(k){var n=dname(k);if(n||k!=='C')sel+='<option value="'+k+'"'+(r.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
+      DRV_KEYS.forEach(function(k){if(cfg.drivers[k]&&cfg.drivers[k].dyn===true&&cfg.drivers[k].nord===true)return;var n=k==='C'?'Норд':dname(k);if(n||k!=='C')sel+='<option value="'+k+'"'+(r.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
       sel+='</select></td>';
       h+=sel;
     } else {
-      var drvLabel=r.drv?xe(dname(r.drv)||r.drv):'<span style="color:#E24B4A;font-size:11px;font-weight:600">Не назначен</span>';
+      var drvLabel=r.drv?xe(dcolName(r.drv)||r.drv):'<span style="color:#E24B4A;font-size:11px;font-weight:600">Не назначен</span>';
       h+='<td style="width:80px;'+dc+'"><span style="font-size:12px;font-weight:600;padding:2px 4px;display:block">'+drvLabel+'</span></td>';
     }
     var cityList=disp2Mode?CITIESC:CITIES;
@@ -1421,7 +1426,7 @@ function _rtblNow(){
   if(newRowDraft){
     var nd=newRowDraft;
     var drvOpts='',cityOpts='',statOpts='';
-    DRV_KEYS.forEach(function(k){var n=dname(k);if(n||k!=='C')drvOpts+='<option value="'+k+'"'+(nd.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
+    DRV_KEYS.forEach(function(k){if(cfg.drivers[k]&&cfg.drivers[k].dyn===true&&cfg.drivers[k].nord===true)return;var n=k==='C'?'Норд':dname(k);if(n||k!=='C')drvOpts+='<option value="'+k+'"'+(nd.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
     var cl=disp2Mode?CITIESC:CITIES;
     cl.forEach(function(city){cityOpts+='<option value="'+xe(city)+'"'+(nd.city===city?' selected':'')+'>'+xe(city)+'</option>';});
     STATS.forEach(function(s){statOpts+='<option value="'+xe(s)+'"'+(nd.status===s?' selected':'')+'>'+xe(s)+'</option>';});
@@ -1473,8 +1478,10 @@ function _autoNordTrash(){
 // Второй (наш) водитель, назначенный на Nord-заказы текущего дня (или '' если нет)
 function secondNordDrv(){ var prim=nordDrvKeys(); var f=''; rows.forEach(function(r){ if(r.date===curD && r.drv && prim.indexOf(r.drv)===-1 && isNordRow(r) && r.addr && r.addr.trim()) f=r.drv; }); return f; }
 function activeDrvs(){
-  if(disp2Mode)return nordDrvKeys().concat([secondNordDrv()||'2nd']); // Виталик + всегда «второе поле»
-  return DRV_KEYS;
+  // Норд = ОДНА машина (слот C): одна колонка «Норд» (имя того, кто вошёл водителем), а не по колонке на каждого Норд-водителя.
+  if(disp2Mode)return ['C'].concat([secondNordDrv()||'2nd']); // слот Норд + всегда «второе поле» (2-я/партнёрская машина)
+  var dr=(cfg&&cfg.drivers)||{};
+  return DRV_KEYS.filter(function(k){ return k==='C' || !(dr[k]&&dr[k].dyn===true&&dr[k].nord===true); });
 }
 function drows(d){
   return rows.filter(function(r){return r.date===curD&&r.drv===d&&r.addr&&r.addr.trim()&&r.inRoute!==false&&(!disp2Mode||isNordRow(r))&&!_hideZentrum(r);});
@@ -1537,13 +1544,13 @@ function bpRow(r,d,n){
 }
 
 function buildMsgPanel(d){
-  var name=dname(d);
+  var name=dcolName(d);
   var avStyle=d==='L'?'style="background:#e6f4ea;color:#1a7a40"'
     :d==='R'?'style="background:#fce8e6;color:#a03018"'
     :d==='C'?'style="background:#e6eef9;color:#185FA5"'
     :d==='2nd'?'style="background:#eceff1;color:#607d8b"'
     :'style="background:#f3e5f5;color:#6a1a7a"';
-  var avLetter=d==='L'?'Л':d==='R'?'Р':d==='C'?'С':d==='2nd'?'+':'В';
+  var avLetter=d==='L'?'Л':d==='R'?'Р':d==='C'?'Н':d==='2nd'?'+':'В';
   var accentColor=d==='L'?'#1a7a40':d==='R'?'#a03018':d==='C'?'#185FA5':'#6a1a7a';
   var accentBg=d==='L'?'#e6f4ea':d==='R'?'#fce8e6':d==='C'?'#e6eef9':'#f3e5f5';
   return '<div class="mc" id="mc'+d+'">'
@@ -1612,7 +1619,7 @@ function gm(){
         wlEl.style.display='';
       } else { wlEl.style.display='none'; }
     }
-    var nEl=document.getElementById('n'+d);if(nEl)nEl.textContent=dname(d);
+    var nEl=document.getElementById('n'+d);if(nEl)nEl.textContent=dcolName(d);
     var sb=document.getElementById('sb'+d);if(sb)sb.style.display=sent[curD+'_'+d]?'':'none';
     var tripKey=curD+'_'+d;
     var tripData=tripStatus[tripKey]||{};
@@ -2122,7 +2129,7 @@ function renderNordMirror(){
     h+='<tr>'+
       '<td><button class="dbtn" onclick="dr(\''+r.id+'\')" title="Удалить">&#215;</button></td>'+
       '<td><input type="date" value="'+(r.date_pending?'':(r.date||''))+'" onchange="ur(\''+r.id+'\',\'date\',this.value)" style="font-size:12px;padding:4px"></td>'+
-      '<td>'+xe(dname(r.drv)||r.drv||'—')+'</td>'+
+      '<td>'+xe(dcolName(r.drv)||r.drv||'—')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
       '<td>'+xe(r.addr||'')+'</td>'+
       '<td style="font-size:12px">'+xe(iv.join(', '))+'</td>'+
@@ -2132,7 +2139,7 @@ function renderNordMirror(){
       '</tr>';
   });
   h+='</tbody></table>';
-  var vName=dname('C')||'Виталик';
+  var vName='Норд'+((nordDriver[today]&&nordDriver[today].name)?(' · '+nordDriver[today].name):'');
   var vToday=nr.filter(function(r){ return r.drv==='C'&&r.date===today; });
   h+='<div style="margin:14px 6px 4px;padding:12px 14px;background:#eef4ff;border-radius:10px"><b>'+xe(vName)+' сегодня ('+fmt(today)+'): '+vToday.length+' адр.</b>';
   if(vToday.length)h+='<div style="font-size:12px;color:#5a6470;margin-top:5px">'+vToday.map(function(r){return xe(r.addr||'');}).join(' &middot; ')+'</div>';
