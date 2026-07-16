@@ -1194,12 +1194,17 @@ function acInit(){
   document.addEventListener('mousedown',function(e){ if(_ac.open&&e.target!==_ac.inp&&!acInside(e.target))acClose(); });
 }
 
+// Норд-планировщик правит/удаляет только СВОИ строки (по plannerId-автору). Диспетчер (zentrum) — всё. Перемещение (order) разрешено всем.
+function canEditRow(r){ return !IS_PLANNER || (r && r.plannerId===PLANNER_ID); }
 function dr(id){
   var r=rows.find(function(x){return x.id===id;});
+  if(r&&!canEditRow(r)){ toast('Это адрес другого техника — удалять нельзя'); return; }
   if(r){ (r.invs||[]).forEach(function(inv){ inv=(''+(inv||'')).trim(); if(inv&&incPlaced[inv]&&incPlaced[inv].rowId===id) incUnplace(inv); }); }
   db.ref('rows/'+id).remove();
 }
 function toggleDone(id,val){
+  var r=rows.find(function(x){return x.id===id;});
+  if(r&&!canEditRow(r)){ toast('Это адрес другого техника'); return; }
   db.ref('rows/'+id+'/done').set(val);
   if(val)db.ref('rows/'+id+'/doneTs').set(Date.now());
 }
@@ -1226,6 +1231,8 @@ function panelMoveRow(id,drv,dir){
   _lastEdit=Date.now();
 }
 function ur(id,f,v){
+  var _re=rows.find(function(x){return x.id===id;});
+  if(_re&&!canEditRow(_re))return; // Норд-планировщик не правит чужие строки
   _lastEdit=Date.now();
   _pending[id+'/'+f]={v:v,ts:Date.now()};
   db.ref('rows/'+id+'/'+f).set(v);
@@ -1245,15 +1252,17 @@ function _applyPending(){
     if(cur===want){delete _pending[key];}else{r[f]=p.v;}
   });
 }
-function tr(id,v){db.ref('rows/'+id+'/inRoute').set(v);}
+function tr(id,v){var r=rows.find(function(x){return x.id===id;});if(r&&!canEditRow(r)){toast('Это адрес другого техника');return;}db.ref('rows/'+id+'/inRoute').set(v);}
 function ai(id){
   var r=rows.find(function(x){return x.id===id;});if(!r)return;
+  if(!canEditRow(r)){ toast('Это адрес другого техника'); return; }
   var inv=[].concat(r.invs||[]);inv.push('');
   db.ref('rows/'+id+'/invs').set(inv);
 }
 function di(id,i){
   _lastEdit=Date.now();
   var r=rows.find(function(x){return x.id===id;});if(!r)return;
+  if(!canEditRow(r)){ toast('Это адрес другого техника'); return; }
   var inv=[].concat(r.invs||['']);
   var removed=(''+(inv[i]||'')).trim();
   if(inv.length===1){inv[0]='';}else{inv.splice(i,1);}
@@ -1265,6 +1274,7 @@ function di(id,i){
 function ui(id,i,v){
   _lastEdit=Date.now();
   var r=rows.find(function(x){return x.id===id;});if(!r)return;
+  if(!canEditRow(r))return;
   var inv=[].concat(r.invs||['']);
   var old=(''+(inv[i]||'')).trim();
   inv[i]=v;
@@ -1307,6 +1317,7 @@ function _rtblNow(){
   var _lastD=null;
   sorted.forEach(function(r){
     var doneCls=r.done?' class="tr-done"':'';
+    var _ce=canEditRow(r); // Норд-планировщик: свои строки правит, чужие — только просмотр (перемещение разрешено отдельно)
     var dim=r.inRoute===false?'opacity:.5;':'';
     var dn=r.done?'<span class="dnbadge dn-yes">&#10003;</span>':'<span class="dnbadge dn-no">—</span>';
     var isEditing=(editingRowId===r.id)||(!r.addr&&!r.done);
@@ -1317,7 +1328,8 @@ function _rtblNow(){
       var wkey=curD+'_'+r.id+'_'+i;
       var whDone=v.trim()&&warehouseStatus[wkey];
       var chk=v.trim()?'<span style="font-size:13px;font-weight:700;flex-shrink:0;color:'+(whDone?'#1a7a40':'#ddd')+';padding:0 2px" title="'+(whDone?'Загружено':'Ожидает')+'">&#10003;</span>':'<span style="width:14px;flex-shrink:0;display:inline-block"></span>';
-      ih+='<div class="irow">'+chk+'<input class="iinp" type="text" value="'+xe(v)+'" placeholder="LK-..." oninput="ui(\''+r.id+'\','+i+',this.value)"><button class="ix" onclick="di(\''+r.id+'\','+i+')">&#215;</button></div>';
+      if(_ce) ih+='<div class="irow">'+chk+'<input class="iinp" type="text" value="'+xe(v)+'" placeholder="LK-..." oninput="ui(\''+r.id+'\','+i+',this.value)"><button class="ix" onclick="di(\''+r.id+'\','+i+')">&#215;</button></div>';
+      else ih+='<div class="irow">'+chk+'<span class="iinp" style="padding:3px 4px;display:inline-block;color:#555">'+(xe(v)||'&mdash;')+'</span></div>';
     });
 
     if(r.date!==_lastD&&(r.addr&&r.addr.trim())){
@@ -1337,10 +1349,11 @@ function _rtblNow(){
     } else if(r.fromDriver){
       h+='<div style="width:28px;height:28px;border-radius:50%;background:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;margin:4px auto" title="Добавлено водителем: '+xe(r.addedByDriver||dname(r.drv)||'')+'">&#128666;</div>';
     } else {
-      h+='<button class="dbtn" onclick="dr(\''+r.id+'\')">&#215;</button>';
+      if(canEditRow(r)) h+='<button class="dbtn" onclick="dr(\''+r.id+'\')">&#215;</button>';
+      else h+='<div style="font-size:9px;color:#9aa;line-height:1.05" title="Адрес другого техника — только автор может удалить">'+xe((((r.plannerName||'')+'').split(' ')[0])||'др.')+'</div>';
     }
     h+='</td>';
-    h+='<td style="width:32px;text-align:center"><input type="checkbox" class="rchk"'+(r.inRoute!==false?' checked':'')+' onchange="tr(\''+r.id+'\',this.checked)"></td>';
+    h+='<td style="width:32px;text-align:center"><input type="checkbox" class="rchk"'+(r.inRoute!==false?' checked':'')+(canEditRow(r)?'':' disabled')+' onchange="tr(\''+r.id+'\',this.checked)"></td>';
     var dis=viewOnly?' disabled':'';
     h+='<td style="width:90px">'+(isEditing?'<input type="date" value="'+(r.date_pending?'':(r.date||''))+'"'+dis+' onchange="ur(\''+r.id+'\',\'date\',this.value)" style="font-size:12px;padding:5px 4px">':(r.date_pending?'<span style="font-size:11px;padding:2px 4px;display:block;color:#E24B4A;font-weight:600" title="1С не передала дату отгрузки — задайте дату">— нет даты</span>':'<span style="font-size:12px;padding:2px 4px;display:block">'+fmt(r.date||'')+'</span>'))+'</td>';
     if(isEditing){
@@ -1378,7 +1391,7 @@ function _rtblNow(){
     if(r.plannerName)addrCellHtml += '<div style="font-size:10px;color:#7a4a00;font-weight:600;margin-top:1px">&#128100; '+xe(r.plannerName)+'</div>';
     addrCellHtml += '</td>';
     h += addrCellHtml;
-    h+='<td><div class="icel">'+ih+'<button class="iadd" onclick="ai(\''+r.id+'\')">+ накладная</button></div></td>';
+    h+='<td><div class="icel">'+ih+(_ce?'<button class="iadd" onclick="ai(\''+r.id+'\')">+ накладная</button>':'')+'</div></td>';
     h+='<td style="width:128px">'+(isEditing?'<select onchange="ur(\''+r.id+'\',\'status\',this.value)" style="'+sc+'">'+so2+'</select>':'<span style="font-size:12px;padding:2px 4px;display:block;'+sc+'">'+xe(r.status||'—')+'</span>')+'</td>';
     h+='<td style="min-width:100px">'+(isEditing?'<input type="text" value="'+xe(r.comment)+'" placeholder="..." oninput="ur(\''+r.id+'\',\'comment\',this.value)">':'<span style="font-size:12px;padding:2px 4px;display:block;color:var(--mu)">'+xe(r.comment||'')+'</span>')+'</td>';
     if(isEditing){
@@ -2129,7 +2142,7 @@ function renderNordMirror(){
     var iv=(r.invs||[]).filter(function(x){return (''+(x||'')).trim();});
     var so=STATS.map(function(s){return '<option'+(r.status===s?' selected':'')+'>'+xe(s)+'</option>';}).join('');
     h+='<tr>'+
-      '<td><button class="dbtn" onclick="dr(\''+r.id+'\')" title="Удалить">&#215;</button></td>'+
+      '<td>'+(canEditRow(r)?'<button class="dbtn" onclick="dr(\''+r.id+'\')" title="Удалить">&#215;</button>':'')+'</td>'+
       '<td><input type="date" value="'+(r.date_pending?'':(r.date||''))+'" onchange="ur(\''+r.id+'\',\'date\',this.value)" style="font-size:12px;padding:4px"></td>'+
       '<td>'+xe(dcolName(r.drv)||r.drv||'—')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
@@ -2657,7 +2670,7 @@ function incDeliveredMismatch(){
   });
   return out;
 }
-function incUnDone(rowId){ db.ref('rows/'+rowId+'/done').set(false); toast('Возвращено в маршрут — отметка доставки снята'); }
+function incUnDone(rowId){ var r=rows.find(function(x){return x.id===rowId;}); if(r&&!canEditRow(r)){ toast('Это адрес другого техника'); return; } db.ref('rows/'+rowId+'/done').set(false); toast('Возвращено в маршрут — отметка доставки снята'); }
 function renderDelivMismatch(){
   var el=document.getElementById('delivMismatch'); if(!el)return;
   var list=incDeliveredMismatch();
@@ -2757,6 +2770,7 @@ function renderIncTaken(){
   }).join('');
 }
 function incReturn(inv,rowId){
+  if(rowId){ var _rr=rows.find(function(x){return x.id===rowId;}); if(_rr&&!canEditRow(_rr)){ toast('Это адрес другого техника'); return; } }
   incUnplace(inv);
   if(rowId){
     db.ref('rows/'+rowId+'/invs').once('value').then(function(s){
@@ -2803,6 +2817,8 @@ function incRenderPos(val){
 }
 function openEdit(id){
   if(editingRowId===id)return;
+  var _re=rows.find(function(x){return x.id===id;});
+  if(_re&&!canEditRow(_re)){ toast('Это адрес другого техника — редактировать нельзя'); return; }
   editingRowId=id;
   rtbl();
   setTimeout(function(){
@@ -2831,8 +2847,9 @@ document.addEventListener('keydown',function(e){
 });
 document.getElementById('dispLbDel').addEventListener('click',function(){
   if(!_lbRowId||!_lbUrl)return;
-  if(!confirm('Удалить это фото?'))return;
   var r=rows.find(function(x){return x.id===_lbRowId;});
+  if(r&&!canEditRow(r)){ toast('Это адрес другого техника — фото удаляет только автор'); return; }
+  if(!confirm('Удалить это фото?'))return;
   if(!r||!r.photos)return;
   var photos=r.photos.filter(function(u){return u!==_lbUrl;});
   db.ref('rows/'+_lbRowId+'/photos').set(photos.length?photos:null);
@@ -2855,7 +2872,8 @@ function _showLbPhoto(idx,addr,rowId){
   _lbUrl=url;
   document.getElementById('dispLbImg').src=url;
   document.getElementById('dispLbInfo').textContent=(addr||'')+ (_lbPhotos.length>1?' ('+(idx+1)+'/'+_lbPhotos.length+')':'');
-  document.getElementById('dispLbDel').style.display=rowId?'':'none';
+  var _dr=rowId?rows.find(function(x){return x.id===rowId;}):null;
+  document.getElementById('dispLbDel').style.display=(rowId&&(!_dr||canEditRow(_dr)))?'':'none';
   var prev=document.getElementById('dispLbPrev');
   var next=document.getElementById('dispLbNext');
   if(prev)prev.style.display=_lbPhotos.length>1?'flex':'none';
