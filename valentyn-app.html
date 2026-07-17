@@ -557,7 +557,7 @@ document.getElementById('photoInputGallery').addEventListener('change', handlePh
 var offlineQueue = JSON.parse(localStorage.getItem('photoQueue_'+DRV) || '[]');
 
 function saveQueue() {
-  localStorage.setItem('photoQueue_'+DRV, JSON.stringify(offlineQueue));
+  try { localStorage.setItem('photoQueue_'+DRV, _qJSON(offlineQueue)); } catch(e) {}
 }
 
 function processQueue() {
@@ -585,7 +585,7 @@ function processQueue() {
     if (pendingIdx !== -1) {
       photos[pendingIdx] = url;
       photoTs[pendingIdx] = item.ts;
-    } else {
+    } else if (photos.indexOf(url) === -1) {
       photos.push(url);
       photoTs.push(item.ts);
     }
@@ -630,35 +630,78 @@ function enqueuePhoto(file, rowId, path, localId, ts) {
   reader.readAsDataURL(file);
 }
 
-function uploadPhotoWithQueue(file, rowId) {
-  var ext = (file.name || 'jpg').split('.').pop().toLowerCase() || 'jpg';
-  var path = 'photos/' + rowId + '/' + Date.now() + '.' + ext;
-  var localId = Date.now().toString(36);
-  var ts = Date.now();
+// ── Сжатие фото: длинная сторона ≤1600px, JPEG ~0.7 → ~200-500 КБ вместо 3-8 МБ ──
+// Быстрая заливка даже на слабом 3G и не переполняет localStorage-очередь.
+// Гарантирует РОВНО ОДИН вызов cb (guard + таймаут-предохранитель), иначе поток мог бы зависнуть.
+function compressPhoto(file, cb) {
+  var done = false;
+  function fin(x) { if (done) return; done = true; cb(x); }
+  if (!file || !file.type || file.type.indexOf('image') !== 0) { fin(file); return; }
+  var tmr = setTimeout(function() { fin(file); }, 8000);
+  function finc(x) { clearTimeout(tmr); fin(x); }
+  try {
+    var img = new Image();
+    var ou = URL.createObjectURL(file);
+    img.onload = function() {
+      try { URL.revokeObjectURL(ou); } catch(e) {}
+      try {
+        var W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+        if (!W || !H) { finc(file); return; }
+        var sc = Math.min(1, 1600 / Math.max(W, H));
+        var w = Math.max(1, Math.round(W * sc)), h = Math.max(1, Math.round(H * sc));
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        if (cv.toBlob) {
+          cv.toBlob(function(b) { finc(b && b.size ? b : file); }, 'image/jpeg', 0.7);
+        } else {
+          var d = cv.toDataURL('image/jpeg', 0.7); var s = atob(d.split(',')[1]);
+          var ab = new ArrayBuffer(s.length); var ia = new Uint8Array(ab);
+          for (var i = 0; i < s.length; i++) ia[i] = s.charCodeAt(i);
+          finc(new Blob([ab], { type: 'image/jpeg' }));
+        }
+      } catch(e) { finc(file); }
+    };
+    img.onerror = function() { try { URL.revokeObjectURL(ou); } catch(e) {} finc(file); };
+    img.src = ou;
+  } catch(e) { finc(file); }
+}
+function _uid() { return Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36); }
+// Сериализация очередей БЕЗ временных флагов (_processing/_p): иначе элемент с _processing:true,
+// сохранённый в localStorage (второе фото пока первое грузится), после reload заклинит очередь навсегда.
+function _qJSON(arr) { return JSON.stringify(arr, function(k, v) { return k.charAt(0) === '_' ? undefined : v; }); }
 
-  if (navigator.onLine) {
-    // Есть сеть: пробуем сразу; если не удалось (слабый сигнал/таймаут) — в очередь на автоповтор
-    showToast('Загружаем фото...');
-    storage.ref(path).put(file).then(function(snap) {
-      return snap.ref.getDownloadURL();
-    }).then(function(url) {
-      var r = rows.find(function(x) { return x.id === rowId; });
-      var photos = (r && r.photos) ? [].concat(r.photos) : [];
-      var photoTs = (r && r.photoTs) ? [].concat(r.photoTs) : [];
-      photos.push(url);
-      photoTs.push(ts);
-      if(r){ r.photos = photos; r.photoTs = photoTs; }
-      return db.ref('rows/' + rowId).update({photos: photos, photoTs: photoTs});
-    }).then(function() {
-      showToast('Фото добавлено ✓');
-      render();
-    }).catch(function(err) {
-      // Плохая сеть: НЕ теряем фото — кладём в очередь, она повторит сама
-      enqueuePhoto(file, rowId, path, localId, ts);
-    });
-  } else {
-    enqueuePhoto(file, rowId, path, localId, ts);
-  }
+function uploadPhotoWithQueue(file, rowId) {
+  var localId = _uid();
+  var ts = Date.now();
+  var path = 'photos/' + rowId + '/' + ts + '_' + localId + '.jpg';
+  // 1) СРАЗУ показываем фото (⏳) и разблокируем «Выполнено» — водитель не ждёт сеть
+  var r = rows.find(function(x) { return x.id === rowId; });
+  var photos = (r && r.photos) ? [].concat(r.photos) : [];
+  var photoTs = (r && r.photoTs) ? [].concat(r.photoTs) : [];
+  photos.push('pending:' + localId); photoTs.push(ts);
+  if (r) { r.photos = photos; r.photoTs = photoTs; }
+  render();
+  showToast('Фото добавлено ⏳ загрузка идёт');
+  // 2) сжать и положить в очередь; заливка + автоповтор идут в фоне, водителя не блокируют
+  compressPhoto(file, function(blob) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      try { offlineQueue.push({ rowId: rowId, path: path, b64: e.target.result, localId: localId, ts: ts }); saveQueue(); }
+      catch(err) { showToast('Мало памяти — не закрывайте, фото грузится'); }
+      setTimeout(processQueue, 200);
+    };
+    reader.onerror = function() {
+      // не удалось прочитать в base64 — заливаем blob напрямую как запасной путь, чтобы не потерять фото
+      storage.ref(path).put(blob).then(function(snap) { return snap.ref.getDownloadURL(); }).then(function(url) {
+        var r2 = rows.find(function(x) { return x.id === rowId; });
+        var ph = (r2 && r2.photos) ? [].concat(r2.photos) : []; var pt = (r2 && r2.photoTs) ? [].concat(r2.photoTs) : [];
+        var ix = ph.indexOf('pending:' + localId); if (ix !== -1) { ph[ix] = url; pt[ix] = ts; } else if (ph.indexOf(url) === -1) { ph.push(url); pt.push(ts); }
+        if (r2) { r2.photos = ph; r2.photoTs = pt; }
+        db.ref('rows/' + rowId).update({ photos: ph, photoTs: pt });
+      }).catch(function() { showToast('Фото не сохранилось, повторите'); });
+    };
+    reader.readAsDataURL(blob);
+  });
 }
 
 // ===================== ОДОМЕТР (пробег) — гейт старта/конца дня =====================
@@ -746,7 +789,7 @@ function odoSave() {
   if (mode === 'end') setTimeout(function(){ pairAsk(date); }, 350);
 }
 var odoQ = JSON.parse(localStorage.getItem('odoQ_' + DRV) || '[]');
-function saveOdoQ() { localStorage.setItem('odoQ_' + DRV, JSON.stringify(odoQ)); }
+function saveOdoQ() { try { localStorage.setItem('odoQ_' + DRV, _qJSON(odoQ)); } catch(e) {} }
 function odoUploadPhoto(file, date, mode, ts) {
   var path = 'odometer/' + DRV + '/' + date + '/' + mode + '_' + ts + '.jpg';
   if (navigator.onLine) {
@@ -925,9 +968,12 @@ function flushDoneQueue() {
 }
 window.addEventListener('online', function() { setTimeout(flushDoneQueue, 2000); });
 setTimeout(flushDoneQueue, 3500);
+setInterval(function() { if (Object.keys(doneQueue).length && navigator.onLine) flushDoneQueue(); }, 30000);
 
 function markDone(id, val) {
   doneQueue[id] = val; saveDoneQueue();
+  var r = rows.find(function(x) { return x.id === id; }); if (r) r.done = val; // локально «липко» — галочка не отскакивает
+  render();
   db.ref('rows/' + id).update({done: val}).then(function() {
     if (doneQueue[id] === val) { delete doneQueue[id]; saveDoneQueue(); }
   }).catch(function() {});
@@ -1141,6 +1187,8 @@ document.getElementById('next').addEventListener('click', function() { sh(1); })
 function __startDB(){
 db.ref('rows').on('value', function(snap) {
   rows = snap.val() ? Object.values(snap.val()) : [];
+  // не дать серверному снимку сбросить ещё не долетевшие отметки «выполнено»
+  Object.keys(doneQueue).forEach(function(id) { var r = rows.find(function(x) { return x.id === id; }); if (r) r.done = doneQueue[id]; });
   render();
   document.getElementById('sync').className = 'sync ok';
 }, function() { document.getElementById('sync').className = 'sync'; });
@@ -1332,62 +1380,81 @@ function acInit(){
   document.addEventListener('mousedown',function(e){ if(_ac.open&&e.target!==_ac.inp&&!acInside(e.target))acClose(); });
 }
 acInit();
+// ── Очередь добавленных водителем заданий — переживает reload и плохую сеть ──
+// Фото сжимаются и хранятся в очереди; строка пишется в RTDB с реальными URL уже после заливки.
+var addTaskQueue = [];
+try { addTaskQueue = JSON.parse(localStorage.getItem('addTaskQueue_' + DRV) || '[]'); } catch(e) { addTaskQueue = []; }
+function saveAddTaskQueue() { try { localStorage.setItem('addTaskQueue_' + DRV, _qJSON(addTaskQueue)); } catch(e) {} }
+function processAddTaskQueue() {
+  if (!addTaskQueue.length) return;
+  var item = addTaskQueue[0];
+  if (item._processing) return;
+  item._processing = true;
+  var ups = (item.photos || []).map(function(ph) {
+    var byteStr = atob(ph.b64.split(',')[1]); var mime = ph.b64.split(';')[0].split(':')[1];
+    var ab = new ArrayBuffer(byteStr.length); var ia = new Uint8Array(ab);
+    for (var i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+    return storage.ref(ph.path).put(new Blob([ab], { type: mime })).then(function(snap) { return snap.ref.getDownloadURL(); });
+  });
+  Promise.all(ups).then(function(urls) {
+    var row = item.row; row.photos = urls; row.photoTs = urls.map(function() { return row.doneTs || Date.now(); });
+    return db.ref('rows/' + row.id).set(row);
+  }).then(function() {
+    addTaskQueue.shift(); saveAddTaskQueue();
+    setTimeout(processAddTaskQueue, 500);
+  }).catch(function() {
+    item._processing = false; setTimeout(processAddTaskQueue, 15000);
+  });
+}
+window.addEventListener('online', function() { setTimeout(processAddTaskQueue, 2500); });
+setInterval(function() { if (addTaskQueue.length && navigator.onLine) processAddTaskQueue(); }, 30000);
+setTimeout(processAddTaskQueue, 3500);
+
 function submitAddTask(){
   if(_addPhotos.length === 0){ showToast('Добавьте хотя бы одно фото'); return; }
   var btn = document.getElementById('addFormSend');
   btn.disabled = true;
-  btn.textContent = 'Отправка...';
+  btn.textContent = 'Сохраняю...';
   var rowId = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
   var comment = (document.getElementById('addFormComment').value || '').trim();
   var status = _addType === 'delivery' ? 'доставка материала' : 'вывоз мусора';
-
+  var now = Date.now();
   var maxOrder = 0;
   rows.forEach(function(r){
     if(r.date === curD && r.drv === DRV && r.order != null && r.order > maxOrder) maxOrder = r.order;
   });
-
-  var uploadPromises = _addPhotos.map(function(p, idx){
-    var path = 'photos/' + rowId + '/' + p.ts + '_' + idx + '.jpg';
-    return storage.ref(path).put(p.file).then(function(snap){
-      return snap.ref.getDownloadURL();
-    });
-  });
-
-  Promise.all(uploadPromises).then(function(urls){
-    var now = Date.now();
-    var row = {
-      id: rowId,
-      date: curD,
-      drv: DRV,
-      city: (document.getElementById('addFormCity')?document.getElementById('addFormCity').value:''),
-      addr: (document.getElementById('addFormAddr')?document.getElementById('addFormAddr').value.trim():''),
-      invs: [''],
-      status: status,
-      comment: comment,
-      weight: null,
-      volume_m3: null,
-      inRoute: true,
-      done: true,
-      doneTs: now,
-      photos: urls,
-      photoTs: urls.map(function(){ return now; }),
-      fromDriver: true,
-      taskType: _addType,
-      addedByDriver: driverName(),
-      createdAt: now,
-      order: maxOrder + 10
-    };
-    return db.ref('rows/' + rowId).set(row);
-  }).then(function(){
-    showToast('Задание добавлено ✓');
+  var row = {
+    id: rowId, date: curD, drv: DRV,
+    city: (document.getElementById('addFormCity')?document.getElementById('addFormCity').value:''),
+    addr: (document.getElementById('addFormAddr')?document.getElementById('addFormAddr').value.trim():''),
+    invs: [''], status: status, comment: comment, weight: null, volume_m3: null,
+    inRoute: true, done: true, doneTs: now, photos: [], photoTs: [],
+    fromDriver: true, taskType: _addType, addedByDriver: driverName(),
+    createdAt: now, order: maxOrder + 10
+  };
+  var metas = []; var left = _addPhotos.length;
+  function finalize() {
+    // оптимистично показываем задание сразу (⏳ на фото), даже без сети
+    var opt = {}; for (var k in row) opt[k] = row[k];
+    opt.photos = metas.map(function(m) { return 'pending:' + m.localId; });
+    opt.photoTs = metas.map(function() { return now; });
+    rows.push(opt); render();
+    addTaskQueue.push({ row: row, photos: metas }); saveAddTaskQueue();
+    setTimeout(processAddTaskQueue, 200);
+    showToast('Задание добавлено ⏳ фото загрузятся');
     if(navigator.vibrate) navigator.vibrate([60,30,60]);
     closeAddForm();
     btn.textContent = 'Отправить ✓';
     btn.disabled = false;
-  }).catch(function(err){
-    showToast('Ошибка: ' + (err.message || err));
-    btn.textContent = 'Отправить ✓';
-    btn.disabled = false;
+  }
+  _addPhotos.forEach(function(p, idx){
+    var localId = _uid(); var path = 'photos/' + rowId + '/' + now + '_' + idx + '.jpg';
+    compressPhoto(p.file, function(blob) {
+      var reader = new FileReader();
+      reader.onload = function(e) { metas.push({ path: path, b64: e.target.result, localId: localId }); left--; if (left <= 0) finalize(); };
+      reader.onerror = function() { left--; if (left <= 0) finalize(); };
+      reader.readAsDataURL(blob);
+    });
   });
 }
 // ─── END ADD TASK ────────────────────────────────────────────────────
