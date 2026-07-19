@@ -353,11 +353,39 @@ function pp(d){
 
 // Auth gate (Варіант A): techId береться з custom-token claim
 function pageFor(c){c=c||{};var r=c.role;if(r==='zentrum'||r==='norden'||r==='lager')return 'index.html';if(r==='driver')return ({L:'lesha-app.html',R:'roma-app.html',C:'driver3-app.html',V:'valentyn-app.html'})[c.drv]||(c.drv?('driver.html?drv='+encodeURIComponent(c.drv)):'login.html');if(r==='tech')return 'tech-app.html';if(r==='loader')return 'lager-app.html';return 'login.html';}
+// Чужой/старый вход открыл эту страницу → НЕ показываем чужой интерфейс молча, а даём явно перезайти под нужный PIN.
+function _roleName(c){var r=c&&c.role;if(r==='zentrum')return 'Диспетчер';if(r==='norden')return 'Планировщик Норд';if(r==='lager')return 'Просмотр';if(r==='driver')return 'Водитель'+(c&&c.drv?' ('+c.drv+')':'');if(r==='tech')return 'Техник';if(r==='loader')return 'Грузчик';return 'Не распознан';}
+function wrongRoleRelogin(){ try{ firebase.auth().signOut().then(function(){ location.replace('login.html'); }).catch(function(){ location.replace('login.html'); }); }catch(e){ location.replace('login.html'); } }
+function showWrongRole(c, needTxt){
+  try{
+    var w=document.getElementById('wrongRole');
+    if(!w){
+      w=document.createElement('div'); w.id='wrongRole';
+      w.style.cssText='position:fixed;inset:0;z-index:99999;background:#1a1a2e;display:flex;align-items:center;justify-content:center;padding:26px 18px;font-family:\'Segoe UI\',sans-serif';
+      w.innerHTML='<div style="background:#fff;border-radius:20px;padding:30px 24px;width:280px;max-width:88vw;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)">'
+        +'<div style="font-size:22px;font-weight:800;color:#854F0B;letter-spacing:.02em">LK Bauservice</div>'
+        +'<div style="width:56px;height:56px;border-radius:50%;background:#fdeceb;display:flex;align-items:center;justify-content:center;margin:18px auto 4px;font-size:26px">&#128274;</div>'
+        +'<div style="font-size:17px;font-weight:800;margin:14px 0 6px;color:#1a1a2e">Другой вход</div>'
+        +'<p id="wrongRoleDesc" style="font-size:13px;color:#555;margin:0 0 4px">Эта страница — для другой роли.</p>'
+        +'<p style="font-size:13px;color:#141816;margin:8px 0 2px">Сейчас вход: <b id="wrongRoleWho" style="color:#854F0B">&mdash;</b></p>'
+        +'<button id="wrongRoleBtn" style="margin-top:20px;width:100%;padding:13px;border-radius:12px;font-size:15px;font-weight:700;border:none;background:#854F0B;color:#fff;font-family:inherit">Войти заново</button>'
+        +'<div style="font-size:11px;color:#bbb;margin-top:16px">Один PIN — один интерфейс</div>'
+        +'</div>';
+      document.body.appendChild(w);
+      document.getElementById('wrongRoleBtn').addEventListener('click', wrongRoleRelogin);
+    }
+    var d=document.getElementById('wrongRoleDesc'); if(d&&needTxt)d.textContent=needTxt;
+    var who=document.getElementById('wrongRoleWho'); if(who)who.textContent=_roleName(c);
+    w.style.display='flex';
+    ['app','driverApp','pinWrap','loading'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+  }catch(e){ location.replace('login.html'); }
+}
 firebase.auth().onAuthStateChanged(function(user){
   if(!user){ location.replace('login.html'); return; }
   user.getIdTokenResult().then(function(res){
+    var _wr=document.getElementById('wrongRole'); if(_wr){ _wr.style.display='none'; }
     var c=res.claims||{};
-    if(c.role!=='tech'){ location.replace(pageFor(c)); return; }
+    if(c.role!=='tech'){ showWrongRole(c, 'Эта страница — для техника.'); return; }
     sessionStorage.removeItem('login_from');
     currentTechId=c.techId||sessionStorage.getItem('login_techId')||sessionStorage.getItem('techId');
     sessionStorage.setItem('techId',currentTechId||'');
