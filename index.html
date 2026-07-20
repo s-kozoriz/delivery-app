@@ -1233,8 +1233,10 @@ function dr(id){
 function toggleDone(id,val){
   var r=rows.find(function(x){return x.id===id;});
   if(r&&!canEditRow(r)){ toast('Это адрес другого техника'); return; }
-  db.ref('rows/'+id+'/done').set(val);
-  if(val)db.ref('rows/'+id+'/doneTs').set(Date.now());
+  // пишем КТО отметил (диспетчер/планировщик), чтобы отличать от отметки водителя — нужно для разбора маршрута
+  var _upd={done:val, doneBy:'disp', doneByName:(IS_PLANNER?(PLANNER_NAME||'Планировщик'):'Диспетчер')};
+  if(val)_upd.doneTs=Date.now();
+  db.ref('rows/'+id).update(_upd);
 }
 function panelMoveRow(id,drv,dir){
   var group=rows.filter(function(r){
@@ -2698,7 +2700,7 @@ function incDeliveredMismatch(){
   });
   return out;
 }
-function incUnDone(rowId){ var r=rows.find(function(x){return x.id===rowId;}); if(r&&!canEditRow(r)){ toast('Это адрес другого техника'); return; } db.ref('rows/'+rowId+'/done').set(false); toast('Возвращено в маршрут — отметка доставки снята'); }
+function incUnDone(rowId){ var r=rows.find(function(x){return x.id===rowId;}); if(r&&!canEditRow(r)){ toast('Это адрес другого техника'); return; } db.ref('rows/'+rowId).update({done:false, doneBy:null, doneByName:null}); toast('Возвращено в маршрут — отметка доставки снята'); }
 function renderDelivMismatch(){
   var el=document.getElementById('delivMismatch'); if(!el)return;
   var list=incDeliveredMismatch();
@@ -2879,8 +2881,12 @@ document.getElementById('dispLbDel').addEventListener('click',function(){
   if(r&&!canEditRow(r)){ toast('Это адрес другого техника — фото удаляет только автор'); return; }
   if(!confirm('Удалить это фото?'))return;
   if(!r||!r.photos)return;
-  var photos=r.photos.filter(function(u){return u!==_lbUrl;});
-  db.ref('rows/'+_lbRowId+'/photos').set(photos.length?photos:null);
+  // удаляем СИНХРОННО из всех трёх массивов (photos/photoTs/photoBy), иначе автор и время сдвинутся и фото припишется не тому
+  var _idx=r.photos.indexOf(_lbUrl);
+  var photos=[].concat(r.photos), photoTs=[].concat(r.photoTs||[]), photoBy=[].concat(r.photoBy||[]);
+  if(_idx!==-1){ photos.splice(_idx,1); if(photoTs.length>_idx)photoTs.splice(_idx,1); if(photoBy.length>_idx)photoBy.splice(_idx,1); }
+  else { photos=photos.filter(function(u){return u!==_lbUrl;}); }
+  db.ref('rows/'+_lbRowId).update({photos:photos.length?photos:null, photoTs:photoTs.length?photoTs:null, photoBy:photoBy.length?photoBy:null});
   try{storage.refFromURL(_lbUrl).delete();}catch(e){}
   document.getElementById('dispLb').style.display='none';
   toast('Фото удалено');

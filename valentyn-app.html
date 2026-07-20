@@ -580,16 +580,21 @@ function processQueue() {
     var r = rows.find(function(x) { return x.id === item.rowId; });
     var photos = (r && r.photos) ? [].concat(r.photos) : [];
     var photoTs = (r && r.photoTs) ? [].concat(r.photoTs) : [];
+    var photoBy = (r && r.photoBy) ? [].concat(r.photoBy) : [];
+    while (photoTs.length < photos.length) photoTs.push(null);
+    while (photoBy.length < photos.length) photoBy.push('');
     // Remove pending placeholder if exists
     var pendingIdx = photos.indexOf('pending:'+item.localId);
     if (pendingIdx !== -1) {
       photos[pendingIdx] = url;
       photoTs[pendingIdx] = item.ts;
+      photoBy[pendingIdx] = item.by || '';
     } else if (photos.indexOf(url) === -1) {
       photos.push(url);
       photoTs.push(item.ts);
+      photoBy.push(item.by || '');
     }
-    return db.ref('rows/' + item.rowId).update({photos: photos, photoTs: photoTs});
+    return db.ref('rows/' + item.rowId).update({photos: photos, photoTs: photoTs, photoBy: photoBy});
   }).then(function() {
     offlineQueue.shift();
     saveQueue();
@@ -686,7 +691,7 @@ function uploadPhotoWithQueue(file, rowId) {
   compressPhoto(file, function(blob) {
     var reader = new FileReader();
     reader.onload = function(e) {
-      try { offlineQueue.push({ rowId: rowId, path: path, b64: e.target.result, localId: localId, ts: ts }); saveQueue(); }
+      try { offlineQueue.push({ rowId: rowId, path: path, b64: e.target.result, localId: localId, ts: ts, by: driverName() }); saveQueue(); }
       catch(err) { showToast('Мало памяти — не закрывайте, фото грузится'); }
       setTimeout(processQueue, 200);
     };
@@ -695,9 +700,10 @@ function uploadPhotoWithQueue(file, rowId) {
       storage.ref(path).put(blob).then(function(snap) { return snap.ref.getDownloadURL(); }).then(function(url) {
         var r2 = rows.find(function(x) { return x.id === rowId; });
         var ph = (r2 && r2.photos) ? [].concat(r2.photos) : []; var pt = (r2 && r2.photoTs) ? [].concat(r2.photoTs) : [];
-        var ix = ph.indexOf('pending:' + localId); if (ix !== -1) { ph[ix] = url; pt[ix] = ts; } else if (ph.indexOf(url) === -1) { ph.push(url); pt.push(ts); }
-        if (r2) { r2.photos = ph; r2.photoTs = pt; }
-        db.ref('rows/' + rowId).update({ photos: ph, photoTs: pt });
+        var pb = (r2 && r2.photoBy) ? [].concat(r2.photoBy) : []; while (pb.length < ph.length) pb.push('');
+        var ix = ph.indexOf('pending:' + localId); if (ix !== -1) { ph[ix] = url; pt[ix] = ts; pb[ix] = driverName(); } else if (ph.indexOf(url) === -1) { ph.push(url); pt.push(ts); pb.push(driverName()); }
+        if (r2) { r2.photos = ph; r2.photoTs = pt; r2.photoBy = pb; }
+        db.ref('rows/' + rowId).update({ photos: ph, photoTs: pt, photoBy: pb });
       }).catch(function() { showToast('Фото не сохранилось, повторите'); });
     };
     reader.readAsDataURL(blob);
@@ -958,11 +964,16 @@ function valSwitch() {
 // синхронизируется с диспетчером в фоне, когда появится сеть. Водитель сеть не ловит.
 var doneQueue = JSON.parse(localStorage.getItem('doneQueue_' + DRV) || '{}');
 function saveDoneQueue() { localStorage.setItem('doneQueue_' + DRV, JSON.stringify(doneQueue)); }
+// время реального нажатия «Выполнено» — отдельной очередью, чтобы дослать его, если исходная запись не долетела (иначе точка осталась бы без времени)
+var doneTsQueue = {}; try { doneTsQueue = JSON.parse(localStorage.getItem('doneTsQueue_' + DRV) || '{}'); } catch(e) { doneTsQueue = {}; }
+function saveDoneTsQueue() { try { localStorage.setItem('doneTsQueue_' + DRV, JSON.stringify(doneTsQueue)); } catch(e) {} }
 function flushDoneQueue() {
   Object.keys(doneQueue).forEach(function(id) {
     var val = doneQueue[id];
-    db.ref('rows/' + id).update({done: val}).then(function() {
-      if (doneQueue[id] === val) { delete doneQueue[id]; saveDoneQueue(); }
+    var _u = {done: val, doneBy: DRV, doneByName: driverName()};
+    if (val && doneTsQueue[id]) _u.doneTs = doneTsQueue[id]; // время реального нажатия, если первая запись не долетела
+    db.ref('rows/' + id).update(_u).then(function() {
+      if (doneQueue[id] === val) { delete doneQueue[id]; saveDoneQueue(); delete doneTsQueue[id]; saveDoneTsQueue(); }
     }).catch(function() {});
   });
 }
@@ -972,9 +983,14 @@ setInterval(function() { if (Object.keys(doneQueue).length && navigator.onLine) 
 
 function markDone(id, val) {
   doneQueue[id] = val; saveDoneQueue();
+  if (val) { doneTsQueue[id] = Date.now(); } else { delete doneTsQueue[id]; }
+  saveDoneTsQueue();
   var r = rows.find(function(x) { return x.id === id; }); if (r) r.done = val; // локально «липко» — галочка не отскакивает
   render();
-  db.ref('rows/' + id).update({done: val}).then(function() {
+  // пишем КТО и КОГДА отметил — иначе постфактум не видно, кто был на точке (нужно для разбора маршрута)
+  var _u = {done: val, doneBy: DRV, doneByName: driverName()};
+  if (val) _u.doneTs = doneTsQueue[id] || Date.now(); // при отмене время НЕ перезаписываем (как в диспетчере)
+  db.ref('rows/' + id).update(_u).then(function() {
     if (doneQueue[id] === val) { delete doneQueue[id]; saveDoneQueue(); }
   }).catch(function() {});
   if (val && navigator.vibrate) navigator.vibrate([60,30,60]);
@@ -1425,7 +1441,7 @@ function processAddTaskQueue() {
     return storage.ref(ph.path).put(new Blob([ab], { type: mime })).then(function(snap) { return snap.ref.getDownloadURL(); });
   });
   Promise.all(ups).then(function(urls) {
-    var row = item.row; row.photos = urls; row.photoTs = urls.map(function() { return row.doneTs || Date.now(); });
+    var row = item.row; row.photos = urls; row.photoTs = urls.map(function() { return row.doneTs || Date.now(); }); row.photoBy = urls.map(function() { return row.doneByName || ''; });
     return db.ref('rows/' + row.id).set(row);
   }).then(function() {
     addTaskQueue.shift(); saveAddTaskQueue();
@@ -1456,7 +1472,7 @@ function submitAddTask(){
     city: (document.getElementById('addFormCity')?document.getElementById('addFormCity').value:''),
     addr: (document.getElementById('addFormAddr')?document.getElementById('addFormAddr').value.trim():''),
     invs: [''], status: status, comment: comment, weight: null, volume_m3: null,
-    inRoute: true, done: true, doneTs: now, photos: [], photoTs: [],
+    inRoute: true, done: true, doneTs: now, doneBy: DRV, doneByName: driverName(), photos: [], photoTs: [],
     fromDriver: true, taskType: _addType, addedByDriver: driverName(),
     createdAt: now, order: maxOrder + 10
   };
