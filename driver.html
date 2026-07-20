@@ -1058,6 +1058,22 @@ function saveDoneQueue() { localStorage.setItem('doneQueue_' + DRV, JSON.stringi
 // время реального нажатия «Выполнено» — отдельной очередью, чтобы дослать его, если исходная запись не долетела (иначе точка осталась бы без времени)
 var doneTsQueue = {}; try { doneTsQueue = JSON.parse(localStorage.getItem('doneTsQueue_' + DRV) || '{}'); } catch(e) { doneTsQueue = {}; }
 function saveDoneTsQueue() { try { localStorage.setItem('doneTsQueue_' + DRV, JSON.stringify(doneTsQueue)); } catch(e) {} }
+// КООРДИНАТЫ в момент отметки — чтобы восстановить реальный маршрут (адрес и время фото для этого недостаточно).
+// GPS работает и без интернета; отметку НЕ задерживаем — координаты дописываются следом, когда придут.
+var geoQueue = {}; try { geoQueue = JSON.parse(localStorage.getItem('geoQueue_' + DRV) || '{}'); } catch(e) { geoQueue = {}; }
+function saveGeoQueue() { try { localStorage.setItem('geoQueue_' + DRV, _qJSON(geoQueue)); } catch(e) {} }
+function grabGeo(cb) {
+  if (!navigator.geolocation) { cb(null); return; }
+  var fired = false;
+  var tmr = setTimeout(function() { if (!fired) { fired = true; cb(null); } }, 9000);
+  try {
+    navigator.geolocation.getCurrentPosition(function(p) {
+      if (fired) return; fired = true; clearTimeout(tmr);
+      cb({ lat: Math.round(p.coords.latitude * 1e6) / 1e6, lon: Math.round(p.coords.longitude * 1e6) / 1e6, acc: Math.round(p.coords.accuracy || 0) });
+    }, function() { if (fired) return; fired = true; clearTimeout(tmr); cb(null); },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
+  } catch(e) { if (!fired) { fired = true; clearTimeout(tmr); cb(null); } }
+}
 function flushDoneQueue() {
   Object.keys(doneQueue).forEach(function(id) {
     var val = doneQueue[id];
@@ -1071,6 +1087,25 @@ function flushDoneQueue() {
 window.addEventListener('online', function() { setTimeout(flushDoneQueue, 2000); });
 setTimeout(flushDoneQueue, 3500);
 setInterval(function() { if (Object.keys(doneQueue).length && navigator.onLine) flushDoneQueue(); }, 30000);
+// досылка координат, если в момент отметки сети не было
+function flushGeoQueue() {
+  Object.keys(geoQueue).forEach(function(id) {
+    var g = geoQueue[id];
+    // выбрасываем протухшее/битое и то, что уже не примут (удалённая или переназначенная строка) — иначе вечные повторы каждые 30с
+    if (!g || !g.ts || (Date.now() - g.ts) > 7 * 24 * 3600 * 1000 || (g.tries || 0) > 20) { delete geoQueue[id]; saveGeoQueue(); return; }
+    db.ref('rows/' + id).update({ doneLat: g.lat, doneLon: g.lon, doneAcc: g.acc, doneGeoTs: g.ts }).then(function() {
+      delete geoQueue[id]; saveGeoQueue();
+    }).catch(function(err) {
+      var msg = (err && (err.code || err.message)) ? String(err.code || err.message) : '';
+      if (msg.toUpperCase().indexOf('PERMISSION') !== -1) { delete geoQueue[id]; } // строку удалили/переназначили — повторять бессмысленно
+      else { g.tries = (g.tries || 0) + 1; }
+      saveGeoQueue();
+    });
+  });
+}
+window.addEventListener('online', function() { setTimeout(flushGeoQueue, 2500); });
+setTimeout(flushGeoQueue, 4000);
+setInterval(function() { if (Object.keys(geoQueue).length && navigator.onLine) flushGeoQueue(); }, 30000);
 
 function markDone(id, val) {
   doneQueue[id] = val; saveDoneQueue();
@@ -1081,11 +1116,27 @@ function markDone(id, val) {
   // пишем КТО и КОГДА отметил — иначе постфактум не видно, кто был на точке (нужно для разбора маршрута)
   var _u = {done: val, doneBy: DRV, doneByName: driverName()};
   if (val) _u.doneTs = doneTsQueue[id] || Date.now(); // при отмене время НЕ перезаписываем (как в диспетчере)
+  // а координаты при отмене СТИРАЕМ — иначе останутся «доказательством присутствия» на невыполненной точке
+  else { _u.doneLat = null; _u.doneLon = null; _u.doneAcc = null; _u.doneGeoTs = null; }
   db.ref('rows/' + id).update(_u).then(function() {
     if (doneQueue[id] === val) { delete doneQueue[id]; saveDoneQueue(); }
   }).catch(function() {});
   if (val && navigator.vibrate) navigator.vibrate([60,30,60]);
   showToast(val ? 'Выполнено &#10003;' : 'Отменено');
+  // координаты берём ПОСЛЕ отметки, чтобы не задерживать водителя; долетят сами (в т.ч. из очереди)
+  if (val) {
+    var _t0 = Date.now();
+    grabGeo(function(g) {
+      if (!g) return;
+      // телефон мог «уснуть» и ответ прийти много позже — тогда координата уже НЕ про эту точку, отбрасываем
+      if (Date.now() - _t0 > 60000) return;
+      g.ts = Date.now(); g.tries = 0;
+      geoQueue[id] = g; saveGeoQueue();
+      db.ref('rows/' + id).update({ doneLat: g.lat, doneLon: g.lon, doneAcc: g.acc, doneGeoTs: g.ts }).then(function() {
+        delete geoQueue[id]; saveGeoQueue();
+      }).catch(function() {});
+    });
+  } else { delete geoQueue[id]; saveGeoQueue(); }
 }
 
 function openLightbox(url) {
