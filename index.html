@@ -345,21 +345,22 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
         <button class="btn btn-sm" onclick="sample()">Пример</button>
       </div>
     </div>
+    <div id="cfBar" style="display:none;margin:0 16px 6px;padding:6px 11px;background:#fff7e0;border:1px solid #f0dca0;border-radius:8px;font-size:12px;color:#7a4a00"></div>
     <div class="tbl"><table>
       <thead><tr>
         <th style="width:28px"></th>
         <th style="width:32px">&#128506;</th>
         <th style="width:90px">Дата</th>
-        <th style="width:80px">Водитель</th>
-        <th style="width:110px">Город</th>
+        <th style="width:92px;vertical-align:top">Водитель<select id="cf-drv" onchange="setColFilter('drv',this.value)" onclick="event.stopPropagation()" style="display:block;width:100%;margin-top:3px;font-size:10px;font-weight:400;border:1px solid #c4c0b4;border-radius:4px;padding:1px 2px;background:#fff;color:#333"><option value="">все</option></select></th>
+        <th style="width:122px;vertical-align:top">Город<select id="cf-city" onchange="setColFilter('city',this.value)" onclick="event.stopPropagation()" style="display:block;width:100%;margin-top:3px;font-size:10px;font-weight:400;border:1px solid #c4c0b4;border-radius:4px;padding:1px 2px;background:#fff;color:#333"><option value="">все</option></select></th>
         <th style="width:70px">До</th>
         <th style="min-width:170px">Адрес</th>
         <th style="min-width:160px">Накладные</th>
-        <th style="width:128px">Статус</th>
+        <th style="width:138px;vertical-align:top">Статус<select id="cf-status" onchange="setColFilter('status',this.value)" onclick="event.stopPropagation()" style="display:block;width:100%;margin-top:3px;font-size:10px;font-weight:400;border:1px solid #c4c0b4;border-radius:4px;padding:1px 2px;background:#fff;color:#333"><option value="">все</option></select></th>
         <th style="min-width:100px">Комментарий</th>
         <th style="width:60px" title="Вес груза (кг)">&#9878; Вес</th>
         <th style="width:70px" title="Объём груза (м&#179;)">&#128230; Объём</th>
-        <th style="width:32px">&#10003;</th>
+        <th style="width:54px;vertical-align:top">&#10003;<select id="cf-done" onchange="setColFilter('doneF',this.value)" onclick="event.stopPropagation()" style="display:block;width:100%;margin-top:3px;font-size:10px;font-weight:400;border:1px solid #c4c0b4;border-radius:4px;padding:1px 2px;background:#fff;color:#333"><option value="">все</option><option value="n">&#9675;</option><option value="y">&#10003;</option></select></th>
           <th style="min-width:80px">&#128247;</th>
       </tr></thead>
       <tbody id="tb"></tbody>
@@ -689,6 +690,9 @@ var cfg={
 var CITIES=cfg.cities.slice();
 var CITIESC=cfg.citiesC?cfg.citiesC.slice():['Aurich','Wilhelmshaven','Varel'];
 var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRowId=null,newRowDraft=null,pinBuf='',viewOnly=false,disp2Mode=false,IS_PLANNER=false,PLANNER_ID='',PLANNER_NAME='',pinMode='dispatcher',_lastEdit=0,_pending={};
+// фильтры колонок главной таблицы + свёрнутые даты (состояние запоминается в браузере)
+var colFilter={drv:'',city:'',status:'',doneF:''};
+var collapsedDates={}; try{ collapsedDates=JSON.parse(localStorage.getItem('dispCollapsed')||'{}'); }catch(e){ collapsedDates={}; }
 var wtAll={},tabelMonth='',tabelView='drv',tabelEdit=null,lagerStaff={},nordPlanners={},wtDenied=false;
 
 firebase.initializeApp({
@@ -1317,6 +1321,31 @@ function cleanAddr(a){var s=(a||'').trim();s=s.replace(/\s+\d*[A-Za-z]*_[A-Za-z]
 function dname(k){if(k==='2nd')return '— второй водитель —';var o=cfg.drivers&&cfg.drivers[k];return(o&&o.name)||(k==='L'?'Лёша':k==='R'?'Рома':'Водитель 3');}
 
 var _rtblTimer=null;
+// ── Фильтры колонок ──
+function setColFilter(f,v){ colFilter[f]=v; var el=document.getElementById('cf-'+(f==='doneF'?'done':f)); if(el)el.style.background=v?'#dce8fb':'#fff'; rtbl(); }
+function _cfOpts(sel,list,cur){ if(!sel)return;
+  if(sel.options.length!==list.length+1){ var o='<option value="">все</option>'; list.forEach(function(it){ o+='<option value="'+xe(it.v)+'">'+xe(it.t)+'</option>'; }); sel.innerHTML=o; } // перестраиваем опции только когда их набор изменился (не мигаем и не закрываем открытый список)
+  if(sel.value!==(cur||''))sel.value=cur||'';
+  sel.style.background=cur?'#dce8fb':'#fff';
+}
+function fillColFilters(){
+  var dl=[]; DRV_KEYS.forEach(function(k){ if(cfg.drivers&&cfg.drivers[k]&&cfg.drivers[k].dyn===true&&cfg.drivers[k].nord===true)return; dl.push({v:k,t:(k==='C'?'Норд':dname(k))}); });
+  _cfOpts(document.getElementById('cf-drv'), dl, colFilter.drv);
+  var cl=(disp2Mode?CITIESC:CITIES).map(function(c){return {v:c,t:c};});
+  _cfOpts(document.getElementById('cf-city'), cl, colFilter.city);
+  var sl=STATS.filter(function(s){return s&&s!=='—';}).map(function(s){return {v:s,t:s};});
+  _cfOpts(document.getElementById('cf-status'), sl, colFilter.status);
+  var dn=document.getElementById('cf-done'); if(dn)dn.style.background=colFilter.doneF?'#dce8fb':'#fff';
+}
+// ── Свёртывание дат ──
+function toggleDate(d){ if(collapsedDates[d])delete collapsedDates[d]; else collapsedDates[d]=1; try{ localStorage.setItem('dispCollapsed',JSON.stringify(collapsedDates)); }catch(e){} rtbl(); }
+function _daySummary(s){
+  if(!s)return '';
+  var cs=Object.keys(s.cities).sort(function(a,b){return s.cities[b]-s.cities[a];}).slice(0,4).map(function(c){return xe(c)+' '+s.cities[c];}).join(', ');
+  var und=s.n-s.done;
+  var b=(s.done?'<span style="color:#1a7a40;font-weight:800">'+s.done+' &#10003;</span>':'')+(und?' <span style="color:#b00;font-weight:800;background:#fdeceb;border-radius:4px;padding:0 5px" title="есть невыполненные — раскройте день">&#9888; '+und+' &#9675;</span>':'');
+  return ' <span style="font-weight:600;color:#8a8a8a;font-size:11px">'+b+' &middot; '+s.n+' адр. &middot; '+cs+'</span>';
+}
 function rtbl(){
   if(_rtblTimer)clearTimeout(_rtblTimer);
   _rtblTimer=setTimeout(_rtblNow,200);
@@ -1330,6 +1359,13 @@ function _rtblNow(){
     if(r.done && r.date<today)return false;
     if(disp2Mode && !isNordRow(r)) return false;
     if(_hideZentrum(r)) return false; // Норд-сміття техніка → в план Виталика (Nord), а не в основной диспетчер
+    if(r.addr&&r.addr.trim()){ // фильтры колонок применяем только к реальным строкам (пустой новый ряд не трогаем)
+      if(colFilter.drv && r.drv!==colFilter.drv) return false;
+      if(colFilter.city && (r.city||'')!==colFilter.city) return false;
+      if(colFilter.status && (r.status||'')!==colFilter.status) return false;
+      if(colFilter.doneF==='y' && !r.done) return false;
+      if(colFilter.doneF==='n' && r.done) return false;
+    }
     return true;
   });
   var sorted=visible.slice().sort(function(a,b){
@@ -1342,6 +1378,10 @@ function _rtblNow(){
     if(ad!==bd)return ad-bd;
     return 0;
   });
+  fillColFilters();
+  // сводка по дням (для свёрнутой плашки): кол-во адрес, выполнено, топ-города
+  var _sum={};
+  sorted.forEach(function(r){ if(!(r.addr&&r.addr.trim())||!r.date)return; var s=_sum[r.date]||(_sum[r.date]={n:0,done:0,cities:{}}); s.n++; if(r.done)s.done++; if(r.city)s.cities[r.city]=(s.cities[r.city]||0)+1; });
   var h='';
   var _dc={};var _di=0;sorted.forEach(function(r){if(r.date&&_dc[r.date]===undefined){_dc[r.date]=_di++%7;}});
   var _lastD=null;
@@ -1367,8 +1407,12 @@ function _rtblNow(){
       var dci=_dc[r.date]||0;
       var dColors=['#1856a0','#1a7a40','#a03018','#7a4a00','#6a1a7a','#007a7a','#4a4a4a'];
       var dBgs=['#e8f0fe','#e6f4ea','#fce8e6','#fef7e0','#f3e8fd','#e0f7fa','#f1f3f4'];
-      h+='<tr class="date-group-hdr"><td colspan="14" style="border-left:6px solid '+dColors[dci]+';background:'+dBgs[dci]+';color:'+dColors[dci]+';border-top:2px solid '+dColors[dci]+'">'+fmt(r.date)+'</td></tr>';
+      var _col=!!collapsedDates[r.date];
+      var _cr=_col?'&#9656;':'&#9662;'; // ▸ свёрнуто / ▾ развёрнуто
+      var _sm=_col?_daySummary(_sum[r.date]):'';
+      h+='<tr class="date-group-hdr"><td colspan="14" onclick="toggleDate(\''+r.date+'\')" title="Свернуть/развернуть день" style="cursor:pointer;border-left:6px solid '+dColors[dci]+';background:'+dBgs[dci]+';color:'+dColors[dci]+';border-top:2px solid '+dColors[dci]+'"><span style="display:inline-block;width:16px">'+_cr+'</span>'+fmt(r.date)+_sm+'</td></tr>';
     }
+    if(collapsedDates[r.date]&&(r.addr&&r.addr.trim())) return; // день свёрнут — строки не рисуем
     var dgClass=' dg-'+(_dc[r.date]||0);
     h+='<tr'+doneCls+' class="'+dgClass+(isEditing?' tr-editing':'')+'" style="'+dim+';cursor:'+(isEditing?'default':'pointer')+'" onclick="openEdit(\''+r.id+'\')">';
     var techUnassigned=r.fromTech&&(!r.drv||r.drv==='');
@@ -1496,11 +1540,23 @@ function _rtblNow(){
     h+='</tr>';
   }
   tb.innerHTML=h;
+  // индикатор активного фильтра колонок — чтобы диспетчер не забыл, что часть строк скрыта
+  var _cfBar=document.getElementById('cfBar');
+  if(_cfBar){
+    var _act=colFilter.drv||colFilter.city||colFilter.status||colFilter.doneF;
+    if(_act){
+      var _p=[]; if(colFilter.drv)_p.push('водитель'); if(colFilter.city)_p.push(xe(colFilter.city)); if(colFilter.status)_p.push(xe(colFilter.status)); if(colFilter.doneF==='y')_p.push('выполненные'); if(colFilter.doneF==='n')_p.push('невыполненные');
+      var _shown=sorted.filter(function(r){return r.addr&&r.addr.trim();}).length;
+      _cfBar.style.display='';
+      _cfBar.innerHTML='&#128269; Фильтр: '+_p.join(' · ')+' — показано '+_shown+' адр. <a href="#" onclick="clearColFilters();return false;" style="color:#854F0B;font-weight:700;margin-left:8px">Сбросить</a>';
+    } else _cfBar.style.display='none';
+  }
   if(newRowDraft){
     var cell=document.getElementById('nrf-inv-cell');
     if(cell)renderNrfInvs(cell);
   }
 }
+function clearColFilters(){ colFilter={drv:'',city:'',status:'',doneF:''}; ['cf-drv','cf-city','cf-status','cf-done'].forEach(function(id){var e=document.getElementById(id);if(e){e.value='';e.style.background='#fff';}}); rtbl(); }
 
 // Водители региона Nord: фиксированный C (Виталик) + динамические с nord:true
 function nordDrvKeys(){ var b=['C']; Object.keys(cfg.drivers||{}).forEach(function(k){ if(b.indexOf(k)===-1 && cfg.drivers[k] && cfg.drivers[k].dyn===true && cfg.drivers[k].nord===true) b.push(k); }); return b; }
