@@ -2769,7 +2769,7 @@ function renderDelivMismatch(){
     var bad=((m.st||'').indexOf('Собран')!==0);
     h+='<tr><td>'+xe(m.city||'')+'</td><td>'+xe(m.addr||'')+'</td><td>'+xe(dname(m.drv)||m.drv||'')+'</td><td>'+incFmtDate(m.date)+'</td>'
       +'<td><span class="'+(bad?'dm-bad':'dm-ok')+'">1С: '+xe(m.st||'—')+'</span></td>'
-      +'<td><button class="dm-ret" onclick="incUnDone(\''+m.rowId+'\')">вернуть в маршрут</button></td></tr>';
+      +'<td><button class="dm-ret" onclick="incReturn(\''+m.inv+'\',\''+m.rowId+'\')">вернуть во Входящие 1С</button></td></tr>';
   });
   h+='</table></div>';
   el.innerHTML=h; el.style.display='';
