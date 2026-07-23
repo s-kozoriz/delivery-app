@@ -178,6 +178,19 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .wt-cancel:active,.wt-yes:active{transform:scale(.97)}
 .wt-done-note{font-size:12px;color:#80786e;margin-top:6px}
 .wt-close{margin-top:14px;background:none;border:none;color:#80786e;font-size:14px;cursor:pointer;padding:6px}
+/* итог за месяц при закрытии смены */
+.wt-summary{position:fixed;inset:0;z-index:400;background:rgba(20,22,26,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+.wts-card{background:#fff;width:100%;max-width:280px;border-radius:20px;padding:24px 22px 20px;text-align:center;animation:wtPop .2s ease;box-shadow:0 16px 40px rgba(0,0,0,.35)}
+.wts-seal{width:54px;height:54px;border-radius:50%;background:#e6f4ec;color:#1a7a40;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px}
+.wts-h{font-size:17px;font-weight:800;color:#20242a;margin-bottom:16px}
+.wts-day{font-size:12px;color:#8a8272;text-transform:uppercase;letter-spacing:.04em}
+.wts-dayv{font-size:30px;font-weight:800;color:#6a1a7a;line-height:1;margin:3px 0 16px}
+.wts-mrow{background:#faf5ec;border:1.5px solid #ecdcc2;border-radius:14px;padding:13px}
+.wts-mlbl{font-size:11px;color:#854F0B;text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.wts-mval{font-size:26px;font-weight:800;color:#854F0B;line-height:1.1}
+.wts-msub{font-size:12px;color:#8a8272;margin-top:2px}
+.wts-done{margin-top:16px;width:100%;background:#6a1a7a;color:#fff;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer}
+.wts-done:active{transform:scale(.98)}
 
 /* ===== Шапка — Вариант 1 «Спокойный воздух» (дизайн-пас). Переопределяет ранние правила по каскаду. Фон .hdr остаётся per-driver. ===== */
 .hdr{padding:16px 18px 18px;position:sticky;top:0;z-index:10}
@@ -479,7 +492,32 @@ function wtMutate(fn) {
 }
 function wtStartSeg() { wtMutate(function (rec) { var L = wtSegs(rec); L.push({ s: nowTime() }); rec.seg = L; rec.done = null; }); if (navigator.vibrate) navigator.vibrate(60); }
 function wtPauseSeg() { wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; }); if (navigator.vibrate) navigator.vibrate(40); }
-function wtFinishDay() { wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; rec.done = true; }); if (navigator.vibrate) navigator.vibrate([60, 40, 60]); }
+function wtFinishDay() { wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; rec.done = true; }); if (navigator.vibrate) navigator.vibrate([60, 40, 60]); closeWtPanel(); showMonthSummary(); }
+// итог за текущий месяц (из уже загруженного wtData, без новых запросов)
+var wtSummaryTimer = null;
+function wtMonthSum() {
+  var pref = wtDate().slice(0, 7), mins = 0, days = 0;
+  for (var d in wtData) { if (!wtData.hasOwnProperty(d)) continue; if (String(d).slice(0, 7) !== pref) continue; var m = wtWorkedMin(wtData[d], false); if (m > 0) { mins += m; days++; } }
+  return { mins: mins, hours: Math.round(mins / 6) / 10, days: days };
+}
+function wtMonthName() { var mn = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']; return mn[new Date().getMonth()]; }
+function wtDaysWord(n) { var t = n % 100, o = n % 10; if (t > 10 && t < 20) return 'рабочих дней'; if (o === 1) return 'рабочий день'; if (o > 1 && o < 5) return 'рабочих дня'; return 'рабочих дней'; }
+function showMonthSummary() {
+  closeMonthSummary();
+  var rec = wtToday(), ms = wtMonthSum();
+  var o = document.createElement('div'); o.id = 'wtSummary'; o.className = 'wt-summary';
+  o.innerHTML = '<div class="wts-card"><div class="wts-seal">&#10003;</div>'
+    + '<div class="wts-h">День завершён</div>'
+    + '<div class="wts-day">Сегодня</div><div class="wts-dayv">' + wtFmt(wtWorkedMin(rec, false)) + '</div>'
+    + '<div class="wts-mrow"><div class="wts-mlbl">За ' + wtMonthName() + '</div>'
+    + '<div class="wts-mval">' + ms.hours + ' ч</div>'
+    + '<div class="wts-msub">' + ms.days + ' ' + wtDaysWord(ms.days) + '</div></div>'
+    + '<button class="wts-done" onclick="closeMonthSummary()">Готово</button></div>';
+  o.onclick = function (e) { if (e.target === o) closeMonthSummary(); };
+  document.body.appendChild(o);
+  wtSummaryTimer = setTimeout(closeMonthSummary, 6000);
+}
+function closeMonthSummary() { if (wtSummaryTimer) { clearTimeout(wtSummaryTimer); wtSummaryTimer = null; } var o = document.getElementById('wtSummary'); if (o && o.parentNode) o.parentNode.removeChild(o); }
 
 function wtPauseDur(rec) { var L = wtSegs(rec); if (!L.length) return 0; var last = L[L.length - 1]; if (!last || !last.e) return 0; var p = (''+last.e).split(':'); var em = (+p[0]) * 60 + (+p[1]); if (isNaN(em)) return 0; var n = new Date(); var m = (n.getHours() * 60 + n.getMinutes()) - em; if (m < 0) m += 1440; return m; }
 function goToday() { curD = isoD(0); render(); }
