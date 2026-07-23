@@ -716,6 +716,7 @@ db.ref('rows').orderByChild('date').startAt(_fromD).endAt(_toD).on('value',funct
   if(Date.now()-_lastEdit>1500){rtbl();incReconcile();}
   gm();rh();renderDelivMismatch();
   var _tnm=document.getElementById('tnordm');if(_tnm&&_tnm.style.display!=='none')renderNordMirror();
+  var _ts=document.getElementById('ts2');if(_ts&&_ts.style.display!=='none')renderStat(); // после F5 на «Статистике» — дорисовать, когда rows подгрузились
   document.getElementById('sync').className='sync ok';
 },function(){document.getElementById('sync').className='sync err';});
 
@@ -1056,6 +1057,7 @@ firebase.auth().onAuthStateChanged(function(user){
     if(c.plannerId){ IS_PLANNER=true; PLANNER_ID=c.plannerId; PLANNER_NAME=c.plannerName||''; ['tabVoice','tabCalib','tabOdo'].forEach(function(id){var b=document.getElementById(id);if(b)b.style.display='none';}); }
     if(role==='zentrum'){ var _tn=document.getElementById('tabNordM'); if(_tn)_tn.style.display=''; }
     __startDB();
+    setTimeout(restoreTab,250); // после того как роль скрыла/показала вкладки — вернуть последнюю открытую
   });
 });
 
@@ -2191,6 +2193,7 @@ function swCfg(name){
 }
 
 function sw(n){
+  if(n!=='warehouse'){try{sessionStorage.setItem('lastTab',n);}catch(e){}} // запомнить вкладку — восстановить после F5 (кроме режимной «Склад»)
   var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo'};
   Object.keys(tabMap).forEach(function(t){
     var el=document.getElementById(tabMap[t]);
@@ -2213,6 +2216,21 @@ function sw(n){
   if(n==='inc')renderInc();
   if(n==='nordm')renderNordMirror();
   if(n==='odo')renderOdo();
+}
+// после F5 остаться на той же вкладке, где был; НО только если её кнопка видима для этой роли и это не режим «Склад»
+function restoreTab(){
+  if(viewOnly)return;                       // склад — принудительно warehouse, не трогаем
+  var n; try{n=sessionStorage.getItem('lastTab');}catch(e){}
+  if(!n||n==='plan'||n==='warehouse')return; // дефолт и так «Маршрут»
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo'};
+  if(!tabMap[n])return;
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег'};
+  var visible=false;                         // вкладка доступна текущей роли?
+  document.querySelectorAll('.tab').forEach(function(b){
+    if(b.textContent.trim()===nameMap[n]&&b.style.display!=='none')visible=true;
+  });
+  if(!visible)return;                        // недоступна (planner/zentrum-only) → остаёмся на «Маршрут»
+  sw(n);
 }
 // Зеркало региона Nord (для zentrum): что планируют техники + правки + день водителя
 function renderNordMirror(){
