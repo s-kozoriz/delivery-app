@@ -226,6 +226,34 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .lag-fix{margin-left:8px;border:1px solid #d0342c;background:#fff;color:#d0342c;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
 .lag-fix:hover{background:#d0342c;color:#fff}
 .inc-empty{padding:26px;text-align:center;color:#80786e}
+/* анализ маршрута */
+.ra-bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:12px 16px 4px}
+.ra-bar label{display:flex;flex-direction:column;gap:3px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#80786e;font-weight:700}
+.ra-bar input,.ra-bar select{font-size:14px;padding:7px 9px;border:1px solid #d8ede2;border-radius:8px;background:#fff;color:#141816}
+.ra-bar .btn{padding:9px 16px}
+.ra-hint{font-size:11.5px;color:#80786e;max-width:420px;line-height:1.45}
+.ra-empty{padding:26px;text-align:center;color:#80786e;line-height:1.6}
+.ra-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:10px 16px 4px}
+.ra-kpi{background:#fff;border:1px solid #e2e5ea;border-radius:12px;padding:12px}
+.ra-kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#80786e;font-weight:700}
+.ra-kpi .v{font-size:22px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+.ra-kpi .h{font-size:11px;color:#80786e;margin-top:2px}
+.ra-kpi.good .v{color:#1a7a40}
+.ra-kpi.warn .v{color:#E24B4A}
+.ra-map{padding:12px 16px 4px;overflow-x:auto}
+.ra-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#80786e;margin-top:9px}
+.ra-legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.ra-legend s{display:inline-block;width:18px;height:3px;background:#1856a0;margin-right:5px;vertical-align:3px;text-decoration:none}
+.ra-sec{padding:10px 16px 2px}
+.ra-sec h3{font-size:13.5px;font-weight:800;margin:0 0 7px}
+.ra-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.ra-tbl th,.ra-tbl td{text-align:left;padding:6px 8px;border-bottom:1px solid #eceff3}
+.ra-tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#80786e}
+.ra-tbl td.n{width:34px;font-weight:800;color:#1856a0;font-variant-numeric:tabular-nums}
+.ra-tbl td.n.add{color:#E24B4A}
+.ra-tbl td.t{width:62px;text-align:right;color:#80786e;font-variant-numeric:tabular-nums}
+.ra-note{margin:12px 16px 4px;padding:12px 14px;background:#faf7f0;border:1px solid #ecdcc2;border-radius:10px;font-size:12.5px;color:#5a5346;line-height:1.55}
+.ra-meta{padding:6px 16px 14px;font-size:11px;color:#a09a90}
 .inc-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
 .inc-tbl td{padding:7px 8px;border-bottom:1px solid #eef1f5;vertical-align:top}
@@ -330,6 +358,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <button class="tab" id="tabCalib" onclick="sw('calib')">Калибровка</button>
     <button class="tab" id="tabInc" onclick="sw('inc')">Входящие 1С</button>
     <button class="tab" id="tabNordM" onclick="sw('nordm')" style="display:none">Nord</button>
+    <button class="tab" id="tabRoute" onclick="sw('route')">Анализ маршрута</button>
     <button class="tab" id="tabCfg" onclick="sw('cfg')">Настройки</button>
   </div>
 </div>
@@ -466,6 +495,18 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     </div>
     <div style="padding:0 14px 8px;font-size:12px;color:#80786e">Временное хранилище. Фото+цифры — для сверки с топливом (Zoll). Экспорт CSV для передачи.</div>
     <div id="odoBody"></div>
+  </div>
+</div>
+<div id="troute" style="display:none">
+  <div class="card">
+    <div class="ch"><h2>&#128506; Анализ маршрута</h2></div>
+    <div class="ra-bar">
+      <label>День<input type="date" id="raDate"></label>
+      <label>Водитель<select id="raDrv"></select></label>
+      <button class="btn" id="raGo" onclick="raAnalyze()">Проанализировать</button>
+      <span class="ra-hint" id="raHint">Считается по кнопке (Google берёт плату за расчёт). Результат сохраняется — повторный просмотр бесплатный.</span>
+    </div>
+    <div id="raBody"></div>
   </div>
 </div>
 <div id="tcalib" style="display:none">
@@ -1054,7 +1095,7 @@ firebase.auth().onAuthStateChanged(function(user){
     if(role==='norden'){disp2Mode=true;enter(false);}
     else if(role==='lager'){disp2Mode=false;enter(true);}
     else{disp2Mode=false;enter(false);}
-    if(c.plannerId){ IS_PLANNER=true; PLANNER_ID=c.plannerId; PLANNER_NAME=c.plannerName||''; ['tabVoice','tabCalib','tabOdo'].forEach(function(id){var b=document.getElementById(id);if(b)b.style.display='none';}); }
+    if(c.plannerId){ IS_PLANNER=true; PLANNER_ID=c.plannerId; PLANNER_NAME=c.plannerName||''; ['tabVoice','tabCalib','tabOdo','tabRoute'].forEach(function(id){var b=document.getElementById(id);if(b)b.style.display='none';}); } // tabRoute показывает те же данные одометра, что и tabOdo — прячем вместе
     if(role==='zentrum'){ var _tn=document.getElementById('tabNordM'); if(_tn)_tn.style.display=''; }
     __startDB();
     setTimeout(restoreTab,250); // после того как роль скрыла/показала вкладки — вернуть последнюю открытую
@@ -2194,12 +2235,12 @@ function swCfg(name){
 
 function sw(n){
   if(n!=='warehouse'){try{sessionStorage.setItem('lastTab',n);}catch(e){}} // запомнить вкладку — восстановить после F5 (кроме режимной «Склад»)
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo',route:'troute'};
   Object.keys(tabMap).forEach(function(t){
     var el=document.getElementById(tabMap[t]);
     if(el)el.style.display=t===n?'':'none';
   });
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег',route:'Анализ маршрута'};
   document.querySelectorAll('.tab').forEach(function(b){
     b.classList.toggle('on',b.textContent.trim()===(nameMap[n]||''));
   });
@@ -2216,15 +2257,16 @@ function sw(n){
   if(n==='inc')renderInc();
   if(n==='nordm')renderNordMirror();
   if(n==='odo')renderOdo();
+  if(n==='route')raOpen();
 }
 // после F5 остаться на той же вкладке, где был; НО только если её кнопка видима для этой роли и это не режим «Склад»
 function restoreTab(){
   if(viewOnly)return;                       // склад — принудительно warehouse, не трогаем
   var n; try{n=sessionStorage.getItem('lastTab');}catch(e){}
   if(!n||n==='plan'||n==='warehouse')return; // дефолт и так «Маршрут»
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo',route:'troute'};
   if(!tabMap[n])return;
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег',route:'Анализ маршрута'};
   var visible=false;                         // вкладка доступна текущей роли?
   document.querySelectorAll('.tab').forEach(function(b){
     if(b.textContent.trim()===nameMap[n]&&b.style.display!=='none')visible=true;
@@ -3180,6 +3222,277 @@ function _unloadMin(w){ if(!w||w<=20)return 15; if(w<=50)return 20; if(w<=100)re
 function _fmtM(m){var h=Math.floor(m/60),mn=m%60;return h>0?(h+'ч '+(mn?mn+'мин':'')):mn+'мин';}
 var _geoCache={};try{_geoCache=JSON.parse(localStorage.getItem('geoCache')||'{}');}catch(e){}
 function _geoSave(){try{localStorage.setItem('geoCache',JSON.stringify(_geoCache));}catch(e){}}
+// ===== АНАЛИЗ МАРШРУТА — чистые функции (считаются локально, тестируются offline) =====
+// точки дня: плановые (расставил диспетчер) отдельно от добавленных водителем в пути (fromDriver)
+function raPoints(rowsArr, drv, date){
+  var uniq={};
+  (rowsArr||[]).forEach(function(r){
+    if(!r||r.drv!==drv||r.date!==date)return;
+    if(!r.addr||!String(r.addr).trim())return;
+    if(r.inRoute===false)return;                 // снятые с маршрута не считаем (как во всех остальных расчётах)
+    var key=((r.city||'')+'|'+(r.addr||'')).toLowerCase().replace(/\s+/g,' ').trim();
+    var ts=null;
+    if(r.photoTs&&r.photoTs.length){var a=r.photoTs.filter(Boolean).map(Number).sort(function(x,y){return x-y;});ts=a[0]||null;}
+    var isDrv=!!r.fromDriver;
+    if(!uniq[key])uniq[key]={city:r.city||'',addr:String(r.addr).trim(),order:(r.order!=null?r.order:1e9),ts:ts,who:(isDrv?'driver':'disp'),dupes:0,lat:null,lon:null,doneTs:null};
+    else uniq[key].dupes++;
+    var u=uniq[key];
+    if(r.order!=null&&r.order<u.order)u.order=r.order;
+    if(ts&&(!u.ts||ts<u.ts))u.ts=ts;
+    if(!isDrv)u.who='disp';                     // плановая строка ПЕРЕВЕШИВАЕТ: адрес остаётся в плане, даже если водитель довёз туда ещё одну накладную
+    if(u.lat==null&&r.doneLat!=null&&r.doneLon!=null){u.lat=r.doneLat;u.lon=r.doneLon;u.doneTs=r.doneGeoTs||null;}
+  });
+  var all=[];for(var k in uniq)if(uniq.hasOwnProperty(k))all.push(uniq[k]);
+  return {
+    planned: all.filter(function(p){return p.who!=='driver';}).sort(function(a,b){return a.order-b.order;}),
+    added: all.filter(function(p){return p.who==='driver';}).sort(function(a,b){return (a.ts||0)-(b.ts||0);})
+  };
+}
+// декодер Google polyline → [[lat,lon],...] (рисуем РЕАЛЬНУЮ дорогу, не прямые)
+function raDecodePoly(s){
+  var pts=[],i=0,lat=0,lng=0;
+  s=s||'';
+  while(i<s.length){
+    var b,sh=0,res=0;
+    do{b=s.charCodeAt(i++)-63;res|=(b&0x1f)<<sh;sh+=5;}while(b>=0x20&&i<s.length);
+    lat+=((res&1)?~(res>>1):(res>>1));
+    sh=0;res=0;
+    do{b=s.charCodeAt(i++)-63;res|=(b&0x1f)<<sh;sh+=5;}while(b>=0x20&&i<s.length);
+    lng+=((res&1)?~(res>>1):(res>>1));
+    pts.push([lat/1e5,lng/1e5]);
+  }
+  return pts;
+}
+// число или null — всё, что идёт в KPI, пропускаем через это (данные приходят из чужих узлов)
+function raNum(v){ if(v==null||v===''||typeof v==='boolean')return null; var n=Number(v); return isFinite(n)?n:null; } // Number(null)===0 — поэтому пустое отсекаем ДО приведения, иначе «нет данных» показалось бы как 0 км
+// KPI: факт (уже посчитанный, км или null), план, оптимум, потери от порядка, перепробег
+function raKpi(factKm, planKm, optKm){
+  var r1=function(v){return Math.round(v*10)/10;};
+  var fact=raNum(factKm), plan=raNum(planKm), opt=raNum(optKm);
+  if(fact!=null)fact=r1(fact);
+  var loss=(plan!=null&&opt!=null)?r1(plan-opt):null;
+  var extra=(fact!=null&&plan!=null)?r1(fact-plan):null;
+  return {factKm:fact,planKm:plan,optKm:opt,
+    lossKm:loss, lossPct:(loss!=null&&opt)?Math.round(loss/opt*100):null,
+    extraKm:extra, extraPct:(extra!=null&&plan)?Math.round(extra/plan*100):null};
+}
+// проекция координат в SVG-холст (равнопрямоугольная, с поправкой долготы по широте)
+function raProject(coords, w, h, pad){
+  pad=pad||20;
+  if(!coords||!coords.length)return [];
+  var i,lat0=0;
+  for(i=0;i<coords.length;i++)lat0+=coords[i][0];
+  lat0=lat0/coords.length;
+  var k=Math.cos(lat0*Math.PI/180);
+  var xs=[],ys=[];
+  for(i=0;i<coords.length;i++){xs.push(coords[i][1]*k);ys.push(-coords[i][0]);} // y вниз = на юг
+  var minX=Math.min.apply(null,xs),maxX=Math.max.apply(null,xs);
+  var minY=Math.min.apply(null,ys),maxY=Math.max.apply(null,ys);
+  var dx=maxX-minX,dy=maxY-minY,s;
+  if(dx<=0&&dy<=0)s=1;
+  else s=Math.min((w-2*pad)/(dx||1e-9),(h-2*pad)/(dy||1e-9));
+  if(!isFinite(s)||s<=0)s=1;
+  var offX=pad+((w-2*pad)-dx*s)/2, offY=pad+((h-2*pad)-dy*s)/2;
+  var out=[];
+  for(i=0;i<coords.length;i++)out.push({x:offX+(xs[i]-minX)*s, y:offY+(ys[i]-minY)*s});
+  return out;
+}
+/* ra-pure-end */
+// ===== АНАЛИЗ МАРШРУТА — UI, расчёт по кнопке, кэш результата =====
+var RA_CACHE={};
+function raT(ts){ if(!ts)return ''; var d=new Date(Number(ts)); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function raAddrQ(p){ return (typeof cleanAddr==='function'?cleanAddr(p.addr||''):String(p.addr||'').trim())+', '+(p.city||'')+', Germany'; } // тот же нормализатор, что и везде (свой отгрызал номер дома)
+// ФАКТ пробега берём из odoCluster — он раскладывает показания ПО МАШИНАМ (водители меняются фургонами),
+// поэтому смена машины в обед не превращается в «намотал 1150 км». Число даём только если день чистый.
+function raFact(drv,date){
+  var out={km:null,dirty:false,why:''};
+  if(typeof odoCluster!=='function')return out;
+  if(!odoAll||!Object.keys(odoAll).length){ out.dirty=true; out.why='данные одометра ещё не загрузились — откройте вкладку заново'; return out; } // иначе сохранили бы «одометра нет» для дня, где он есть
+  var c; try{ c=odoCluster(); }catch(e){ return out; }
+  var km=0, has=false;
+  ((c&&c.vans)||[]).forEach(function(v){
+    (v.evs||[]).forEach(function(e){
+      if(!e||e.drv!==drv||e.date!==date)return;
+      if(e.clean===false){ out.dirty=true; out.why='показания не сходятся (опечатка или пропущены дни)'; return; }
+      if(e.cross){ out.dirty=true; if(!out.why)out.why='показание другого региона'; }
+      if(e.carry){ out.dirty=true; if(!out.why)out.why='в приросте накоплено за прошлые дни'; }
+      var d=raNum(e.delta);
+      if(d!=null&&d>0){ km+=d; has=true; }
+    });
+  });
+  ((c&&c.unknown)||[]).forEach(function(e){ if(e&&e.drv===drv&&e.date===date){ out.dirty=true; if(!out.why)out.why='показание не привязалось к машине'; } });
+  if(has&&!out.dirty)out.km=Math.round(km*10)/10;
+  return out;
+}
+function raOpen(){
+  var d=document.getElementById('raDate'), s=document.getElementById('raDrv');
+  if(d&&!d.value)d.value=curD||isoD(0);
+  if(s&&!s.options.length){
+    var keys=Object.keys((cfg&&cfg.drivers)||{});
+    if(!keys.length)keys=['L','R','C','V'];
+    if(disp2Mode)keys=keys.filter(function(k){return k==='C';});
+    s.innerHTML=keys.map(function(k){return '<option value="'+xe(k)+'">'+xe(dname(k)||k)+'</option>';}).join('');
+  }
+  if(d)d.onchange=raShowSaved;   // привязываем ВСЕГДА: после F5 браузер восстанавливает дату, и прежняя привязка терялась
+  if(s)s.onchange=raShowSaved;
+  raShowSaved();
+}
+function raShowSaved(){
+  var dv=document.getElementById('raDrv'), dt=document.getElementById('raDate'), b=document.getElementById('raBody');
+  if(!dv||!dt||!b)return;
+  var drv=dv.value, date=dt.value; if(!drv||!date)return;
+  var k=drv+'|'+date;
+  if(RA_CACHE[k]){ raRender(RA_CACHE[k]); return; }
+  b.innerHTML='<div class="ra-empty">Читаем сохранённый расчёт…</div>';
+  db.ref('route_analysis/'+drv+'/'+date).once('value').then(function(s){
+    var v=s.val();
+    if(v){ RA_CACHE[k]=v; raRender(v); }
+    else b.innerHTML='<div class="ra-empty">За этот день расчёта ещё нет.<br>Нажмите «Проанализировать» — посчитаем и сохраним.</div>';
+  }).catch(function(){ b.innerHTML='<div class="ra-empty">Не удалось прочитать сохранённый расчёт (нет связи или прав).</div>'; });
+}
+function raErrRu(s){
+  var m={ MAX_WAYPOINTS_EXCEEDED:'слишком много адресов в одном запросе (максимум 25)',
+    OVER_QUERY_LIMIT:'исчерпан дневной лимит запросов Google',
+    REQUEST_DENIED:'Google отклонил запрос (ключ или биллинг)',
+    ZERO_RESULTS:'маршрут между этими адресами не найден',
+    NOT_FOUND:'один из адресов не найден на карте',
+    INVALID_REQUEST:'неверный запрос к Google',
+    NET:'нет связи с Google (проверьте интернет)', ERR:'Google ответил ошибкой' };
+  return (Object.prototype.hasOwnProperty.call(m,s)?m[s]:null)||('ошибка Google: '+String(s||'')); // hasOwnProperty: иначе статус вроде 'toString' вернул бы функцию из прототипа и рендер упал бы
+}
+// один запрос маршрута через наш прокси (кольцо база→точки→база)
+function raRoute(startCity, qs, optimize){
+  if(!qs||!qs.length)return Promise.resolve(null);
+  var o=encodeURIComponent(startCity.indexOf(',')>0?startCity:(startCity+', Germany'));
+  var wps=qs.map(function(x){return encodeURIComponent(x);});
+  var url='https://maps.googleapis.com/maps/api/directions/json?origin='+o+'&destination='+o+
+    '&waypoints='+(optimize?'optimize:true|':'')+wps.join('|')+'&key='+MAPS_KEY+'&language=de';
+  return fetch('https://lk-proxy.s-kozorizz.workers.dev/maps?url='+encodeURIComponent(url))
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j||j.status!=='OK')return {err:(j&&j.status)||'ERR'};
+      var legs=j.routes[0].legs, m=0, sec=0;
+      legs.forEach(function(l){ m+=l.distance.value; sec+=l.duration.value; });
+      return { km:Math.round(m/100)/10, min:Math.round(sec/60),
+               poly:(j.routes[0].overview_polyline||{}).points||'', order:j.routes[0].waypoint_order||null };
+    }).catch(function(){ return {err:'NET'}; });
+}
+function raAnalyze(){
+  var dv=document.getElementById('raDrv'), dt=document.getElementById('raDate'), b=document.getElementById('raBody'), btn=document.getElementById('raGo');
+  if(!dv||!dt||!b)return;
+  var drv=dv.value, date=dt.value;
+  if(!drv||!date){ toast('Выберите день и водителя'); return; }
+  var P=raPoints(rows,drv,date);
+  if(!P.planned.length && !P.added.length){ b.innerHTML='<div class="ra-empty">За '+xe(date)+' у этого водителя нет адресов.</div>'; return; }
+  if(!P.planned.length){ b.innerHTML='<div class="ra-empty">За этот день нет плановых адресов (только добавленные в пути) — сравнивать не с чем.</div>'; return; }
+  if(P.planned.length>25){ b.innerHTML='<div class="ra-empty">В этом дне '+P.planned.length+' плановых адресов, а Google считает максимум 25 за один запрос.<br>Расчёт не выполнен (и деньги не потрачены). Уберите лишние адреса из маршрута или разбейте день.</div>'; return; }
+  var startCity=(cfg.drivers&&cfg.drivers[drv]&&cfg.drivers[drv].startCity)||'Wilhelmshaven';
+  var all=P.planned.concat(P.added);
+  if(btn)btn.disabled=true;
+  b.innerHTML='<div class="ra-empty">Ищем адреса на карте (разово, дальше из кэша) — это займёт до '+Math.ceil(all.length*1.2)+' сек…</div>';
+  var qs=[startCity.indexOf(',')>0?startCity:(startCity+', Germany')].concat(all.map(raAddrQ));
+  _geocodeSeq(qs).then(function(coords){
+    all.forEach(function(p,i){ var c=coords[i+1]; if(c){ p.glat=c.lat; p.glon=c.lon; } });
+    b.innerHTML='<div class="ra-empty">Считаем расстояния по дорогам (Google)…</div>';
+    var pq=P.planned.map(raAddrQ);
+    return raRoute(startCity,pq,false).then(function(plan){
+      return raRoute(startCity,pq,true).then(function(opt){
+        var err=(plan&&plan.err)||(opt&&opt.err)||null;
+        if(err){ // НЕ затираем ранее сохранённый хороший расчёт неудачей (сеть/квота/лимит)
+          b.innerHTML='<div class="ra-empty">Google не посчитал: <b>'+xe(raErrRu(err))+'</b><br>Сохранённый ранее расчёт не тронут. Попробуйте позже.</div>';
+          return null;
+        }
+        var fa=raFact(drv,date);
+        return db.ref('odometer/'+drv+'/'+date).once('value').then(function(s){
+          var odo=s.val()||null;
+          var planKm=(plan&&plan.km!=null)?plan.km:null, optKm=(opt&&opt.km!=null)?opt.km:null;
+          var data={ drv:drv, date:date, ts:Date.now(), startCity:startCity,
+            base:coords[0]||null, kpi:raKpi(fa.km,planKm,optKm), factDirty:!!fa.dirty, factWhy:fa.why||'',
+            planKm:planKm, planMin:raNum(plan&&plan.min), optKm:optKm, optMin:raNum(opt&&opt.min),
+            poly:(plan&&plan.poly)||'', planned:P.planned, added:P.added, odo:odo, err:null };
+          RA_CACHE[drv+'|'+date]=data;
+          raRender(data);
+          db.ref('route_analysis/'+drv+'/'+date).set(data).catch(function(){ toast('Посчитано, но сохранить не удалось'); });
+        });
+      });
+    });
+  }).catch(function(e){
+    b.innerHTML='<div class="ra-empty">Не удалось посчитать: '+xe(String((e&&e.message)||e||'ошибка'))+'</div>';
+  }).then(function(){ if(btn)btn.disabled=false; });
+}
+function raMapSvg(d){
+  var poly=raDecodePoly(d.poly||''), pts=[];
+  if(d.base&&d.base.lat!=null)pts.push({lat:d.base.lat,lon:d.base.lon,kind:'base'});
+  (d.planned||[]).forEach(function(p){ if(p.glat!=null)pts.push({lat:p.glat,lon:p.glon,kind:'plan'}); });
+  (d.added||[]).forEach(function(p){ if(p.glat!=null)pts.push({lat:p.glat,lon:p.glon,kind:'add',t:p.ts}); });
+  var all=poly.slice(); pts.forEach(function(p){ all.push([p.lat,p.lon]); });
+  if(all.length<2)return '<div class="ra-empty">Карта недоступна: координаты адресов не найдены.</div>';
+  var W=880,H=430, pr=raProject(all,W,H,26);
+  var polyPr=pr.slice(0,poly.length), ptPr=pr.slice(poly.length), path='';
+  polyPr.forEach(function(p,i){ path+=(i?' L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1); });
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="max-width:'+W+'px;display:block">'
+    +'<rect x="0" y="0" width="'+W+'" height="'+H+'" rx="12" fill="rgba(24,86,160,.05)"/>';
+  if(path)svg+='<path d="'+path+'" fill="none" stroke="#1856a0" stroke-width="3" opacity=".9" stroke-linejoin="round" stroke-linecap="round"/>';
+  var nPlan=0;
+  ptPr.forEach(function(p,i){
+    var s=pts[i], x=p.x.toFixed(1), y=p.y.toFixed(1);
+    if(s.kind==='base')svg+='<g><rect x="'+(p.x-11).toFixed(1)+'" y="'+(p.y-11).toFixed(1)+'" width="22" height="22" rx="5" fill="#141816" stroke="#fff" stroke-width="2.5"/><text x="'+x+'" y="'+(p.y+4).toFixed(1)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">Б</text></g>';
+    else if(s.kind==='plan'){ nPlan++; svg+='<g><circle cx="'+x+'" cy="'+y+'" r="12" fill="#1856a0" stroke="#fff" stroke-width="2.5"/><text x="'+x+'" y="'+(p.y+4).toFixed(1)+'" text-anchor="middle" font-size="11.5" font-weight="700" fill="#fff">'+nPlan+'</text></g>'; }
+    else svg+='<g><circle cx="'+x+'" cy="'+y+'" r="9" fill="#E24B4A" stroke="#fff" stroke-width="2.5"/>'+(s.t?'<text x="'+x+'" y="'+(p.y-13).toFixed(1)+'" text-anchor="middle" font-size="10" font-weight="700" fill="#a3302f">'+raT(s.t)+'</text>':'')+'</g>';
+  });
+  svg+='</svg>';
+  return '<div class="ra-map">'+svg+'<div class="ra-legend"><span><s></s>Реальная дорога (план)</span><span><i style="background:#1856a0"></i>Плановые точки</span><span><i style="background:#E24B4A"></i>Добавлены в пути</span><span><i style="background:#141816"></i>Б — база</span></div></div>';
+}
+function raRender(d){
+  var b=document.getElementById('raBody'); if(!b||!d)return;
+  // всё, что попадает в разметку, приводим к числу/экранируем: данные приходят из чужих узлов (одометр водителя, чужой расчёт)
+  var kr=d.kpi||{}, k={factKm:raNum(kr.factKm),planKm:raNum(kr.planKm),optKm:raNum(kr.optKm),
+    lossKm:raNum(kr.lossKm),lossPct:raNum(kr.lossPct),extraKm:raNum(kr.extraKm),extraPct:raNum(kr.extraPct)};
+  var planMin=raNum(d.planMin);
+  function card(l,v,h,cls){ return '<div class="ra-kpi '+(cls||'')+'"><div class="l">'+xe(String(l))+'</div><div class="v">'+xe(String(v))+'</div><div class="h">'+xe(String(h||''))+'</div></div>'; }
+  var oS=raNum(d.odo&&d.odo.start&&d.odo.start.km), oE=raNum(d.odo&&d.odo.end&&d.odo.end.km);
+  var odoH=(oS!=null&&oE!=null)?(oS+' → '+oE):'одометр не заполнен';
+  var factV, factH, factCls;
+  if(d.factDirty){ factV='требует проверки'; factH=String(d.factWhy||'сверьте вкладку «Пробег»'); factCls='warn'; }
+  else if(k.factKm!=null){ factV=k.factKm+' км'; factH=odoH; factCls=(k.extraKm!=null&&k.extraKm>0?'warn':''); }
+  else { factV='—'; factH=odoH; factCls=''; }
+  var lossV,lossH,lossCls;
+  if(k.lossKm==null){ lossV='—'; lossH=''; lossCls=''; }
+  else if(k.lossKm<0){ lossV='0 км'; lossH='план короче по км (Google ищет самый быстрый, не самый короткий)'; lossCls='good'; }
+  else { lossV=k.lossKm+' км'; lossH=(k.lossPct!=null?k.lossPct+'% к оптимуму':''); lossCls=(k.lossKm<3?'good':'warn'); }
+  var h='<div class="ra-kpis">'
+    +card('Факт (одометр)',factV,factH,factCls)
+    +card('План диспетчера',(k.planKm!=null?k.planKm+' км':'—'),(d.planned||[]).length+' точек'+(planMin!=null?' · '+planMin+' мин':''),'')
+    +card('Оптимально',(k.optKm!=null?k.optKm+' км':'—'),'тот же набор, по времени','')
+    +card('Потери от порядка',lossV,lossH,lossCls)
+    +'</div>';
+  if(d.err)h+='<div class="ra-empty">Google вернул: '+xe(raErrRu(d.err))+' — цифры могут быть неполными.</div>';
+  var noGeo=((d.planned||[]).concat(d.added||[])).filter(function(p){return p.glat==null;}).length;
+  if(noGeo)h+='<div class="ra-meta">'+noGeo+' адрес(ов) не найдены на карте — в таблицах они есть, на карте не показаны.</div>';
+  h+=raMapSvg(d);
+  var pl=(d.planned||[]).map(function(p,i){
+    return '<tr><td class="n">'+(i+1)+'</td><td>'+xe(p.city||'')+'</td><td>'+xe(p.addr||'')+'</td><td class="t">'+(p.ts?raT(p.ts):'—')+'</td></tr>';
+  }).join('');
+  h+='<div class="ra-sec"><h3>Планировал диспетчер ('+(d.planned||[]).length+')</h3>'
+    +'<table class="ra-tbl"><thead><tr><th>№</th><th>Город</th><th>Адрес</th><th>Фото</th></tr></thead><tbody>'+pl+'</tbody></table></div>';
+  if((d.added||[]).length){
+    var ad=(d.added||[]).map(function(p){
+      return '<tr><td class="n add">+</td><td>'+xe(p.city||'')+'</td><td>'+xe(p.addr||'')+'</td><td class="t">'+(p.ts?raT(p.ts):'—')+'</td></tr>';
+    }).join('');
+    h+='<div class="ra-sec"><h3>Добавлено водителем в пути ('+d.added.length+')</h3>'
+      +'<table class="ra-tbl"><thead><tr><th></th><th>Город</th><th>Адрес</th><th>Фото</th></tr></thead><tbody>'+ad+'</tbody></table></div>';
+  }
+  var note='План — '+(k.planKm!=null?k.planKm+' км':'—')+', лучший порядок для тех же адресов — '+(k.optKm!=null?k.optKm+' км':'—')+
+    (k.lossKm!=null?(k.lossKm<=0?': порядок построен оптимально.':(k.lossKm<3?': порядок построен почти оптимально.':': порядок можно улучшить примерно на '+k.lossKm+' км.')):'.');
+  if(d.factDirty)note+=' Фактический пробег не показан: '+xe(String(d.factWhy||'показания одометра требуют проверки'))+' — во вкладке «Пробег» число за этот день может быть (там правила мягче), выводы по километражу пока делать рано.';
+  else if(k.factKm!=null&&k.extraKm!=null&&k.extraKm>0)note+=' По одометру намотано '+k.factKm+' км — на '+k.extraKm+' км больше плана'+
+    ((d.added||[]).length?('; вероятное объяснение — '+d.added.length+' точек, добавленных уже в пути.'):'.');
+  else if(k.factKm!=null&&k.extraKm!=null&&k.extraKm<0)note+=' По одометру '+k.factKm+' км — МЕНЬШЕ плана на '+Math.abs(k.extraKm)+' км. Обычно это значит, что возврат на базу не попал в одометр (день закрыт у клиента), а не экономию.';
+  note+=' Маршрут считается кольцом: база → точки → база; факт берётся по машине (смена фургона учтена).';
+  h+='<div class="ra-note">'+note+'</div>';
+  h+='<div class="ra-meta">Расчёт сохранён '+raT(d.ts)+(d.ts?(' · '+new Date(Number(d.ts)).toLocaleDateString('ru-RU')):'')+'. Повторное открытие бесплатно; кнопка пересчитает заново.</div>';
+  b.innerHTML=h;
+}
 function _geocode(q){
   if(_geoCache[q])return Promise.resolve(_geoCache[q]);
   return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q))
