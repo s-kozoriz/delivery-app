@@ -264,6 +264,22 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .ra-icol li{font-size:12.5px;color:#3a4658;line-height:1.5;margin:3px 0}
 .ra-icol.adv li{color:#245c38}
 .ra-imeta{font-size:11px;color:#8a94a3;margin-top:10px;line-height:1.45}
+/* список проанализированных дней */
+.ra-listcap{padding:10px 16px 4px;font-size:12px;color:#80786e}
+.ra-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:2px 16px 10px}
+.ra-card{background:#fff;border:1px solid #e2e5ea;border-radius:12px;padding:12px 13px;cursor:pointer;transition:.12s}
+.ra-card:hover{border-color:#b9cbe4;box-shadow:0 2px 10px rgba(24,86,160,.1)}
+.ra-card:active{transform:scale(.99)}
+.rc-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.rc-date{font-size:13px;font-weight:700;color:#20242a}
+.rc-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.rc-badge.warn{background:#fdecea;color:#c0392b}
+.rc-badge.good{background:#e7f4ec;color:#1a7a40}
+.rc-badge.mut{background:#eef0f3;color:#80786e}
+.rc-head{font-size:12.5px;color:#3a4658;line-height:1.4;margin-bottom:7px}
+.rc-nums{font-size:11.5px;color:#8a94a3;font-variant-numeric:tabular-nums}
+.rc-unplan{font-size:11.5px;color:#7a8698;margin-top:4px;font-variant-numeric:tabular-nums}
+.rc-unplan.hi{color:#c0392b;font-weight:600}
 .inc-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
 .inc-tbl td{padding:7px 8px;border-bottom:1px solid #eef1f5;vertical-align:top}
@@ -516,6 +532,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
       <button class="btn" id="raGo" onclick="raAnalyze()">Проанализировать</button>
       <span class="ra-hint" id="raHint">Считается по кнопке (Google берёт плату за расчёт). Результат сохраняется — повторный просмотр бесплатный.</span>
     </div>
+    <div id="raList"></div>
     <div id="raBody"></div>
   </div>
 </div>
@@ -3307,7 +3324,6 @@ function raProject(coords, w, h, pad){
   for(i=0;i<coords.length;i++)out.push({x:offX+(xs[i]-minX)*s, y:offY+(ys[i]-minY)*s});
   return out;
 }
-function raPlural(n,one,few,many){ var t=n%100,o=n%10; if(t>10&&t<20)return many; if(o===1)return one; if(o>1&&o<5)return few; return many; }
 // города, в которые заезжали ПОВТОРНО (не подряд) — признак «мотания» туда-сюда
 function raRevisits(seq){
   var out=[],seen={},prev=null;
@@ -3318,14 +3334,21 @@ function raRevisits(seq){
   }
   return out;
 }
+// доля адресов, добавленных водителем в пути = показатель качества планирования техника
+// (сколько точек он НЕ предусмотрел заранее, а добавили по ходу дня / забыли)
+function raAddedShare(planned,added){
+  var p=(planned||[]).length, a=(added||[]).length, t=p+a;
+  return {planned:p, added:a, total:t, pct: t>0?Math.round(a/t*100):0};
+}
 // ВЫВОД: заголовок + причины неоптимальности + что сделать в следующий раз (из тех же данных)
 function raInsight(d){
   var kr=(d&&d.kpi)||{};
   var f=raNum(kr.factKm),plan=raNum(kr.planKm),opt=raNum(kr.optKm),loss=raNum(kr.lossKm),extra=raNum(kr.extraKm),extraPct=raNum(kr.extraPct);
   var added=(d&&d.added)||[], planned=(d&&d.planned)||[];
+  var sh=raAddedShare(planned,added);
   var reasons=[],advice=[];
   if(added.length){
-    reasons.push(added.length+' '+raPlural(added.length,'адрес водитель добавил','адреса водитель добавил','адресов водитель добавил')+' уже в пути — это главная причина лишнего пробега против плана');
+    reasons.push(sh.added+' из '+sh.total+' точек ('+sh.pct+'%) водитель добавил уже в пути — техник их не запланировал; это главная причина лишнего пробега');
     advice.push('заранее известные из этих адресов ставить в план с вечера, а не догонять в течение дня');
   }
   if(loss!=null&&loss>=3){
@@ -3348,6 +3371,29 @@ function raInsight(d){
   if(!reasons.length)reasons.push('серьёзных потерь не видно: порядок близок к оптимальному и лишних точек в пути нет');
   if(!advice.length)advice.push('так и продолжать — планировать заранее и держать адреса одного города вместе');
   return {head:head,reasons:reasons,advice:advice};
+}
+function raFmtDate(iso){ var p=String(iso||'').split('-'); return (p.length===3)?(p[2]+'.'+p[1]+'.'+p[0].slice(2)):String(iso||''); }
+// значок дня в списке: перепробег %, «✓ добро» или «проверить»
+function raBadge(k){
+  k=k||{}; var f=raNum(k.factKm),ex=raNum(k.extraKm),exP=raNum(k.extraPct),loss=raNum(k.lossKm);
+  if(f!=null){ if(ex!=null&&ex>0)return {cls:'warn',txt:'+'+(exP!=null?exP+'%':ex+' км')}; return {cls:'good',txt:'✓'}; }
+  if(loss!=null&&loss>=3)return {cls:'warn',txt:'+'+loss+' км к плану'};
+  return {cls:'mut',txt:'—'};
+}
+// карточка одного проанализированного дня (из уже сохранённых данных, без Google)
+function raCardHtml(e){
+  var d=(e&&e.data)||{}, k=d.kpi||{}, ins=raInsight(d), b=raBadge(k), ash=raAddedShare(d.planned,d.added);
+  var f=raNum(k.factKm),pl=raNum(k.planKm),op=raNum(k.optKm);
+  var num=function(v,u){ return (v!=null?(v+(u||'')):'—'); };
+  // drv/date кладём в data-атрибуты (xe закрывает их через "), а НЕ в inline onclick:
+  // ключ Firebase может содержать одинарную кавычку (' разрешён), а xe её не экранирует → инъекция в onclick
+  return '<div class="ra-card" data-drv="'+xe(String(e.drv||''))+'" data-date="'+xe(String(e.date||''))+'" onclick="raPickEl(this)">'
+    +'<div class="rc-top"><span class="rc-date">'+xe(raFmtDate(e.date))+' &middot; '+xe(String(e.dname||e.drv||''))+'</span>'
+    +'<span class="rc-badge '+b.cls+'">'+xe(b.txt)+'</span></div>'
+    +'<div class="rc-head">'+xe(ins.head)+'</div>'
+    +'<div class="rc-nums">факт '+num(f,' км')+' &middot; план '+num(pl,' км')+' &middot; оптимум '+num(op,' км')+'</div>'
+    +(ash.total?'<div class="rc-unplan'+(ash.pct>=25?' hi':'')+'">не спланировано '+ash.pct+'% &middot; '+ash.added+' из '+ash.total+' добавил водитель</div>':'')
+    +'</div>';
 }
 /* ra-pure-end */
 // ===== АНАЛИЗ МАРШРУТА — UI, расчёт по кнопке, кэш результата =====
@@ -3400,6 +3446,7 @@ function raOpen(){
     s.innerHTML=keys.map(function(k){return '<option value="'+xe(k)+'">'+xe(dname(k)||k)+'</option>';}).join('');
   }
   if(d)d.onchange=raShowSaved;   // привязываем ВСЕГДА: после F5 браузер восстанавливает дату, и прежняя привязка терялась
+  raList(); // обзор всех уже проанализированных дней
   if(s)s.onchange=raShowSaved;
   raShowSaved();
 }
@@ -3425,6 +3472,39 @@ function raErrRu(s){
     INVALID_REQUEST:'неверный запрос к Google',
     NET:'нет связи с Google (проверьте интернет)', ERR:'Google ответил ошибкой' };
   return (Object.prototype.hasOwnProperty.call(m,s)?m[s]:null)||('ошибка Google: '+String(s||'')); // hasOwnProperty: иначе статус вроде 'toString' вернул бы функцию из прототипа и рендер упал бы
+}
+// список уже проанализированных дней (карточки с выводом) — из сохранённого, без Google
+function raList(){
+  var el=document.getElementById('raList'); if(!el)return;
+  // планировщик Норда читает только своего водителя (и перф, и не тянет чужие регионы)
+  var ref=disp2Mode?db.ref('route_analysis/C'):db.ref('route_analysis');
+  ref.once('value').then(function(s){
+    var val=s.val()||{}, items=[];
+    var pushDays=function(drv,byDate){
+      Object.keys(byDate||{}).forEach(function(date){
+        var d=byDate[date]; if(!d||typeof d!=='object')return;
+        items.push({drv:drv,date:date,dname:(dname(drv)||drv),data:d});
+      });
+    };
+    if(disp2Mode)pushDays('C',val);              // val = {date:data}
+    else Object.keys(val).forEach(function(drv){ pushDays(drv,val[drv]); }); // val = {drv:{date:data}}
+    items.sort(function(a,b){ return a.date<b.date?1:(a.date>b.date?-1:0); }); // новые сверху
+    if(!items.length){ el.innerHTML=''; return; }
+    el.innerHTML='<div class="ra-listcap">Уже проанализировано ('+items.length+') — нажмите день, чтобы открыть разбор:</div>'
+      +'<div class="ra-cards">'+items.map(raCardHtml).join('')+'</div>';
+  }).catch(function(){ el.innerHTML='<div class="ra-meta">Не удалось прочитать список проанализированных дней.</div>'; });
+}
+function raPickEl(el){ if(el)raPick(el.getAttribute('data-drv')||'', el.getAttribute('data-date')||''); }
+function raPick(drv,date){
+  var dv=document.getElementById('raDrv'), dt=document.getElementById('raDate');
+  if(dv&&drv){
+    var found=false; for(var i=0;i<dv.options.length;i++)if(dv.options[i].value===drv)found=true;
+    if(!found){ var o=document.createElement('option'); o.value=drv; o.textContent=dname(drv)||drv; dv.appendChild(o); }
+    dv.value=drv;
+  }
+  if(dt&&date)dt.value=date;
+  raShowSaved();
+  var b=document.getElementById('raBody'); if(b&&b.scrollIntoView){ try{ b.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }
 }
 // один запрос маршрута через наш прокси (кольцо база→точки→база)
 function raRoute(startCity, qs, optimize){
@@ -3479,7 +3559,7 @@ function raAnalyze(){
             poly:(plan&&plan.poly)||'', planned:P.planned, added:P.added, odo:odo, err:null };
           RA_CACHE[drv+'|'+date]=data;
           raRender(data);
-          db.ref('route_analysis/'+drv+'/'+date).set(data).catch(function(){ toast('Посчитано, но сохранить не удалось'); });
+          db.ref('route_analysis/'+drv+'/'+date).set(data).then(function(){ raList(); }).catch(function(){ toast('Посчитано, но сохранить не удалось'); }); // обновить список: новый день появится
         });
       });
     });
@@ -3535,11 +3615,15 @@ function raRender(d){
     +'</div>';
   if(k.factKm!=null&&d.factSoft&&d.factWhy)h+='<div class="ra-imeta">* факт по одометру: '+xe(String(d.factWhy))+' — цифру показываем, но с этой оговоркой.</div>';
   h+='<div class="ra-imeta">Считается кольцом: база → точки → база; факт берётся по машине — смена фургона в течение дня учтена.</div></div>';
+  var ash=raAddedShare(d.planned,d.added);
+  var addV=ash.total?(ash.added+' из '+ash.total):'—';
+  var addCls=ash.pct>=25?'warn':(ash.added>0?'':'good');
   h+='<div class="ra-kpis">'
     +card('Факт (одометр)',factV,factH,factCls)
     +card('План диспетчера',(k.planKm!=null?k.planKm+' км':'—'),(d.planned||[]).length+' точек'+(planMin!=null?' · '+planMin+' мин':''),'')
     +card('Оптимально',(k.optKm!=null?k.optKm+' км':'—'),'тот же набор, по времени','')
     +card('Потери от порядка',lossV,lossH,lossCls)
+    +card('Не спланировано',(ash.total?ash.pct+'%':'—'),(ash.total?addV+' добавил водитель в пути':''),addCls)
     +'</div>';
   if(d.err)h+='<div class="ra-empty">Google вернул: '+xe(raErrRu(d.err))+' — цифры могут быть неполными.</div>';
   var noGeo=((d.planned||[]).concat(d.added||[])).filter(function(p){return p.glat==null;}).length;
