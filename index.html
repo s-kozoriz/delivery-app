@@ -253,17 +253,18 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .ra-tbl td.n.add{color:#E24B4A}
 .ra-tbl td.t{width:62px;text-align:right;color:#80786e;font-variant-numeric:tabular-nums}
 .ra-meta{padding:6px 16px 14px;font-size:11px;color:#a09a90}
-/* вывод вверху */
-.ra-insight{margin:12px 16px 6px;padding:15px 16px;background:#f3f6fb;border:1px solid #d5e1f0;border-radius:12px}
-.ra-ih{font-size:15px;font-weight:800;color:#1a2a3f;line-height:1.4;margin-bottom:12px}
-.ra-icols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media (max-width:620px){.ra-icols{grid-template-columns:1fr}}
-.ra-icol .ra-icap{font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;color:#7a8698;margin-bottom:5px}
-.ra-icol.adv .ra-icap{color:#1a7a40}
-.ra-icol ul{margin:0;padding-left:18px}
-.ra-icol li{font-size:12.5px;color:#3a4658;line-height:1.5;margin:3px 0}
-.ra-icol.adv li{color:#245c38}
-.ra-imeta{font-size:11px;color:#8a94a3;margin-top:10px;line-height:1.45}
+/* вывод вверху — 4 пронумерованных пункта (строки) */
+.ra-pts{margin:12px 16px 6px;background:#fff;border:1px solid #d5e1f0;border-radius:14px;overflow:hidden}
+.ra-pt{display:flex;align-items:center;gap:12px;padding:13px 15px;border-top:1px solid #eef2f7}
+.ra-pt:first-child{border-top:none}
+.pt-no{width:25px;height:25px;flex-shrink:0;border-radius:50%;background:#1856a0;color:#fff;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.pt-mid{flex:1;min-width:0}
+.pt-nm{font-size:13.5px;font-weight:700;color:#20242a}
+.pt-ds{font-size:12px;color:#80868f;margin-top:1px;line-height:1.35}
+.pt-vd{font-size:13.5px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums;color:#4a5560}
+.pt-vd.warn{color:#c0392b} .pt-vd.good{color:#1a7a40}
+.pt-ic{width:22px;flex-shrink:0;text-align:center;font-size:15px}
+.ra-imeta{font-size:11px;color:#8a94a3;margin:2px 16px 10px;line-height:1.45}
 /* список проанализированных дней */
 .ra-listcap{padding:10px 16px 4px;font-size:12px;color:#80786e}
 .ra-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:2px 16px 10px}
@@ -3340,37 +3341,49 @@ function raAddedShare(planned,added){
   var p=(planned||[]).length, a=(added||[]).length, t=p+a;
   return {planned:p, added:a, total:t, pct: t>0?Math.round(a/t*100):0};
 }
-// ВЫВОД: заголовок + причины неоптимальности + что сделать в следующий раз (из тех же данных)
+// повторные заезды в один город за день (мотание туда-обратно). Дубли адреса
+// (несколько накладных на один адрес) НЕ считаем — это один заезд, а не повтор.
+function raRepeats(d){
+  var seq=((d&&d.planned)||[]).slice().sort(function(a,b){return (a.order||0)-(b.order||0);}).map(function(p){return p.city||'';});
+  ((d&&d.added)||[]).slice().sort(function(a,b){return (a.ts||0)-(b.ts||0);}).forEach(function(p){seq.push(p.city||'');});
+  var rev=raRevisits(seq);
+  return {count:rev.length, cities:rev, detail: rev.length?('возврат в город: '+rev.join(', ')):'повторных заездов не было'};
+}
+function raRepWord(n){ var t=n%100,o=n%10; if(t>10&&t<20)return 'повторов'; if(o===1)return 'повтор'; if(o>1&&o<5)return 'повтора'; return 'повторов'; }
+// короткий заголовок дня для карточки в списке
+function raHeadline(d){
+  var kr=(d&&d.kpi)||{}; var f=raNum(kr.factKm),extra=raNum(kr.extraKm),extraPct=raNum(kr.extraPct),loss=raNum(kr.lossKm);
+  var added=((d&&d.added)||[]).length;
+  if(f!=null&&extra!=null&&extra>0)return 'Перепробег +'+extra+' км'+(extraPct!=null?' ('+extraPct+'%)':'');
+  if(f!=null&&extra!=null&&extra<0)return 'Факт меньше плана';
+  if(loss!=null&&loss<3&&!added)return 'Близко к оптимуму';
+  return 'Есть резерв улучшить';
+}
+// ВЫВОД — строго 4 пронумерованных пункта, одинаковый порядок каждый день
 function raInsight(d){
   var kr=(d&&d.kpi)||{};
   var f=raNum(kr.factKm),plan=raNum(kr.planKm),opt=raNum(kr.optKm),loss=raNum(kr.lossKm),extra=raNum(kr.extraKm),extraPct=raNum(kr.extraPct);
-  var added=(d&&d.added)||[], planned=(d&&d.planned)||[];
-  var sh=raAddedShare(planned,added);
-  var reasons=[],advice=[];
-  if(added.length){
-    reasons.push(sh.added+' из '+sh.total+' точек ('+sh.pct+'%) водитель добавил уже в пути — техник их не запланировал; это главная причина лишнего пробега');
-    advice.push('заранее известные из этих адресов ставить в план с вечера, а не догонять в течение дня');
-  }
-  if(loss!=null&&loss>=3){
-    reasons.push('порядок объезда не оптимальный — из-за очерёдности точек лишних '+loss+' км');
-    advice.push('тот же набор адресов в лучшем порядке даёт '+(opt!=null?opt+' км':'меньше')+' вместо '+(plan!=null?plan+' км':'—')+' — переставить точки');
-  }
-  var seq=planned.slice().sort(function(a,b){return (a.order||0)-(b.order||0);}).map(function(p){return p.city||'';});
-  added.slice().sort(function(a,b){return (a.ts||0)-(b.ts||0);}).forEach(function(p){seq.push(p.city||'');});
-  var rev=raRevisits(seq);
-  if(rev.length){
-    reasons.push('возврат в '+rev.join(', ')+' — в город заезжали повторно, а не одним заходом');
-    advice.push('собирать все адреса одного города в одну связку, без возврата туда-обратно');
-  }
-  var head;
-  if(f!=null&&extra!=null&&extra>0)head='Фактически '+f+' км — на '+extra+' км'+(extraPct!=null?' ('+extraPct+'%)':'')+' больше плана.';
-  else if(f!=null&&extra!=null&&extra<0)head='Фактически '+f+' км — меньше плана (обычно возврат на базу не попал в одометр).';
-  else if(f!=null&&loss!=null&&loss<3&&!added.length)head='Маршрут пройден близко к оптимуму — существенного резерва нет.';
-  else if(loss!=null&&loss<3&&!added.length)head='Порядок построен почти оптимально — существенного резерва нет.';
-  else head='Есть резерв сделать маршрут короче.';
-  if(!reasons.length)reasons.push('серьёзных потерь не видно: порядок близок к оптимальному и лишних точек в пути нет');
-  if(!advice.length)advice.push('так и продолжать — планировать заранее и держать адреса одного города вместе');
-  return {head:head,reasons:reasons,advice:advice};
+  var sh=raAddedShare((d&&d.planned)||[],(d&&d.added)||[]);
+  var pts=[];
+  // 1. Пробег — совпал ли факт с планом
+  if(f==null)pts.push({no:1,name:'Пробег',verdict:'нет данных',desc:'одометр за день не заполнен',state:'mut'});
+  else if(extra==null)pts.push({no:1,name:'Пробег',verdict:f+' км',desc:'план в км не посчитан — сравнить не с чем',state:'mut'});
+  else if(extra>0)pts.push({no:1,name:'Пробег',verdict:'+'+extra+' км'+(extraPct!=null?' · '+extraPct+'%':''),desc:'факт '+f+' км против плана '+plan+' км',state:'warn'});
+  else if(extra<0)pts.push({no:1,name:'Пробег',verdict:f+' км',desc:'меньше плана — возврат на базу мог не попасть в одометр',state:'good'});
+  else pts.push({no:1,name:'Пробег',verdict:'совпал',desc:'факт '+f+' км ≈ план '+plan+' км',state:'good'});
+  // 2. План против оптимального маршрута
+  if(loss==null)pts.push({no:2,name:'План против оптимального маршрута',verdict:'—',desc:'оптимальный порядок не посчитан',state:'mut'});
+  else if(loss<=0)pts.push({no:2,name:'План против оптимального маршрута',verdict:'оптимально',desc:'лучший порядок не короче плана',state:'good'});
+  else if(loss<3)pts.push({no:2,name:'План против оптимального маршрута',verdict:'+'+loss+' км',desc:'порядок почти идеальный (оптимум '+(opt!=null?opt+' км':'—')+')',state:'good'});
+  else pts.push({no:2,name:'План против оптимального маршрута',verdict:'+'+loss+' км',desc:'порядок можно улучшить: оптимум '+(opt!=null?opt+' км':'—')+' против плана '+(plan!=null?plan+' км':'—'),state:'warn'});
+  // 3. Процент незапланированного техником
+  if(!sh.total)pts.push({no:3,name:'Процент незапланированного техником',verdict:'—',desc:'нет точек',state:'mut'});
+  else pts.push({no:3,name:'Процент незапланированного техником',verdict:sh.pct+'%',desc:sh.added+' из '+sh.total+' точек водитель добавил в пути',state:(sh.pct>=25?'warn':(sh.added>0?'':'good'))});
+  // 4. Повторы точек за день (возврат в город)
+  var rep=raRepeats(d);
+  if(!rep.count)pts.push({no:4,name:'Повторы точек за день',verdict:'нет',desc:'повторных заездов не было',state:'good'});
+  else pts.push({no:4,name:'Повторы точек за день',verdict:rep.count+' '+raRepWord(rep.count),desc:rep.detail,state:'warn'});
+  return {points:pts};
 }
 function raFmtDate(iso){ var p=String(iso||'').split('-'); return (p.length===3)?(p[2]+'.'+p[1]+'.'+p[0].slice(2)):String(iso||''); }
 // значок дня в списке: перепробег %, «✓ добро» или «проверить»
@@ -3382,7 +3395,7 @@ function raBadge(k){
 }
 // карточка одного проанализированного дня (из уже сохранённых данных, без Google)
 function raCardHtml(e){
-  var d=(e&&e.data)||{}, k=d.kpi||{}, ins=raInsight(d), b=raBadge(k), ash=raAddedShare(d.planned,d.added);
+  var d=(e&&e.data)||{}, k=d.kpi||{}, b=raBadge(k), ash=raAddedShare(d.planned,d.added);
   var f=raNum(k.factKm),pl=raNum(k.planKm),op=raNum(k.optKm);
   var num=function(v,u){ return (v!=null?(v+(u||'')):'—'); };
   // drv/date кладём в data-атрибуты (xe закрывает их через "), а НЕ в inline onclick:
@@ -3390,7 +3403,7 @@ function raCardHtml(e){
   return '<div class="ra-card" data-drv="'+xe(String(e.drv||''))+'" data-date="'+xe(String(e.date||''))+'" onclick="raPickEl(this)">'
     +'<div class="rc-top"><span class="rc-date">'+xe(raFmtDate(e.date))+' &middot; '+xe(String(e.dname||e.drv||''))+'</span>'
     +'<span class="rc-badge '+b.cls+'">'+xe(b.txt)+'</span></div>'
-    +'<div class="rc-head">'+xe(ins.head)+'</div>'
+    +'<div class="rc-head">'+xe(raHeadline(d))+'</div>'
     +'<div class="rc-nums">факт '+num(f,' км')+' &middot; план '+num(pl,' км')+' &middot; оптимум '+num(op,' км')+'</div>'
     +(ash.total?'<div class="rc-unplan'+(ash.pct>=25?' hi':'')+'">не спланировано '+ash.pct+'% &middot; '+ash.added+' из '+ash.total+' добавил водитель</div>':'')
     +'</div>';
@@ -3606,15 +3619,17 @@ function raRender(d){
   if(k.lossKm==null){ lossV='—'; lossH=''; lossCls=''; }
   else if(k.lossKm<0){ lossV='0 км'; lossH='план короче по км (Google ищет самый быстрый, не самый короткий)'; lossCls='good'; }
   else { lossV=k.lossKm+' км'; lossH=(k.lossPct!=null?k.lossPct+'% к оптимуму':''); lossCls=(k.lossKm<3?'good':'warn'); }
-  // ВЫВОД — ВВЕРХУ: главное для руководителя (что не так и что сделать), детали ниже
+  // ВЫВОД — ВВЕРХУ: строго 4 пронумерованных пункта (одинаковый порядок каждый день)
   var ins=raInsight(d);
-  var h='<div class="ra-insight"><div class="ra-ih">'+xe(ins.head)+'</div>'
-    +'<div class="ra-icols">'
-    +'<div class="ra-icol"><div class="ra-icap">Почему не оптимально</div><ul>'+ins.reasons.map(function(r){return '<li>'+xe(r)+'</li>';}).join('')+'</ul></div>'
-    +'<div class="ra-icol adv"><div class="ra-icap">Что сделать в следующий раз</div><ul>'+ins.advice.map(function(r){return '<li>'+xe(r)+'</li>';}).join('')+'</ul></div>'
-    +'</div>';
+  var ico={warn:'⚠️',good:'✅',mut:'•'};
+  var h='<div class="ra-pts">'+ins.points.map(function(p){
+    return '<div class="ra-pt"><div class="pt-no">'+p.no+'</div>'
+      +'<div class="pt-mid"><div class="pt-nm">'+xe(String(p.name))+'</div><div class="pt-ds">'+xe(String(p.desc))+'</div></div>'
+      +'<div class="pt-vd '+(p.state||'')+'">'+xe(String(p.verdict))+'</div>'
+      +'<div class="pt-ic">'+(ico[p.state]||'')+'</div></div>';
+  }).join('')+'</div>';
   if(k.factKm!=null&&d.factSoft&&d.factWhy)h+='<div class="ra-imeta">* факт по одометру: '+xe(String(d.factWhy))+' — цифру показываем, но с этой оговоркой.</div>';
-  h+='<div class="ra-imeta">Считается кольцом: база → точки → база; факт берётся по машине — смена фургона в течение дня учтена.</div></div>';
+  h+='<div class="ra-imeta">Считается кольцом: база → точки → база; факт берётся по машине — смена фургона в течение дня учтена.</div>';
   var ash=raAddedShare(d.planned,d.added);
   var addV=ash.total?(ash.added+' из '+ash.total):'—';
   var addCls=ash.pct>=25?'warn':(ash.added>0?'':'good');
