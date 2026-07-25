@@ -1,0 +1,26 @@
+name: route-analysis
+
+on:
+  schedule:
+    - cron: '0 21 * * 1-6'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Дата YYYY-MM-DD (пусто = сегодня)'
+        required: false
+        default: ''
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Анализ маршрутов за день по всем авто
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
+          MAPS_KEY: ${{ secrets.MAPS_KEY }}
+          DATE: ${{ github.event.inputs.date }}
+        run: node scripts/route-analysis-cron.mjs "$DATE"
