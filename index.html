@@ -252,8 +252,18 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .ra-tbl td.n{width:34px;font-weight:800;color:#1856a0;font-variant-numeric:tabular-nums}
 .ra-tbl td.n.add{color:#E24B4A}
 .ra-tbl td.t{width:62px;text-align:right;color:#80786e;font-variant-numeric:tabular-nums}
-.ra-note{margin:12px 16px 4px;padding:12px 14px;background:#faf7f0;border:1px solid #ecdcc2;border-radius:10px;font-size:12.5px;color:#5a5346;line-height:1.55}
 .ra-meta{padding:6px 16px 14px;font-size:11px;color:#a09a90}
+/* вывод вверху */
+.ra-insight{margin:12px 16px 6px;padding:15px 16px;background:#f3f6fb;border:1px solid #d5e1f0;border-radius:12px}
+.ra-ih{font-size:15px;font-weight:800;color:#1a2a3f;line-height:1.4;margin-bottom:12px}
+.ra-icols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:620px){.ra-icols{grid-template-columns:1fr}}
+.ra-icol .ra-icap{font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;color:#7a8698;margin-bottom:5px}
+.ra-icol.adv .ra-icap{color:#1a7a40}
+.ra-icol ul{margin:0;padding-left:18px}
+.ra-icol li{font-size:12.5px;color:#3a4658;line-height:1.5;margin:3px 0}
+.ra-icol.adv li{color:#245c38}
+.ra-imeta{font-size:11px;color:#8a94a3;margin-top:10px;line-height:1.45}
 .inc-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
 .inc-tbl td{padding:7px 8px;border-bottom:1px solid #eef1f5;vertical-align:top}
@@ -3297,6 +3307,48 @@ function raProject(coords, w, h, pad){
   for(i=0;i<coords.length;i++)out.push({x:offX+(xs[i]-minX)*s, y:offY+(ys[i]-minY)*s});
   return out;
 }
+function raPlural(n,one,few,many){ var t=n%100,o=n%10; if(t>10&&t<20)return many; if(o===1)return one; if(o>1&&o<5)return few; return many; }
+// города, в которые заезжали ПОВТОРНО (не подряд) — признак «мотания» туда-сюда
+function raRevisits(seq){
+  var out=[],seen={},prev=null;
+  for(var i=0;i<seq.length;i++){
+    var c=(seq[i]||'').trim(); if(!c)continue; // пустой город пропускаем, prev не сбрасываем (иначе A,'',A ложно счёл бы возвратом)
+    if(c!==prev&&seen[c]&&out.indexOf(c)===-1)out.push(c);
+    seen[c]=1; prev=c;
+  }
+  return out;
+}
+// ВЫВОД: заголовок + причины неоптимальности + что сделать в следующий раз (из тех же данных)
+function raInsight(d){
+  var kr=(d&&d.kpi)||{};
+  var f=raNum(kr.factKm),plan=raNum(kr.planKm),opt=raNum(kr.optKm),loss=raNum(kr.lossKm),extra=raNum(kr.extraKm),extraPct=raNum(kr.extraPct);
+  var added=(d&&d.added)||[], planned=(d&&d.planned)||[];
+  var reasons=[],advice=[];
+  if(added.length){
+    reasons.push(added.length+' '+raPlural(added.length,'адрес водитель добавил','адреса водитель добавил','адресов водитель добавил')+' уже в пути — это главная причина лишнего пробега против плана');
+    advice.push('заранее известные из этих адресов ставить в план с вечера, а не догонять в течение дня');
+  }
+  if(loss!=null&&loss>=3){
+    reasons.push('порядок объезда не оптимальный — из-за очерёдности точек лишних '+loss+' км');
+    advice.push('тот же набор адресов в лучшем порядке даёт '+(opt!=null?opt+' км':'меньше')+' вместо '+(plan!=null?plan+' км':'—')+' — переставить точки');
+  }
+  var seq=planned.slice().sort(function(a,b){return (a.order||0)-(b.order||0);}).map(function(p){return p.city||'';});
+  added.slice().sort(function(a,b){return (a.ts||0)-(b.ts||0);}).forEach(function(p){seq.push(p.city||'');});
+  var rev=raRevisits(seq);
+  if(rev.length){
+    reasons.push('возврат в '+rev.join(', ')+' — в город заезжали повторно, а не одним заходом');
+    advice.push('собирать все адреса одного города в одну связку, без возврата туда-обратно');
+  }
+  var head;
+  if(f!=null&&extra!=null&&extra>0)head='Фактически '+f+' км — на '+extra+' км'+(extraPct!=null?' ('+extraPct+'%)':'')+' больше плана.';
+  else if(f!=null&&extra!=null&&extra<0)head='Фактически '+f+' км — меньше плана (обычно возврат на базу не попал в одометр).';
+  else if(f!=null&&loss!=null&&loss<3&&!added.length)head='Маршрут пройден близко к оптимуму — существенного резерва нет.';
+  else if(loss!=null&&loss<3&&!added.length)head='Порядок построен почти оптимально — существенного резерва нет.';
+  else head='Есть резерв сделать маршрут короче.';
+  if(!reasons.length)reasons.push('серьёзных потерь не видно: порядок близок к оптимальному и лишних точек в пути нет');
+  if(!advice.length)advice.push('так и продолжать — планировать заранее и держать адреса одного города вместе');
+  return {head:head,reasons:reasons,advice:advice};
+}
 /* ra-pure-end */
 // ===== АНАЛИЗ МАРШРУТА — UI, расчёт по кнопке, кэш результата =====
 var RA_CACHE={};
@@ -3304,24 +3356,38 @@ function raT(ts){ if(!ts)return ''; var d=new Date(Number(ts)); return String(d.
 function raAddrQ(p){ return (typeof cleanAddr==='function'?cleanAddr(p.addr||''):String(p.addr||'').trim())+', '+(p.city||'')+', Germany'; } // тот же нормализатор, что и везде (свой отгрызал номер дома)
 // ФАКТ пробега берём из odoCluster — он раскладывает показания ПО МАШИНАМ (водители меняются фургонами),
 // поэтому смена машины в обед не превращается в «намотал 1150 км». Число даём только если день чистый.
+function raFactNote(notes){
+  var a=[];
+  if(notes.carry)a.push('часть пробега накоплена с прошлых дней (утром замер не сделали)');
+  if(notes.cross)a.push('есть показание другого региона');
+  if(notes.typo)a.push('часть показаний не сходится — возможна опечатка');
+  if(notes.unk)a.push('одно показание не привязалось к машине');
+  return a.join('; ');
+}
+// Факт берём ТАК ЖЕ, как вкладка «Пробег»: сумма чистых суточных приростов (dsum) по машинам.
+// carry/cross/опечатка НЕ прячут число (иначе два экрана по тем же данным дают разный вердикт) —
+// это лишь мягкая пометка о точности. km=null только если чистых приростов за день нет вовсе.
 function raFact(drv,date){
-  var out={km:null,dirty:false,why:''};
-  if(typeof odoCluster!=='function')return out;
-  if(!odoAll||!Object.keys(odoAll).length){ out.dirty=true; out.why='данные одометра ещё не загрузились — откройте вкладку заново'; return out; } // иначе сохранили бы «одометра нет» для дня, где он есть
-  var c; try{ c=odoCluster(); }catch(e){ return out; }
-  var km=0, has=false;
+  var out={km:null,soft:false,why:'',reason:'',notReady:false};
+  if(typeof odoCluster!=='function'){ out.reason='расклад по машинам недоступен'; return out; }
+  if(!odoAll||!Object.keys(odoAll).length){ out.reason='данные одометра ещё не загрузились'; out.notReady=true; return out; } // гонка загрузки — НЕ кэшируем (см. raAnalyze), иначе «—» застрянет
+  var c; try{ c=odoCluster(); }catch(e){ out.reason='не удалось разложить одометр по машинам'; return out; }
+  var km=0, has=false, notes={};
   ((c&&c.vans)||[]).forEach(function(v){
     (v.evs||[]).forEach(function(e){
       if(!e||e.drv!==drv||e.date!==date)return;
-      if(e.clean===false){ out.dirty=true; out.why='показания не сходятся (опечатка или пропущены дни)'; return; }
-      if(e.cross){ out.dirty=true; if(!out.why)out.why='показание другого региона'; }
-      if(e.carry){ out.dirty=true; if(!out.why)out.why='в приросте накоплено за прошлые дни'; }
       var d=raNum(e.delta);
-      if(d!=null&&d>0){ km+=d; has=true; }
+      if(e.clean!==false && d!=null && d>0){ km+=d; has=true; if(e.carry)notes.carry=1; if(e.cross)notes.cross=1; }
+      else if(e.clean===false){ notes.typo=1; }
     });
   });
-  ((c&&c.unknown)||[]).forEach(function(e){ if(e&&e.drv===drv&&e.date===date){ out.dirty=true; if(!out.why)out.why='показание не привязалось к машине'; } });
-  if(has&&!out.dirty)out.km=Math.round(km*10)/10;
+  ((c&&c.unknown)||[]).forEach(function(e){ if(e&&e.drv===drv&&e.date===date)notes.unk=1; });
+  if(has){
+    out.km=Math.round(km*10)/10;
+    if(Object.keys(notes).length){ out.soft=true; out.why=raFactNote(notes); } // число есть, точность с оговоркой
+  }else{
+    out.reason=Object.keys(notes).length?raFactNote(notes):'за этот день нет показаний одометра';
+  }
   return out;
 }
 function raOpen(){
@@ -3403,11 +3469,12 @@ function raAnalyze(){
           return null;
         }
         var fa=raFact(drv,date);
+        if(fa.notReady){ b.innerHTML='<div class="ra-empty">Данные одометра ещё загружаются. Нажмите «Проанализировать» ещё раз через пару секунд — маршрут посчитан, ждём только одометр.</div>'; return null; } // НЕ сохраняем: иначе закэшируем «одометра нет» для дня, где он есть
         return db.ref('odometer/'+drv+'/'+date).once('value').then(function(s){
           var odo=s.val()||null;
           var planKm=(plan&&plan.km!=null)?plan.km:null, optKm=(opt&&opt.km!=null)?opt.km:null;
           var data={ drv:drv, date:date, ts:Date.now(), startCity:startCity,
-            base:coords[0]||null, kpi:raKpi(fa.km,planKm,optKm), factDirty:!!fa.dirty, factWhy:fa.why||'',
+            base:coords[0]||null, kpi:raKpi(fa.km,planKm,optKm), factSoft:!!fa.soft, factWhy:fa.why||'', factReason:fa.reason||'',
             planKm:planKm, planMin:raNum(plan&&plan.min), optKm:optKm, optMin:raNum(opt&&opt.min),
             poly:(plan&&plan.poly)||'', planned:P.planned, added:P.added, odo:odo, err:null };
           RA_CACHE[drv+'|'+date]=data;
@@ -3453,14 +3520,22 @@ function raRender(d){
   var oS=raNum(d.odo&&d.odo.start&&d.odo.start.km), oE=raNum(d.odo&&d.odo.end&&d.odo.end.km);
   var odoH=(oS!=null&&oE!=null)?(oS+' → '+oE):'одометр не заполнен';
   var factV, factH, factCls;
-  if(d.factDirty){ factV='требует проверки'; factH=String(d.factWhy||'сверьте вкладку «Пробег»'); factCls='warn'; }
-  else if(k.factKm!=null){ factV=k.factKm+' км'; factH=odoH; factCls=(k.extraKm!=null&&k.extraKm>0?'warn':''); }
-  else { factV='—'; factH=odoH; factCls=''; }
+  if(k.factKm!=null){ factV=k.factKm+' км'; factH=(d.factSoft&&d.factWhy)?('* '+String(d.factWhy)):odoH; factCls=(k.extraKm!=null&&k.extraKm>0?'warn':''); }
+  else { factV='—'; factH=String(d.factReason||odoH); factCls=''; }
   var lossV,lossH,lossCls;
   if(k.lossKm==null){ lossV='—'; lossH=''; lossCls=''; }
   else if(k.lossKm<0){ lossV='0 км'; lossH='план короче по км (Google ищет самый быстрый, не самый короткий)'; lossCls='good'; }
   else { lossV=k.lossKm+' км'; lossH=(k.lossPct!=null?k.lossPct+'% к оптимуму':''); lossCls=(k.lossKm<3?'good':'warn'); }
-  var h='<div class="ra-kpis">'
+  // ВЫВОД — ВВЕРХУ: главное для руководителя (что не так и что сделать), детали ниже
+  var ins=raInsight(d);
+  var h='<div class="ra-insight"><div class="ra-ih">'+xe(ins.head)+'</div>'
+    +'<div class="ra-icols">'
+    +'<div class="ra-icol"><div class="ra-icap">Почему не оптимально</div><ul>'+ins.reasons.map(function(r){return '<li>'+xe(r)+'</li>';}).join('')+'</ul></div>'
+    +'<div class="ra-icol adv"><div class="ra-icap">Что сделать в следующий раз</div><ul>'+ins.advice.map(function(r){return '<li>'+xe(r)+'</li>';}).join('')+'</ul></div>'
+    +'</div>';
+  if(k.factKm!=null&&d.factSoft&&d.factWhy)h+='<div class="ra-imeta">* факт по одометру: '+xe(String(d.factWhy))+' — цифру показываем, но с этой оговоркой.</div>';
+  h+='<div class="ra-imeta">Считается кольцом: база → точки → база; факт берётся по машине — смена фургона в течение дня учтена.</div></div>';
+  h+='<div class="ra-kpis">'
     +card('Факт (одометр)',factV,factH,factCls)
     +card('План диспетчера',(k.planKm!=null?k.planKm+' км':'—'),(d.planned||[]).length+' точек'+(planMin!=null?' · '+planMin+' мин':''),'')
     +card('Оптимально',(k.optKm!=null?k.optKm+' км':'—'),'тот же набор, по времени','')
@@ -3482,14 +3557,6 @@ function raRender(d){
     h+='<div class="ra-sec"><h3>Добавлено водителем в пути ('+d.added.length+')</h3>'
       +'<table class="ra-tbl"><thead><tr><th></th><th>Город</th><th>Адрес</th><th>Фото</th></tr></thead><tbody>'+ad+'</tbody></table></div>';
   }
-  var note='План — '+(k.planKm!=null?k.planKm+' км':'—')+', лучший порядок для тех же адресов — '+(k.optKm!=null?k.optKm+' км':'—')+
-    (k.lossKm!=null?(k.lossKm<=0?': порядок построен оптимально.':(k.lossKm<3?': порядок построен почти оптимально.':': порядок можно улучшить примерно на '+k.lossKm+' км.')):'.');
-  if(d.factDirty)note+=' Фактический пробег не показан: '+xe(String(d.factWhy||'показания одометра требуют проверки'))+' — во вкладке «Пробег» число за этот день может быть (там правила мягче), выводы по километражу пока делать рано.';
-  else if(k.factKm!=null&&k.extraKm!=null&&k.extraKm>0)note+=' По одометру намотано '+k.factKm+' км — на '+k.extraKm+' км больше плана'+
-    ((d.added||[]).length?('; вероятное объяснение — '+d.added.length+' точек, добавленных уже в пути.'):'.');
-  else if(k.factKm!=null&&k.extraKm!=null&&k.extraKm<0)note+=' По одометру '+k.factKm+' км — МЕНЬШЕ плана на '+Math.abs(k.extraKm)+' км. Обычно это значит, что возврат на базу не попал в одометр (день закрыт у клиента), а не экономию.';
-  note+=' Маршрут считается кольцом: база → точки → база; факт берётся по машине (смена фургона учтена).';
-  h+='<div class="ra-note">'+note+'</div>';
   h+='<div class="ra-meta">Расчёт сохранён '+raT(d.ts)+(d.ts?(' · '+new Date(Number(d.ts)).toLocaleDateString('ru-RU')):'')+'. Повторное открытие бесплатно; кнопка пересчитает заново.</div>';
   b.innerHTML=h;
 }
