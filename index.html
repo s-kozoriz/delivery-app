@@ -1515,7 +1515,8 @@ function _rtblNow(){
       var wkey=curD+'_'+r.id+'_'+i;
       var whDone=v.trim()&&warehouseStatus[wkey];
       var chk=v.trim()?'<span style="font-size:13px;font-weight:700;flex-shrink:0;color:'+(whDone?'#1a7a40':'#ddd')+';padding:0 2px" title="'+(whDone?'Загружено':'Ожидает')+'">&#10003;</span>':'<span style="width:14px;flex-shrink:0;display:inline-block"></span>';
-      if(_ce) ih+='<div class="irow">'+chk+'<input class="iinp" type="text" value="'+xe(v)+'" placeholder="LK-..." oninput="ui(\''+r.id+'\','+i+',this.value)"><button class="ix" onclick="di(\''+r.id+'\','+i+')">&#215;</button></div>';
+      // Поле вводу — лише у ВІДКРИТОМУ на редагування рядку; у згорнутому номер = клікабельне посилання на состав (як остальные колонки)
+      if(_ce&&isEditing) ih+='<div class="irow">'+chk+'<input class="iinp" type="text" value="'+xe(v)+'" placeholder="LK-..." oninput="ui(\''+r.id+'\','+i+',this.value)"><button class="ix" onclick="di(\''+r.id+'\','+i+')">&#215;</button></div>';
       else ih+='<div class="irow">'+chk+'<span class="iinp" style="padding:3px 4px;display:inline-block;color:#555">'+(v.trim()?invLinkHtml(v):'&mdash;')+'</span></div>';
     });
 
@@ -1582,7 +1583,7 @@ function _rtblNow(){
     if(r.plannerName)addrCellHtml += '<div style="font-size:10px;color:#7a4a00;font-weight:600;margin-top:1px">&#128100; '+xe(r.plannerName)+'</div>';
     addrCellHtml += '</td>';
     h += addrCellHtml;
-    h+='<td><div class="icel">'+ih+(_ce?'<button class="iadd" onclick="ai(\''+r.id+'\')">+ накладная</button>':'')+'</div></td>';
+    h+='<td><div class="icel">'+ih+(_ce&&isEditing?'<button class="iadd" onclick="ai(\''+r.id+'\')">+ накладная</button>':'')+'</div></td>';
     h+='<td style="width:128px">'+(isEditing?'<select onchange="ur(\''+r.id+'\',\'status\',this.value)" style="'+sc+'">'+so2+'</select>':'<span style="font-size:12px;padding:2px 4px;display:block;'+sc+'">'+xe(r.status||'—')+'</span>')+'</td>';
     h+='<td style="min-width:100px">'+(isEditing?'<input type="text" value="'+xe(r.comment)+'" placeholder="..." oninput="ur(\''+r.id+'\',\'comment\',this.value)">':'<span style="font-size:12px;padding:2px 4px;display:block;color:var(--mu)">'+xe(r.comment||'')+'</span>')+'</td>';
     if(isEditing){
