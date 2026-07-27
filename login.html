@@ -103,7 +103,7 @@ function check(){
       return firebase.auth().signInWithCustomToken(res.token);
     }).then(function(){
       sessionStorage.setItem('login_from','login');
-      if(res.role==='zentrum' || res.role==='norden' || res.role==='lager'){
+      if(res.role==='zentrum' || res.role==='norden' || res.role==='lager' || res.role==='viewer'){
         sessionStorage.setItem('login_role', res.role);
       } else {
         sessionStorage.removeItem('login_role');

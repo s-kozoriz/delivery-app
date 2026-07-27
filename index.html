@@ -766,7 +766,7 @@ var cfg={
 };
 var CITIES=cfg.cities.slice();
 var CITIESC=cfg.citiesC?cfg.citiesC.slice():['Aurich','Wilhelmshaven','Varel'];
-var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRowId=null,newRowDraft=null,pinBuf='',viewOnly=false,disp2Mode=false,IS_PLANNER=false,PLANNER_ID='',PLANNER_NAME='',pinMode='dispatcher',_lastEdit=0,_pending={};
+var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRowId=null,newRowDraft=null,pinBuf='',viewOnly=false,disp2Mode=false,IS_VIEWER=false,IS_PLANNER=false,PLANNER_ID='',PLANNER_NAME='',pinMode='dispatcher',_lastEdit=0,_pending={};
 // фильтры колонок главной таблицы + свёрнутые даты (состояние запоминается в браузере)
 var colFilter={drv:'',city:'',status:'',doneF:''};
 var collapsedDates={}; try{ collapsedDates=JSON.parse(localStorage.getItem('dispCollapsed')||'{}'); }catch(e){ collapsedDates={}; }
@@ -813,7 +813,12 @@ db.ref('cfg').on('value',function(s){
 db.ref('sent').on('value',function(s){sent=s.val()||{};gm();rh();});
 db.ref('trips').on('value',function(s){tripStatus=s.val()||{};gm();});
 db.ref('worktime').on('value',function(s){wtAll=s.val()||{};wtDenied=false;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
-db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
+// viewer НЕ має читати lager_staff (там PINи) — імена вантажників бере з PIN-free дзеркала loaders_pub
+if(IS_VIEWER){
+  db.ref('loaders_pub').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
+} else {
+  db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
+}
 var pairsAll={};
 db.ref('pairs').on('value',function(s){pairsAll=s.val()||{};var tt2=document.getElementById('ttab');if(tt2&&tt2.style.display!=='none')renderTabel();},function(){});
 // ── Пробег (одометр) — временное хранилище для сверки с топливом (Zoll); фото уходит контролёру позже ──
@@ -1061,6 +1066,35 @@ function applyViewMode(){
   document.head.appendChild(style);
   setTimeout(function(){ rtbl(); }, 200);
 }
+// Роль viewer («Просмотр»): только чтение 4 вкладок — Маршрут, История, Табель, Входящие 1С.
+// Мягкая блокировка UI здесь; ТВЁРДАЯ граница — правила RTDB (у viewer нет ни одного .write).
+function applyViewerMode(){
+  document.getElementById('appTitle').textContent='LK Bauservice — Просмотр';
+  ['tabStat','tabVoice','tabOdo','tabCalib','tabRoute','tabCfg','tabNordM'].forEach(function(id){
+    var b=document.getElementById(id); if(b)b.style.display='none';
+  });
+  var style=document.createElement('style');
+  style.id='viewer-style';
+  style.textContent=[
+    /* поля строк — как текст, без правки */
+    'td input, td select { pointer-events:none!important; border:none!important; background:transparent!important; color:var(--tx)!important; opacity:1!important; font-weight:500!important; }',
+    'td input[type=checkbox] { opacity:.35!important; }',
+    /* кнопки-мутаторы */
+    'td button, .iadd, .ix, .dbtn, .rchk, .inc-accept, .inc-return, .dm-ret, .tabel-edit, .tabel-add, .tabel-savebig, .tabel-addseg, .tabel-segdel, .tabel-cancel { pointer-events:none!important; opacity:.3!important; }',
+    '#tblBtns { display:none!important; }',
+    '#addRowBtn { display:none!important; }',
+    '.tr-done td input, .tr-done td select { color:var(--tx)!important; opacity:1!important; }',
+    /* заметки дня — читать можно, править нельзя */
+    '#notesText { pointer-events:none!important; }',
+    '#notesBody .btn { display:none!important; }',
+    /* панели водителей: стрелки порядка и расчёт маршрута — не для просмотра */
+    '.mc button { pointer-events:none!important; opacity:.3!important; }',
+    /* ссылки-номера накладных остаются кликабельными */
+    '.inc-invlink { pointer-events:auto!important; opacity:1!important; }'
+  ].join('\n');
+  document.head.appendChild(style);
+  setTimeout(function(){ rtbl(); }, 200);
+}
 function applyDisp2Mode(){
   document.getElementById('appTitle').textContent='LK Norden';
   document.getElementById('tabCfg').style.display='none';
@@ -1093,9 +1127,9 @@ function lockNonCRows(){
   });
 }
 // Auth gate (Варіант A): роль береться з custom-token claim; кожна сторінка звіряє СВОЮ роль
-function pageFor(c){c=c||{};var r=c.role;if(r==='zentrum'||r==='norden'||r==='lager')return 'index.html';if(r==='driver')return ({L:'lesha-app.html',R:'roma-app.html',C:'driver3-app.html',V:'valentyn-app.html'})[c.drv]||(c.drv?('driver.html?drv='+encodeURIComponent(c.drv)):'login.html');if(r==='tech')return 'tech-app.html';if(r==='loader')return 'lager-app.html';return 'login.html';}
+function pageFor(c){c=c||{};var r=c.role;if(r==='zentrum'||r==='norden'||r==='lager'||r==='viewer')return 'index.html';if(r==='driver')return ({L:'lesha-app.html',R:'roma-app.html',C:'driver3-app.html',V:'valentyn-app.html'})[c.drv]||(c.drv?('driver.html?drv='+encodeURIComponent(c.drv)):'login.html');if(r==='tech')return 'tech-app.html';if(r==='loader')return 'lager-app.html';return 'login.html';}
 // Чужой/старый вход открыл эту страницу → НЕ показываем чужой интерфейс молча, а даём явно перезайти под нужный PIN.
-function _roleName(c){var r=c&&c.role;if(r==='zentrum')return 'Диспетчер';if(r==='norden')return 'Планировщик Норд';if(r==='lager')return 'Просмотр';if(r==='driver')return 'Водитель'+(c&&c.drv?' ('+c.drv+')':'');if(r==='tech')return 'Техник';if(r==='loader')return 'Грузчик';return 'Не распознан';}
+function _roleName(c){var r=c&&c.role;if(r==='zentrum')return 'Диспетчер';if(r==='norden')return 'Планировщик Норд';if(r==='lager')return 'Склад (LK Lager)';if(r==='viewer')return 'Просмотр (только чтение)';if(r==='driver')return 'Водитель'+(c&&c.drv?' ('+c.drv+')':'');if(r==='tech')return 'Техник';if(r==='loader')return 'Грузчик';return 'Не распознан';}
 function wrongRoleRelogin(){ try{ firebase.auth().signOut().then(function(){ location.replace('login.html'); }).catch(function(){ location.replace('login.html'); }); }catch(e){ location.replace('login.html'); } }
 function showWrongRole(c, needTxt){
   try{
@@ -1126,10 +1160,11 @@ firebase.auth().onAuthStateChanged(function(user){
   user.getIdTokenResult().then(function(res){
     var _wr=document.getElementById('wrongRole'); if(_wr){ _wr.style.display='none'; }
     var c=res.claims||{}; var role=c.role||'';
-    if(!(role==='zentrum'||role==='norden'||role==='lager')){ showWrongRole(c, 'Эта страница — для диспетчера.'); return; }
+    if(!(role==='zentrum'||role==='norden'||role==='lager'||role==='viewer')){ showWrongRole(c, 'Эта страница — для диспетчера.'); return; }
     sessionStorage.removeItem('login_role');
     if(role==='norden'){disp2Mode=true;enter(false);}
     else if(role==='lager'){disp2Mode=false;enter(true);}
+    else if(role==='viewer'){disp2Mode=false;IS_VIEWER=true;enter(false);applyViewerMode();}
     else{disp2Mode=false;enter(false);}
     if(c.plannerId){ IS_PLANNER=true; PLANNER_ID=c.plannerId; PLANNER_NAME=c.plannerName||''; ['tabVoice','tabCalib','tabOdo','tabRoute'].forEach(function(id){var b=document.getElementById(id);if(b)b.style.display='none';}); } // tabRoute показывает те же данные одометра, что и tabOdo — прячем вместе
     if(role==='zentrum'){ var _tn=document.getElementById('tabNordM'); if(_tn)_tn.style.display=''; }
@@ -1308,12 +1343,14 @@ function acInit(){
 // Норд-планировщик правит/удаляет только СВОИ строки (по plannerId-автору). Диспетчер (zentrum) — всё. Перемещение (order) разрешено всем.
 function canEditRow(r){ return !IS_PLANNER || (r && r.plannerId===PLANNER_ID); }
 function dr(id){
+  if(IS_VIEWER)return;
   var r=rows.find(function(x){return x.id===id;});
   if(r&&!canEditRow(r)){ toast('Это адрес другого техника — удалять нельзя'); return; }
   if(r){ (r.invs||[]).forEach(function(inv){ inv=(''+(inv||'')).trim(); if(inv&&incPlaced[inv]&&incPlaced[inv].rowId===id) incUnplace(inv); }); }
   db.ref('rows/'+id).remove();
 }
 function toggleDone(id,val){
+  if(IS_VIEWER)return;
   var r=rows.find(function(x){return x.id===id;});
   if(r&&!canEditRow(r)){ toast('Это адрес другого техника'); return; }
   // пишем КТО отметил (диспетчер/планировщик), чтобы отличать от отметки водителя — нужно для разбора маршрута
@@ -1344,6 +1381,7 @@ function panelMoveRow(id,drv,dir){
   _lastEdit=Date.now();
 }
 function ur(id,f,v){
+  if(IS_VIEWER)return;
   var _re=rows.find(function(x){return x.id===id;});
   if(_re&&!canEditRow(_re))return; // Норд-планировщик не правит чужие строки
   _lastEdit=Date.now();
@@ -1478,7 +1516,7 @@ function _rtblNow(){
       var whDone=v.trim()&&warehouseStatus[wkey];
       var chk=v.trim()?'<span style="font-size:13px;font-weight:700;flex-shrink:0;color:'+(whDone?'#1a7a40':'#ddd')+';padding:0 2px" title="'+(whDone?'Загружено':'Ожидает')+'">&#10003;</span>':'<span style="width:14px;flex-shrink:0;display:inline-block"></span>';
       if(_ce) ih+='<div class="irow">'+chk+'<input class="iinp" type="text" value="'+xe(v)+'" placeholder="LK-..." oninput="ui(\''+r.id+'\','+i+',this.value)"><button class="ix" onclick="di(\''+r.id+'\','+i+')">&#215;</button></div>';
-      else ih+='<div class="irow">'+chk+'<span class="iinp" style="padding:3px 4px;display:inline-block;color:#555">'+(xe(v)||'&mdash;')+'</span></div>';
+      else ih+='<div class="irow">'+chk+'<span class="iinp" style="padding:3px 4px;display:inline-block;color:#555">'+(v.trim()?invLinkHtml(v):'&mdash;')+'</span></div>';
     });
 
     if(r.date!==_lastD&&(r.addr&&r.addr.trim())){
@@ -1716,7 +1754,7 @@ function bpRow(r,d,n){
   if(r.timeSlot)h+=' <span style="color:var(--mu);font-size:11px">до '+r.timeSlot+'</span>';
   if(r.done)h+=' <span style="color:var(--g);font-size:11px">&#10003; выполнено</span>';
   var iv=(r.invs||[]).map(function(i){return i.trim();}).filter(Boolean);
-  if(iv.length)h+='<div style="margin-left:14px;font-size:11.5px;color:var(--mu)">&#128196; '+xe(iv.join(', '))+'</div>';
+  if(iv.length)h+='<div style="margin-left:14px;font-size:11.5px;color:var(--mu)">&#128196; '+iv.map(function(i){return invLinkHtml(i);}).join(', ')+'</div>';
   var ex=[];if(r.status&&r.status!=='—')ex.push(r.status);if(r.comment&&r.comment.trim())ex.push(r.comment.trim());
   if(ex.length)h+='<div style="margin-left:14px;font-size:11.5px;color:#7a5500">'+xe(ex.join(' · '))+'</div>';
   h+='</div></div>';
@@ -1919,7 +1957,7 @@ function renderHistDetail(iso, el, dayRowsOverride){
       html+='<a href="'+mu+'" target="_blank" style="font-size:13px;font-weight:600;color:var(--acc);text-decoration:none">'+xe(r.addr)+'</a>';
       html+='<span style="font-size:11px;color:var(--mu);margin-left:6px">'+xe(r.city)+'</span>';
       var invs=(r.invs||[]).map(function(i){return i.trim();}).filter(Boolean);
-      if(invs.length)html+='<div style="font-size:11px;color:var(--mu);margin-top:2px">'+xe(invs.join(', '))+'</div>';
+      if(invs.length)html+='<div style="font-size:11px;color:var(--mu);margin-top:2px">'+invs.map(function(i){return invLinkHtml(i);}).join(', ')+'</div>';
       html+='</div>';
       if(photos.length){
         html+='<div style="display:flex;gap:4px;flex-shrink:0">';
@@ -2149,7 +2187,7 @@ function renderWarehouse(){
             html+='<div style="font-size:13px;font-weight:700">'+xe(r.addr)+'</div>';
             html+='<div style="font-size:12px;font-weight:700;color:var(--mu);margin-bottom:2px">'+xe(r.city)+'</div>';
           }
-          html+='<div style="font-size:13px;font-weight:700;color:#1856a0;margin:1px 0">'+xe(inv)+'</div>';
+          html+='<div style="font-size:13px;font-weight:700;margin:1px 0">'+invLinkHtml(inv)+'</div>';
           html+='</td>';
           html+='<td style="padding:6px 10px;font-size:13px;font-weight:700">'+(isFirst?(r.timeSlot||'—'):'')+'</td>';
           html+='<td style="padding:6px 10px;font-size:13px;font-weight:700">'+(isFirst?xe(r.comment||''):'')+'</td>';
@@ -2329,7 +2367,7 @@ function renderNordMirror(){
       '<td>'+xe(dcolName(r.drv)||r.drv||'—')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
       '<td>'+xe(r.addr||'')+'</td>'+
-      '<td style="font-size:12px">'+xe(iv.join(', '))+'</td>'+
+      '<td style="font-size:12px">'+iv.map(function(i){return invLinkHtml(i);}).join(', ')+'</td>'+
       '<td><select onchange="ur(\''+r.id+'\',\'status\',this.value)" style="font-size:12px;padding:4px">'+so+'</select></td>'+
       '<td>'+(r.plannerName?'<b style="color:#7a4a00">'+xe(r.plannerName)+'</b>':'<span style="color:#9aa5b1">—</span>')+'</td>'+
       '<td>'+(r.weight?wkg(r.weight)+'кг':'—')+'</td>'+
@@ -2428,13 +2466,14 @@ function tabelMonthName(ym){var mn=['Январь','Февраль','Март','
 function tabelShift(d){var p=tabelMonth.split('-');var dt=new Date(parseInt(p[0],10),(parseInt(p[1],10)-1)+d,1);tabelMonth=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');tabelEdit=null;renderTabel();}
 function tabelSeg(s){tabelView=s;tabelEdit=null;renderTabel();}
 var tabelEditSegs=[],tabelEditDone=false,tabelEditDate='';
-function tabelEditDay(k,d){var rec=(wtAll[k]||{})[d]||{};tabelEdit={drv:k,date:d};tabelEditSegs=tSegs(rec).map(function(g){return {s:g.s||'',e:g.e||''};});if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];tabelEditDone=!!rec.done;tabelEditDate=d;renderTabel();}
-function tabelAddDay(k){tabelEdit={drv:k,nw:true};tabelEditSegs=[{s:'',e:''}];tabelEditDone=false;tabelEditDate=isoD(0);renderTabel();}
+function tabelEditDay(k,d){if(IS_VIEWER)return;var rec=(wtAll[k]||{})[d]||{};tabelEdit={drv:k,date:d};tabelEditSegs=tSegs(rec).map(function(g){return {s:g.s||'',e:g.e||''};});if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];tabelEditDone=!!rec.done;tabelEditDate=d;renderTabel();}
+function tabelAddDay(k){if(IS_VIEWER)return;tabelEdit={drv:k,nw:true};tabelEditSegs=[{s:'',e:''}];tabelEditDone=false;tabelEditDate=isoD(0);renderTabel();}
 function tabelCancel(){tabelEdit=null;renderTabel();}
 function tabelReadInputs(){tabelEditSegs.forEach(function(g,i){var es=document.getElementById('tseg_s_'+i),ee=document.getElementById('tseg_e_'+i);if(es)g.s=es.value;if(ee)g.e=ee.value;});var dt=document.getElementById('tabelNewDate');if(dt)tabelEditDate=dt.value;}
 function tabelAddSeg(){tabelReadInputs();tabelEditSegs.push({s:'',e:''});renderTabel();}
 function tabelDelSeg(i){tabelReadInputs();tabelEditSegs.splice(i,1);if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];renderTabel();}
 function tabelSave(){
+  if(IS_VIEWER)return;
   tabelReadInputs();
   var k=tabelEdit.drv,d=tabelEditDate;
   if(!d){toast('Укажите дату');return;}
@@ -2780,7 +2819,7 @@ function incReady(r){ var s=(r.ready_status||'').trim(); if(!s)return true; retu
 function incColor(r){ var s=(r.ready_status||'').trim(); if(!s)return ''; if(s.indexOf('Собран')===0)return 'inc-ready'; if(s.indexOf('К сбор')===0)return 'inc-tosb'; if(s.indexOf('Заказ')===0)return 'inc-order'; return 'inc-reserve'; }
 function incSelWeight(){ var t=0; Object.keys(incSel).forEach(function(inv){ var r=incRec(inv); if(r&&incSel[inv]&&typeof r.weight_kg==='number')t+=r.weight_kg; }); return Math.round(t*100)/100; }
 function incBadge(){ var l=incList().filter(function(r){return !incPlaced[r.invoice];}); if(disp2Mode){l=l.filter(function(r){return CITIESC.indexOf((r.city||''))!==-1;});} var n=l.length; var t=document.getElementById('tabInc'); if(t)t.classList.toggle('has-new',n>0); var c=document.getElementById('incCount'); if(c)c.textContent=n?('('+n+')'):''; }
-function incToggle(inv,cb){ if(cb.checked)incSel[inv]=true; else delete incSel[inv]; incUpdateBar(); }
+function incToggle(inv,cb){ if(IS_VIEWER){cb.checked=false;return;} if(cb.checked)incSel[inv]=true; else delete incSel[inv]; incUpdateBar(); }
 function incUpdateBar(){
   var bar=document.getElementById('incBar'); if(!bar)return;
   var n=Object.keys(incSel).length; var w=incSelWeight();
@@ -2912,6 +2951,7 @@ function renderInc(){
   body.innerHTML=h; incUpdateBar(); renderIncTaken();
 }
 function incAccept(){
+  if(IS_VIEWER)return;
   var invs=Object.keys(incSel).filter(function(inv){ var r=incRec(inv); return r&&!incPlaced[inv]; });
   if(!invs.length){ toast('Отметьте накладные галочкой'); return; }
   var groups={};
@@ -2948,10 +2988,11 @@ function renderIncTaken(){
   var head='<div class="inc-taken-h" onclick="incShowTaken=!incShowTaken;renderIncTaken()">В плане отгрузки: '+taken.length+'  '+(incShowTaken?'&#9650;':'&#9660;')+'</div>';
   if(!incShowTaken){ el.innerHTML=head; return; }
   el.innerHTML=head+taken.map(function(p){
-    return '<div class="inc-taken-row"><span>'+xe(p.invoice)+' &middot; '+xe(p.address||'')+'</span><button class="inc-return" onclick="incReturn(\''+p.invoice+'\',\''+(p.rowId||'')+'\')">вернуть</button></div>';
+    return '<div class="inc-taken-row"><span>'+invLinkHtml(p.invoice)+' &middot; '+xe(p.address||'')+'</span><button class="inc-return" onclick="incReturn(\''+p.invoice+'\',\''+(p.rowId||'')+'\')">вернуть</button></div>';
   }).join('');
 }
 function incReturn(inv,rowId){
+  if(IS_VIEWER)return;
   if(rowId){ var _rr=rows.find(function(x){return x.id===rowId;}); if(_rr&&!canEditRow(_rr)){ toast('Это адрес другого техника'); return; } }
   incUnplace(inv);
   if(rowId){
@@ -2965,11 +3006,17 @@ function incReturn(inv,rowId){
   renderInc();
 }
 // ── Состав накладной (клик по номеру → модалка, ленивое чтение позиций) ──
+// Универсальная ссылка-номер для ЛЮБОЙ вкладки: значение через data-атрибут (xe экранирует "),
+// НЕ в inline-JS-строку — ручной номер с апострофом не ломает разметку (урок XSS).
+function invClick(el,ev){ if(ev&&ev.stopPropagation)ev.stopPropagation(); var inv=(el&&el.getAttribute)?el.getAttribute('data-inv'):''; if(inv)incShowPos(inv); }
+function invLinkHtml(inv,style){ inv=(''+(inv||'')).trim(); if(!inv)return ''; return '<span class="inc-invlink"'+(style?' style="'+style+'"':'')+' data-inv="'+xe(inv)+'" onclick="invClick(this,event)" title="Показать состав накладной">'+xe(inv)+'</span>'; }
 function incShowPos(inv){
   var m=document.getElementById('incPosModal'); if(!m)return;
   document.getElementById('incPosTitle').textContent='Состав накладной '+inv;
   document.getElementById('incPosBody').innerHTML='<div class="pos-empty">Загрузка…</div>';
   m.style.display='flex';
+  // ручной номер со спецсимволами пути Firebase — не читаем базу (иначе db.ref бросит исключение)
+  if(/[.#$\[\]\/]/.test(inv)){ incRenderPos(null); return; }
   db.ref('1c/delivery/positions/'+inv).once('value').then(function(s){ incRenderPos(s.val()); })
     .catch(function(){ var b=document.getElementById('incPosBody'); if(b)b.innerHTML='<div class="pos-empty">Ошибка загрузки позиций.</div>'; });
 }
@@ -2998,6 +3045,7 @@ function incRenderPos(val){
   body.innerHTML=h;
 }
 function openEdit(id){
+  if(IS_VIEWER)return;
   if(editingRowId===id)return;
   var _re=rows.find(function(x){return x.id===id;});
   if(_re&&!canEditRow(_re)){ toast('Это адрес другого техника — редактировать нельзя'); return; }
