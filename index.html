@@ -297,14 +297,18 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .inc-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
 .inc-tbl td{padding:7px 8px;border-bottom:1px solid #eef1f5;vertical-align:top}
-.inc-tbl tr.inc-ready{background:#d3e6fa}
-.inc-tbl tr.inc-reserve{background:#d6f0e0}
-.inc-tbl tr.inc-order{background:#fad4d4}
-.inc-tbl tr.inc-tosb{background:#fdecbb}
-.inc-tbl tr.inc-ready td:first-child{box-shadow:inset 7px 0 0 #0072b2}
-.inc-tbl tr.inc-reserve td:first-child{box-shadow:inset 7px 0 0 #009e73}
-.inc-tbl tr.inc-order td:first-child{box-shadow:inset 7px 0 0 #d55e00}
-.inc-tbl tr.inc-tosb td:first-child{box-shadow:inset 7px 0 0 #e69f00}
+/* Кольори статусів = як в 1С (скріншот Сергія 2026-07-28): Заказ жовто-гарячий, Принят блідо-жовтий,
+   Резерв сіро-зелений, К сборке (Комплектуется) блакитний, Собрано зелений; інше — без кольору. */
+.inc-tbl tr.inc-ready{background:#92d050}
+.inc-tbl tr.inc-reserve{background:#c5cdb9}
+.inc-tbl tr.inc-order{background:#ffc000}
+.inc-tbl tr.inc-tosb{background:#9fc5e8}
+.inc-tbl tr.inc-accepted{background:#ffe599}
+.inc-tbl tr.inc-ready td:first-child{box-shadow:inset 7px 0 0 #5a9e33}
+.inc-tbl tr.inc-reserve td:first-child{box-shadow:inset 7px 0 0 #8f9a7d}
+.inc-tbl tr.inc-order td:first-child{box-shadow:inset 7px 0 0 #c79200}
+.inc-tbl tr.inc-tosb td:first-child{box-shadow:inset 7px 0 0 #4a86c8}
+.inc-tbl tr.inc-accepted td:first-child{box-shadow:inset 7px 0 0 #d9b545}
 .inc-sub{font-size:11px;color:#80786e;margin-top:1px}
 .inc-lock{color:#c4ccd4}
 .inc-tbl input[type=checkbox]{width:18px;height:18px;cursor:pointer}
@@ -2817,7 +2821,7 @@ function incReconcile(){
   });
 }
 function incReady(r){ var s=(r.ready_status||'').trim(); if(!s)return true; return s.indexOf('Собран')===0||s.indexOf('К сбор')===0; }
-function incColor(r){ var s=(r.ready_status||'').trim(); if(!s)return ''; if(s.indexOf('Собран')===0)return 'inc-ready'; if(s.indexOf('К сбор')===0)return 'inc-tosb'; if(s.indexOf('Заказ')===0)return 'inc-order'; return 'inc-reserve'; }
+function incColor(r){ var s=(r.ready_status||'').trim(); if(!s)return ''; if(s.indexOf('Собран')===0)return 'inc-ready'; if(s.indexOf('К сбор')===0||s.indexOf('Комплект')===0)return 'inc-tosb'; if(s.indexOf('Заказ')===0)return 'inc-order'; if(s.indexOf('Принят')===0)return 'inc-accepted'; if(s.indexOf('Резерв')===0)return 'inc-reserve'; return ''; }
 function incSelWeight(){ var t=0; Object.keys(incSel).forEach(function(inv){ var r=incRec(inv); if(r&&incSel[inv]&&typeof r.weight_kg==='number')t+=r.weight_kg; }); return Math.round(t*100)/100; }
 function incBadge(){ var l=incList().filter(function(r){return !incPlaced[r.invoice];}); if(disp2Mode){l=l.filter(function(r){return CITIESC.indexOf((r.city||''))!==-1;});} var n=l.length; var t=document.getElementById('tabInc'); if(t)t.classList.toggle('has-new',n>0); var c=document.getElementById('incCount'); if(c)c.textContent=n?('('+n+')'):''; }
 function incToggle(inv,cb){ if(IS_VIEWER){cb.checked=false;return;} if(cb.checked)incSel[inv]=true; else delete incSel[inv]; incUpdateBar(); }
