@@ -2908,7 +2908,7 @@ function renderDelivMismatch(){
     +'<div class="dm-scroll"><table class="dm-tbl">';
   list.forEach(function(m){
     var bad=((m.st||'').indexOf('Собран')!==0);
-    h+='<tr><td>'+xe(m.city||'')+'</td><td>'+xe(m.addr||'')+'</td><td>'+xe(dname(m.drv)||m.drv||'')+'</td><td>'+incFmtDate(m.date)+'</td>'
+    h+='<tr><td>'+invLinkHtml(m.inv)+'</td><td>'+xe(m.city||'')+'</td><td>'+xe(m.addr||'')+'</td><td>'+xe(dname(m.drv)||m.drv||'')+'</td><td>'+incFmtDate(m.date)+'</td>'
       +'<td><span class="'+(bad?'dm-bad':'dm-ok')+'">1С: '+xe(m.st||'—')+'</span></td>'
       +'<td><button class="dm-ret" onclick="incReturn(\''+m.inv+'\',\''+m.rowId+'\')">вернуть во Входящие 1С</button></td></tr>';
   });
