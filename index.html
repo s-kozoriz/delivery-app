@@ -55,6 +55,8 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .iinp{flex:1;border:1px solid var(--bd2);border-radius:4px;padding:3px 6px;font-size:12px;background:var(--card);color:var(--tx);min-width:0}
 .iinp:focus{outline:3px solid #1856a0;outline-offset:1px;background:#dceeff;box-shadow:0 0 0 4px rgba(24,86,160,.12)}
 .ix{border:none;background:none;cursor:pointer;color:#ccc;font-size:12px;padding:0 2px;line-height:1}
+.ipeek{border:none;background:none;cursor:pointer;font-size:13px;padding:0 2px;line-height:1;opacity:.65}
+.ipeek:hover{opacity:1}
 .ix:hover{color:#c00}
 .iadd{border:none;background:none;font-size:11px;color:var(--acc);cursor:pointer;padding:1px 0;text-align:left}
 .iadd:hover{text-decoration:underline}
@@ -1520,8 +1522,9 @@ function _rtblNow(){
       var wkey=curD+'_'+r.id+'_'+i;
       var whDone=v.trim()&&warehouseStatus[wkey];
       var chk=v.trim()?'<span style="font-size:13px;font-weight:700;flex-shrink:0;color:'+(whDone?'#1a7a40':'#ddd')+';padding:0 2px" title="'+(whDone?'Загружено':'Ожидает')+'">&#10003;</span>':'<span style="width:14px;flex-shrink:0;display:inline-block"></span>';
-      // Поле вводу — лише у ВІДКРИТОМУ на редагування рядку; у згорнутому номер = клікабельне посилання на состав (як остальные колонки)
-      if(_ce&&isEditing) ih+='<div class="irow">'+chk+'<input class="iinp" type="text" value="'+xe(v)+'" placeholder="LK-..." oninput="ui(\''+r.id+'\','+i+',this.value)"><button class="ix" onclick="di(\''+r.id+'\','+i+')">&#215;</button></div>';
+      // Поле вводу — лише у ВІДКРИТОМУ на редагування рядку; у згорнутому номер = клікабельне посилання на состав (як остальные колонки).
+      // В режиме правки само поле нужно для редактирования номера → рядом кнопка-глаз для просмотра состава.
+      if(_ce&&isEditing) ih+='<div class="irow">'+chk+'<input class="iinp" type="text" value="'+xe(v)+'" placeholder="LK-..." oninput="ui(\''+r.id+'\','+i+',this.value)">'+(v.trim()?'<button class="ipeek" title="Показать состав накладной" onclick="invPeek(this,event)">&#128065;</button>':'')+'<button class="ix" onclick="di(\''+r.id+'\','+i+')">&#215;</button></div>';
       else ih+='<div class="irow">'+chk+'<span class="iinp" style="padding:3px 4px;display:inline-block;color:#555">'+(v.trim()?invLinkHtml(v):'&mdash;')+'</span></div>';
     });
 
@@ -3015,6 +3018,8 @@ function incReturn(inv,rowId){
 // Универсальная ссылка-номер для ЛЮБОЙ вкладки: значение через data-атрибут (xe экранирует "),
 // НЕ в inline-JS-строку — ручной номер с апострофом не ломает разметку (урок XSS).
 function invClick(el,ev){ if(ev&&ev.stopPropagation)ev.stopPropagation(); var inv=(el&&el.getAttribute)?el.getAttribute('data-inv'):''; if(inv)incShowPos(inv); }
+// Кнопка-глаз возле ПОЛЯ ввода номера (строка в режиме правки): берёт ТЕКУЩЕЕ значение поля
+function invPeek(btn,ev){ if(ev&&ev.stopPropagation)ev.stopPropagation(); var row=btn&&btn.parentNode; var inp=row?row.querySelector('input.iinp'):null; var inv=inp?(''+inp.value).trim():''; if(inv)incShowPos(inv); }
 function invLinkHtml(inv,style){ inv=(''+(inv||'')).trim(); if(!inv)return ''; return '<span class="inc-invlink"'+(style?' style="'+style+'"':'')+' data-inv="'+xe(inv)+'" onclick="invClick(this,event)" title="Показать состав накладной">'+xe(inv)+'</span>'; }
 function incShowPos(inv){
   var m=document.getElementById('incPosModal'); if(!m)return;
