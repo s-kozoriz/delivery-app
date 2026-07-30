@@ -70,8 +70,19 @@ function odoEvents(odoAll,cfg){
   var a=[];
   Object.keys(odoAll||{}).forEach(function(drv){ var bd=odoAll[drv]||{};
     Object.keys(bd).forEach(function(date){ var r=bd[date]||{};
-      ['start','end'].forEach(function(m){ var x=r[m];
-        if(x&&typeof x.km==='number'&&!isNaN(x.km)){ a.push({drv:drv,date:date,m:m,km:x.km,tsEff:odoTsEff(x,date,m),photo:(x.photo||''),drvNord:odoIsNordDrv(cfg,drv)}); }
+      // ev = журнал событий (с 30.07): смена машины среди дня + указанная водителем машина.
+      // Есть журнал — берём только его, иначе start/end продублировались бы.
+      var _ev=r.ev, _has={};
+      if(_ev&&typeof _ev==='object'){
+        Object.keys(_ev).forEach(function(k){ var x=_ev[k]||{}; if(typeof x.km!=='number'||isNaN(x.km))return;
+          var kind=x.kind||'start'; _has[kind]=1;
+          a.push({drv:drv,date:date,m:((kind==='end'||kind==='swap_out')?'end':'start'),kind:kind,van:(x.van||null),km:x.km,tsEff:odoTsEff(x,date,kind),photo:(x.photo||''),drvNord:odoIsNordDrv(cfg,drv)});
+        });
+      }
+      // ПЕРЕХОДНЫЙ ДЕНЬ: начал на старой версии, закончил на новой — журнал неполный.
+      // Берём из старой структуры то, чего в журнале НЕТ, иначе потеряем начало дня.
+      ['start','end'].forEach(function(m){ if(_has[m])return; var x=r[m];
+        if(x&&typeof x.km==='number'&&!isNaN(x.km)){ a.push({drv:drv,date:date,m:m,kind:m,van:(x.van||null),km:x.km,tsEff:odoTsEff(x,date,m),photo:(x.photo||''),drvNord:odoIsNordDrv(cfg,drv)}); }
       });
     });
   });
@@ -84,8 +95,12 @@ function odoCluster(odoAll,cfg){
   var unknown=[];
   evs.forEach(function(e){
     var best=null,bd=Infinity;
-    vans.forEach(function(v){ var ref=(v.cur!=null?v.cur:v.seed); var d=Math.abs(e.km-ref); if(d<bd){ bd=d; best=v; } });
-    if(!best||bd>ODO_BAND){ e.flag='unknown'; unknown.push(e); return; }
+    // машину указал сам водитель (с 30.07) — не гадаем
+    if(e.van){ vans.forEach(function(v){ if(v.id===e.van){ best=v; bd=0; } }); }
+    if(!best){
+      vans.forEach(function(v){ var ref=(v.cur!=null?v.cur:v.seed); var d=Math.abs(e.km-ref); if(d<bd){ bd=d; best=v; } });
+      if(!best||bd>ODO_BAND){ e.flag='unknown'; unknown.push(e); return; }
+    }
     var v=best; e.vanId=v.id; e.vanRegion=v.region; e.cross=((v.region==='nord')!==e.drvNord);
     if(v.cur===null){ v.cur=e.km; v.lastDate=e.date; e.clean=true; e.flag='first'; e.delta=null; v.evs.push(e); return; }
     var gap=e.km-v.cur, el=Math.max(1,odoDayNum(e.date)-odoDayNum(v.lastDate)), sd=(e.date===v.lastDate);
@@ -102,9 +117,42 @@ function odoCluster(odoAll,cfg){
   });
   return {vans:vans,unknown:unknown};
 }
+// Отрезок = «водитель был за рулём ЭТОЙ машины с километра A до километра B». Открывается на
+// start/swap_in, закрывается на end/swap_out. Пробег водителя = сумма его отрезков.
+// ⛔Почему не приростами событий: событие «сел в авто» даёт прирост, который накатал ПРЕДЫДУЩИЙ
+// водитель этой машины (она стояла не с нуля). Считая приростами, чужой пробег приписали бы тому,
+// кто только что сел — а на этих цифрах висят зарплата и штрафы.
+function odoSegments(cluster){
+  var out=[];
+  ((cluster&&cluster.vans)||[]).forEach(function(v){
+    var open={};
+    (v.evs||[]).slice().sort(function(x,y){return x.tsEff-y.tsEff;}).forEach(function(e){
+      var key=e.drv+'|'+e.date, kind=(e.kind||e.m);
+      if(kind==='start'||kind==='swap_in'){ open[key]={drv:e.drv,date:e.date,kmFrom:e.km,tsFrom:e.tsEff,clean:(e.clean!==false),declared:!!e.van}; return; }
+      if(kind==='end'||kind==='swap_out'){
+        var o=open[key]; if(!o)return;
+        var km=e.km-o.kmFrom;
+        // declared = машину указал водитель на ОБОИХ концах отрезка. Только такие дни считаем
+        // отрезками; старые дни (машина угадана) остаются на прежнем расчёте, чтобы история не поехала.
+        out.push({drv:o.drv,date:o.date,van:v.id,kmFrom:o.kmFrom,kmTo:e.km,km:km,tsFrom:o.tsFrom,tsTo:e.tsEff,clean:(o.clean&&e.clean!==false&&km>=0),declared:(o.declared&&!!e.van)});
+        delete open[key];
+      }
+    });
+  });
+  out.sort(function(x,y){return x.tsFrom-y.tsFrom;});
+  return out;
+}
 // факт как «Пробег»: сумма чистых суточных приростов по машине; carry/cross/typo — мягкая пометка
 function raFact(cluster,drv,date){
   var out={km:null,soft:false,why:'',reason:''};
+  // машина указана водителем → считаем отрезками, иначе припишем ему чужой пробег
+  var _seg=odoSegments(cluster).filter(function(s){return s.declared&&s.drv===drv&&s.date===date;});
+  if(_seg.length){
+    var _t=0,_bad=false;
+    _seg.forEach(function(s){ if(s.km>0)_t+=s.km; if(s.clean===false)_bad=true; });
+    out.km=_t; out.soft=_bad; out.why=_bad?'есть сомнительное показание одометра':'';
+    return out;
+  }
   var km=0,has=false,notes={};
   ((cluster&&cluster.vans)||[]).forEach(function(v){ (v.evs||[]).forEach(function(e){
     if(!e||e.drv!==drv||e.date!==date)return;
