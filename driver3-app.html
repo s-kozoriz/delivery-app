@@ -595,7 +595,7 @@ document.getElementById('photoInputGallery').addEventListener('change', handlePh
 var offlineQueue = JSON.parse(localStorage.getItem('photoQueue_'+DRV) || '[]');
 
 function saveQueue() {
-  try { localStorage.setItem('photoQueue_'+DRV, _qJSON(offlineQueue)); } catch(e) {}
+  return _lsSet('photoQueue_'+DRV, _qJSON(offlineQueue));
 }
 
 function processQueue() {
@@ -661,14 +661,10 @@ function enqueuePhoto(file, rowId, path, localId, ts) {
     if (photos.indexOf('pending:' + localId) === -1) { photos.push('pending:' + localId); photoTs.push(ts); }
     if(r){ r.photos = photos; r.photoTs = photoTs; }
     render();
-    try {
-      offlineQueue.push({rowId: rowId, path: path, b64: b64, localId: localId, ts: ts});
-      saveQueue();
-      showToast('Слабая сеть — фото сохранено, загрузится само');
-      setTimeout(processQueue, 1500);
-    } catch(e) {
-      showToast('Нет места для хранения фото');
-    }
+    offlineQueue.push({rowId: rowId, path: path, b64: b64, localId: localId, ts: ts});
+    if (saveQueue()) showToast('Слабая сеть — фото сохранено, загрузится само');
+    else showToast('Мало памяти — НЕ закрывайте приложение, фото ещё не сохранено');
+    setTimeout(processQueue, 1500);
   };
   reader.readAsDataURL(file);
 }
@@ -676,7 +672,8 @@ function enqueuePhoto(file, rowId, path, localId, ts) {
 // ── Сжатие фото: длинная сторона ≤1600px, JPEG ~0.7 → ~200-500 КБ вместо 3-8 МБ ──
 // Быстрая заливка даже на слабом 3G и не переполняет localStorage-очередь.
 // Гарантирует РОВНО ОДИН вызов cb (guard + таймаут-предохранитель), иначе поток мог бы зависнуть.
-function compressPhoto(file, cb) {
+function compressPhoto(file, cb, lvl) {
+  lvl = lvl || { side: 1600, q: 0.7 }; // без аргумента — прежнее поведение
   var done = false;
   function fin(x) { if (done) return; done = true; cb(x); }
   if (!file || !file.type || file.type.indexOf('image') !== 0) { fin(file); return; }
@@ -690,14 +687,14 @@ function compressPhoto(file, cb) {
       try {
         var W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
         if (!W || !H) { finc(file); return; }
-        var sc = Math.min(1, 1600 / Math.max(W, H));
+        var sc = Math.min(1, lvl.side / Math.max(W, H));
         var w = Math.max(1, Math.round(W * sc)), h = Math.max(1, Math.round(H * sc));
         var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
         cv.getContext('2d').drawImage(img, 0, 0, w, h);
         if (cv.toBlob) {
-          cv.toBlob(function(b) { finc(b && b.size ? b : file); }, 'image/jpeg', 0.7);
+          cv.toBlob(function(b) { finc(b && b.size ? b : file); }, 'image/jpeg', lvl.q);
         } else {
-          var d = cv.toDataURL('image/jpeg', 0.7); var s = atob(d.split(',')[1]);
+          var d = cv.toDataURL('image/jpeg', lvl.q); var s = atob(d.split(',')[1]);
           var ab = new ArrayBuffer(s.length); var ia = new Uint8Array(ab);
           for (var i = 0; i < s.length; i++) ia[i] = s.charCodeAt(i);
           finc(new Blob([ab], { type: 'image/jpeg' }));
@@ -712,6 +709,28 @@ function _uid() { return Date.now().toString(36) + Math.floor(Math.random() * 1e
 // Сериализация очередей БЕЗ временных флагов (_processing/_p): иначе элемент с _processing:true,
 // сохранённый в localStorage (второе фото пока первое грузится), после reload заклинит очередь навсегда.
 function _qJSON(arr) { return JSON.stringify(arr, function(k, v) { return k.charAt(0) === '_' ? undefined : v; }); }
+// Запись в localStorage с ЧЕСТНЫМ результатом. Раньше тут молчал catch{}: при переполнении квоты
+// фото не попадало на диск, жило только в памяти вкладки — браузер выгружал вкладку, и фото
+// исчезало без следа (жалоба водителя 29.07.2026). Теперь вызывающий код знает о провале.
+function _lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch(e) { return false; } }
+// Сколько символов заняли ОЧЕРЕДИ ФОТО. Все три (доставка/одометр/доп.задание) делят одну квоту
+// браузера (~5 МБ), поэтому считаем вместе — иначе застрявший одометр съест место доставке.
+function _qChars() {
+  var n = 0;
+  try {
+    ['photoQueue_', 'odoQ_', 'addTaskQueue_'].forEach(function(p) {
+      var s = localStorage.getItem(p + DRV); if (s) n += s.length;
+    });
+  } catch(e) {}
+  return n;
+}
+// Чем полнее очереди, тем мельче жмём следующее фото доставки: при долгом отсутствии сети водитель
+// успевает наснимать столько, что квота кончается. Пустая очередь = прежнее качество 1600px/0.7.
+function photoLvl(chars) {
+  if (chars > 1400000) return { side: 1024, q: 0.5 };
+  if (chars > 700000) return { side: 1280, q: 0.6 };
+  return { side: 1600, q: 0.7 };
+}
 
 function uploadPhotoWithQueue(file, rowId) {
   var localId = _uid();
@@ -729,8 +748,10 @@ function uploadPhotoWithQueue(file, rowId) {
   compressPhoto(file, function(blob) {
     var reader = new FileReader();
     reader.onload = function(e) {
-      try { offlineQueue.push({ rowId: rowId, path: path, b64: e.target.result, localId: localId, ts: ts, by: driverName() }); saveQueue(); }
-      catch(err) { showToast('Мало памяти — не закрывайте, фото грузится'); }
+      offlineQueue.push({ rowId: rowId, path: path, b64: e.target.result, localId: localId, ts: ts, by: driverName() });
+      // saveQueue() честно говорит, попало ли фото на диск. Если нет — оно живёт только в этой
+      // вкладке, браузер её выгрузит и фото пропадёт. Поэтому предупреждаем ЯВНО, а не молчим.
+      if (!saveQueue()) showToast('Мало памяти — НЕ закрывайте приложение, фото ещё не сохранено');
       setTimeout(processQueue, 200);
     };
     reader.onerror = function() {
@@ -745,7 +766,7 @@ function uploadPhotoWithQueue(file, rowId) {
       }).catch(function() { showToast('Фото не сохранилось, повторите'); });
     };
     reader.readAsDataURL(blob);
-  });
+  }, photoLvl(_qChars()));
 }
 
 // ===================== ОДОМЕТР (пробег) — гейт старта/конца дня =====================
@@ -832,7 +853,7 @@ function odoSave() {
   if (mode === 'end') setTimeout(function(){ pairAsk(date); }, 350);
 }
 var odoQ = JSON.parse(localStorage.getItem('odoQ_' + DRV) || '[]');
-function saveOdoQ() { try { localStorage.setItem('odoQ_' + DRV, _qJSON(odoQ)); } catch(e) {} }
+function saveOdoQ() { return _lsSet('odoQ_' + DRV, _qJSON(odoQ)); }
 function odoUploadPhoto(file, date, mode, ts) {
   var path = 'odometer/' + DRV + '/' + date + '/' + mode + '_' + ts + '.jpg';
   if (navigator.onLine) {
@@ -841,10 +862,21 @@ function odoUploadPhoto(file, date, mode, ts) {
       .catch(function () { odoEnqueue(file, path, date, mode, ts); });
   } else { odoEnqueue(file, path, date, mode, ts); }
 }
+// ⛔ Фото пробега раньше ложилось в localStorage БЕЗ сжатия: оригинал с камеры 3-8 МБ давал
+// 4-11 МБ base64 и ОДНИМ снимком забивал всю квоту браузера (~5 МБ). После этого любое фото
+// доставки уже не сохранялось на диск, а saveQueue молчал — фото исчезало вместе с вкладкой.
+// Жмём как фото доставки, но ВСЕГДА 1600px/0.7: на одометре нужно читать цифры (это доказательство пробега).
 function odoEnqueue(file, path, date, mode, ts) {
-  var rd = new FileReader();
-  rd.onload = function (e) { try { odoQ.push({ path: path, b64: e.target.result, date: date, mode: mode, ts: ts }); saveOdoQ(); showToast('Слабая сеть — фото пробега загрузится само'); setTimeout(odoProcessQ, 1500); } catch (er) { showToast('Нет места для фото'); } };
-  rd.readAsDataURL(file);
+  compressPhoto(file, function (blob) {
+    var rd = new FileReader();
+    rd.onload = function (e) {
+      odoQ.push({ path: path, b64: e.target.result, date: date, mode: mode, ts: ts });
+      if (saveOdoQ()) showToast('Слабая сеть — фото пробега загрузится само');
+      else showToast('Мало памяти — НЕ закрывайте приложение, фото пробега не сохранено');
+      setTimeout(odoProcessQ, 1500);
+    };
+    rd.readAsDataURL(blob);
+  });
 }
 function odoProcessQ() {
   if (!odoQ.length) return; var it = odoQ[0]; if (it._p) return; it._p = true;
@@ -1460,7 +1492,7 @@ acInit();
 // Фото сжимаются и хранятся в очереди; строка пишется в RTDB с реальными URL уже после заливки.
 var addTaskQueue = [];
 try { addTaskQueue = JSON.parse(localStorage.getItem('addTaskQueue_' + DRV) || '[]'); } catch(e) { addTaskQueue = []; }
-function saveAddTaskQueue() { try { localStorage.setItem('addTaskQueue_' + DRV, _qJSON(addTaskQueue)); } catch(e) {} }
+function saveAddTaskQueue() { return _lsSet('addTaskQueue_' + DRV, _qJSON(addTaskQueue)); }
 function processAddTaskQueue() {
   if (!addTaskQueue.length) return;
   var item = addTaskQueue[0];
