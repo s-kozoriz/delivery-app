@@ -240,5 +240,26 @@ for(const drv of drvs){
     done++;
   }catch(e){ console.log('  '+drv+': ошибка '+(e&&e.message||e)); fail++; }
 }
+// Отрезки «водитель × машина» за день — источник для выгрузки в KL (их «Контроль автопарка»).
+// Пишем ОТДЕЛЬНО от маршрутов: пробег есть и в те дни, когда маршрут не строился (цикл выше
+// берёт только водителей с маршрутом). Считает тот же odoSegments, что и экран диспетчера.
+const _segDay=odoSegments(cluster).filter(s=>s.date===date);
+const _byDrv={}; _segDay.forEach(s=>{ (_byDrv[s.drv]=_byDrv[s.drv]||[]).push(s); });
+let _segSaved=0;
+for(const _d of Object.keys(_byDrv)){
+  const _list=_byDrv[_d];
+  let _km=0,_declared=true,_clean=true;
+  _list.forEach(s=>{ if(s.km>0)_km+=s.km; if(!s.declared)_declared=false; if(s.clean===false)_clean=false; });
+  // ЧЕСТНО: если машину не указывали, она УГАДАНА алгоритмом — вешать на такие данные
+  // ответственность за пробег и штрафы нельзя, поэтому помечаем источник явно.
+  await put('odo_segments/'+_d+'/'+date,{
+    drv:_d, date:date, ts:Date.now(), km:_km,
+    source:(_declared?'declared':'guessed'),
+    flag:(_clean?(_declared?'ok':'guessed'):'check'),
+    segments:_list.map(s=>({van:s.van,odo_start:s.kmFrom,odo_end:s.kmTo,km:s.km,ts_from:s.tsFrom,ts_to:s.tsTo,clean:(s.clean!==false)}))
+  });
+  _segSaved++;
+}
+console.log('Отрезки водитель×машина: сохранено '+_segSaved+' (дата '+date+')');
 if(geoNew)await put('geo_cache',geoCache);
 console.log('Итог: сохранено '+done+', пропущено '+skip+', сбой '+fail+', геокод новых '+geoNew);
