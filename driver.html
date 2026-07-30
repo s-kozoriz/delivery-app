@@ -876,12 +876,18 @@ function odoRec() { return odoData[wtDate()] || {}; }
     + '#odoGate .opeek{background:none;border:none;color:#8ea3c4;font-size:13px;font-weight:700;cursor:pointer;padding:8px;text-decoration:underline;font-family:inherit}'
     + '#odoBanner{display:none;align-items:center;justify-content:space-between;gap:8px;background:#b23b2e;color:#fff;padding:10px 12px;font-size:13px;font-weight:800}'
     + '#odoBanner.on{display:flex}'
-    + '#odoBanner button{background:#fff;color:#b23b2e;border:none;border-radius:8px;padding:7px 13px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}';
+    + '#odoBanner button{background:#fff;color:#b23b2e;border:none;border-radius:8px;padding:7px 13px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}'
+    + '#odoGate .ovans{display:flex;gap:8px;flex-wrap:wrap}'
+    + '#odoGate .ovan{flex:1;min-width:98px;border:1px solid #3a4a60;background:#131c28;color:#c9d6e8;border-radius:11px;padding:13px 10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
+    + '#odoGate .ovan.on{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
+    + '#odoVanBar{display:none;align-items:center;justify-content:space-between;gap:8px;background:#123a5c;color:#fff;padding:9px 12px;font-size:13px;font-weight:700}'
+    + '#odoVanBar.on{display:flex}'
+    + '#odoVanBar button{background:#fff;color:#123a5c;border:none;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}';
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   var g = document.createElement('div'); g.id = 'odoGate';
   g.innerHTML = '<div class="ohd" id="odoHd"></div><div class="osub" id="odoSub"></div>'
     + '<div class="ocam" id="odoCam"></div>'
-    + '<div class="oform"><button class="oshot" id="odoShot" onclick="odoShoot()">&#128247; Сфотографировать пробег</button>'
+    + '<div class="oform"><div class="ovans" id="odoVans"></div><button class="oshot" id="odoShot" onclick="odoShoot()">&#128247; Сфотографировать пробег</button>'
     + '<div class="okm"><label>Пробег, км</label><input id="odoKm" type="number" inputmode="numeric" placeholder="напр. 123456" oninput="odoValidate()"></div>'
     + '<button class="ogo" id="odoGo" disabled onclick="odoSave()"></button>'
     + '<button class="opeek" id="odoPeek" onclick="odoPeek()">Только посмотреть маршрут</button></div>';
@@ -891,17 +897,78 @@ function odoRec() { return odoData[wtDate()] || {}; }
   var ban = document.createElement('div'); ban.id = 'odoBanner';
   ban.innerHTML = '<span>&#9888; Пробег не зафиксирован</span><button onclick="odoOpen(\'start\')">Начать день</button>';
   var app = document.getElementById('driverApp'); if (app) app.insertBefore(ban, app.firstChild);
+  var vb = document.createElement('div'); vb.id = 'odoVanBar';
+  vb.innerHTML = '<span id="odoVanBarTx"></span><button onclick="odoOpen(\'swap_out\')">Сменить машину</button>';
+  if (app) app.insertBefore(vb, app.firstChild);
+  setTimeout(odoRenderVanBar, 1500); setInterval(odoRenderVanBar, 30000); // cfg приходит асинхронно
 })();
+// ── МАШИНА ВОДИТЕЛЯ ──────────────────────────────────────────
+// Раньше машину НЕ вводили: её вычислял алгоритм по близости пробега. Пока авто были
+// закреплены, это работало; когда водители стали пересаживаться, старт дня попадал на одну
+// машину, а конец — на другую, и дневной пробег превращался в мусор. Ответственность за
+// пробег и штрафы персональная, поэтому машину теперь УКАЗЫВАЕТ водитель, а не угадывает код.
+var odoVanSel = null, odoVanEx = null;
+var odoVan = null; try { odoVan = localStorage.getItem('odoVan_' + DRV) || null; } catch (e) {}
+function odoVans() {
+  var m = (typeof cfg !== 'undefined' && cfg && cfg.machines) ? cfg.machines : null, out = [];
+  if (m) Object.keys(m).forEach(function (id) { out.push({ id: id, label: (m[id] && m[id].label) || ('Машина ' + id) }); });
+  return out;
+}
+function odoVanLabel(id) {
+  if (!id) return '';
+  var f = odoVans().filter(function (v) { return v.id === id; })[0];
+  return f ? f.label : ('Машина ' + id);
+}
+function odoRenderVans(show, exclude) {
+  odoVanEx = exclude || null;
+  var el = document.getElementById('odoVans'); if (!el) return;
+  if (!show) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  var list = odoVans().filter(function (v) { return v.id !== odoVanEx; });
+  if (!list.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'flex';
+  el.innerHTML = list.map(function (v) {
+    return '<button type="button" class="ovan' + (v.id === odoVanSel ? ' on' : '') + '" data-van="' + v.id + '" onclick="odoPickVan(this)">' + v.label + '</button>';
+  }).join('');
+}
+function odoPickVan(btn) { odoVanSel = btn.getAttribute('data-van'); odoRenderVans(true, odoVanEx); odoValidate(); }
+function odoSetVan(id) {
+  odoVan = id || null;
+  try { if (id) localStorage.setItem('odoVan_' + DRV, id); else localStorage.removeItem('odoVan_' + DRV); } catch (e) {}
+  odoRenderVanBar();
+}
+// Полоска «на какой машине вы сейчас» — чтобы пересадка не забылась: водитель видит её постоянно.
+function odoRenderVanBar() {
+  var el = document.getElementById('odoVanBar'); if (!el) return;
+  var tx = document.getElementById('odoVanBarTx');
+  var driving = false; // odoDriving() есть только в универсальном driver.html, в портах — нет
+  try { driving = (typeof odoDriving === 'function') ? odoDriving() : (wtState(wtToday()) !== 'idle'); } catch (e) { driving = !!odoVan; }
+  if (odoVan && driving) { if (tx) tx.textContent = '\uD83D\uDE9A Вы на: ' + odoVanLabel(odoVan); el.classList.add('on'); }
+  else el.classList.remove('on');
+}
+// Куда пишется событие. start/end сохраняют СТАРУЮ структуру — её читают диспетчер и вечерний
+// робот; смена авто среди дня идёт только в журнал, иначе она затёрла бы начало/конец дня.
+function odoPaths(drv, it) {
+  var base = 'odometer/' + drv + '/' + it.date;
+  return { legacy: (it.mode === 'start' || it.mode === 'end') ? (base + '/' + it.mode) : null, ev: base + '/ev/' + it.ts };
+}
+function odoPhotoDbPath(drv, date, mode, ts) {
+  var base = 'odometer/' + drv + '/' + date;
+  return (mode === 'start' || mode === 'end') ? (base + '/' + mode + '/photo') : (base + '/ev/' + ts + '/photo');
+}
 function odoOpen(mode) {
   if (valMode === 'loader') return; // грузчик не за рулём — одометр не открываем
   if (mode === 'start' && isNordDrv() && nordWheel && nordWheel.drv && nordWheel.drv !== DRV) { showToast('Руль сейчас у ' + xe(nordWheel.name || nordWheel.drv)); return; } // общий руль Норд-машины занят другим
   if (mode === 'end' && isNordDrv() && !(nordWheel && nordWheel.drv === DRV)) { showToast('Руль уже не за вами'); return; } // нельзя сдать руль, который уже не у меня (устаревшая панель)
   odoMode = mode; odoPhotoFile = null;
-  var end = mode === 'end';
-  document.getElementById('odoHd').textContent = end ? 'Конец дня — пробег' : 'Начало дня — пробег';
-  document.getElementById('odoSub').textContent = 'Сфотографируйте одометр и впишите км' + (end ? ', чтобы завершить день.' : ', чтобы начать день.');
-  document.getElementById('odoGo').textContent = end ? 'Завершить день' : 'Начать рабочий день';
-  document.getElementById('odoPeek').style.display = end ? 'none' : '';
+  var end = mode === 'end', so = mode === 'swap_out', si = mode === 'swap_in';
+  var _hd = document.getElementById('odoHd'), _sub = document.getElementById('odoSub');
+  if (so) { _hd.textContent = 'Смена машины · шаг 1 из 2'; _sub.textContent = 'Сдаёте ' + odoVanLabel(odoVan) + ': сфотографируйте одометр и впишите КОНЕЧНЫЙ пробег.'; }
+  else if (si) { _hd.textContent = 'Смена машины · шаг 2 из 2'; _sub.textContent = 'Выберите машину, которую берёте, и впишите её пробег сейчас.'; }
+  else { _hd.textContent = end ? 'Конец дня — пробег' : 'Начало дня — пробег'; _sub.textContent = 'Сфотографируйте одометр и впишите км' + (end ? ', чтобы завершить день.' : ', чтобы начать день.'); }
+  document.getElementById('odoGo').textContent = so ? 'Дальше →' : si ? 'Готово ✓' : end ? 'Завершить день' : 'Начать рабочий день';
+  document.getElementById('odoPeek').style.display = (end || so || si) ? 'none' : '';
+  odoVanSel = si ? null : odoVan;
+  odoRenderVans(mode === 'start' || si, si ? odoVan : null);
   var sh = document.getElementById('odoShot'); sh.className = 'oshot'; sh.innerHTML = '&#128247; Сфотографировать пробег';
   document.getElementById('odoCam').innerHTML = '<div class="ohint">Нажмите «Сфотографировать пробег»</div>';
   document.getElementById('odoKm').value = '';
@@ -919,7 +986,12 @@ function odoOnFile(e) {
 }
 function odoValidate() {
   var km = (document.getElementById('odoKm').value || '').trim();
-  document.getElementById('odoGo').disabled = !(odoPhotoFile && km.length > 0);
+  // на старте дня и на «беру машину» без выбора дальше нельзя — иначе снова придётся гадать,
+  // на чём человек ехал, а на этих данных висят пробег и штрафы
+  // если cfg с машинами ещё не пришёл (нет сети на старте дня) — список пуст, и требовать
+  // выбор НЕЛЬЗЯ: иначе водитель вообще не сможет начать день
+  var needVan = (odoMode === 'start' || odoMode === 'swap_in') && odoVans().length > 0;
+  document.getElementById('odoGo').disabled = !(odoPhotoFile && km.length > 0 && (!needVan || odoVanSel));
 }
 function odoPeek() {
   document.getElementById('odoGate').classList.remove('on');
@@ -931,13 +1003,23 @@ function odoSave() {
   if (!odoPhotoFile || kmv === '' || !(km >= 0)) return;
   var mode = odoMode, date = wtDate(), ts = Date.now();
   if (mode === 'start' && wtState(wtToday()) === 'idle') wtStartSeg(); // взял руль в начале дня = ещё и клок-ин; «сдать руль» день НЕ завершает
-  try { if (mode === 'start') localStorage.setItem('odoDrv_' + DRV + '_' + date, '1'); else localStorage.removeItem('odoDrv_' + DRV + '_' + date); } catch (e) {}
-  if (isNordDrv()) { try { if (mode === 'start') db.ref('nord_wheel/' + date).set({ drv: DRV, name: myName(), ts: ts }); else db.ref('nord_wheel/' + date).remove(); } catch (e) {} } // общий руль Норд-машины: взял/сдал
-  odoWriteKm(date, mode, km, ts);
+  try { if (mode === 'start' || mode === 'swap_in') localStorage.setItem('odoDrv_' + DRV + '_' + date, '1'); else if (mode === 'end') localStorage.removeItem('odoDrv_' + DRV + '_' + date); } catch (e) {}
+  if (isNordDrv()) { try { if (mode === 'start' || mode === 'swap_in') db.ref('nord_wheel/' + date).set({ drv: DRV, name: myName(), ts: ts }); else if (mode === 'end') db.ref('nord_wheel/' + date).remove(); } catch (e) {} } // общий руль Норд-машины: взял/сдал
+  var vanEv = (mode === 'swap_out') ? odoVan : (odoVanSel || odoVan);
+  odoWriteKm(date, mode, km, ts, vanEv);
   odoUploadPhoto(odoPhotoFile, date, mode, ts);
+  if (mode === 'swap_out') {
+    // сдал старую — сразу ведём на шаг 2, чтобы человек не остался «ни на какой машине»
+    odoSetVan(null);
+    showToast('Машина сдана · теперь выберите новую');
+    if (navigator.vibrate) navigator.vibrate(40);
+    odoOpen('swap_in');
+    return;
+  }
+  if (mode === 'start' || mode === 'swap_in') odoSetVan(odoVanSel || odoVan); else if (mode === 'end') odoSetVan(null);
   document.getElementById('odoGate').classList.remove('on');
   document.getElementById('odoBanner').classList.remove('on');
-  showToast(mode === 'end' ? 'Руль сдан · пробег записан ✓' : 'За рулём · пробег записан ✓');
+  showToast(mode === 'swap_in' ? ('Вы на: ' + odoVanLabel(odoVan) + ' ✓') : mode === 'end' ? 'Руль сдан · пробег записан ✓' : 'За рулём · пробег записан ✓');
   if (navigator.vibrate) navigator.vibrate(60);
   // пары «водитель+грузчик» нужны только в основном регионе (много машин). Норд = 1 машина → якорь по одометру, пары не спрашиваем.
   if (mode === 'end' && !(cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].nord)) setTimeout(function () { pairAsk(date); }, 350);
@@ -949,7 +1031,7 @@ function odoUploadPhoto(file, date, mode, ts) {
   var path = 'odometer/' + DRV + '/' + date + '/' + mode + '_' + ts + '.jpg';
   if (navigator.onLine) {
     storage.ref(path).put(file).then(function (sn) { return sn.ref.getDownloadURL(); })
-      .then(function (url) { db.ref('odometer/' + DRV + '/' + date + '/' + mode + '/photo').set(url); })
+      .then(function (url) { db.ref(odoPhotoDbPath(DRV, date, mode, ts)).set(url); })
       .catch(function () { odoEnqueue(file, path, date, mode, ts); });
   } else { odoEnqueue(file, path, date, mode, ts); }
 }
@@ -961,7 +1043,7 @@ function odoEnqueue(file, path, date, mode, ts) {
   compressPhoto(file, function (blob) {
     var rd = new FileReader();
     rd.onload = function (e) {
-      odoQ.push({ path: path, b64: e.target.result, date: date, mode: mode, ts: ts });
+      odoQ.push({ path: path, b64: e.target.result, date: date, mode: mode, ts: ts, dbp: odoPhotoDbPath(DRV, date, mode, ts) });
       if (saveOdoQ()) showToast('Слабая сеть — фото пробега загрузится само');
       else showToast('Мало памяти — НЕ закрывайте приложение, фото пробега не сохранено');
       setTimeout(odoProcessQ, 1500);
@@ -974,7 +1056,7 @@ function odoProcessQ() {
   var bs = atob(it.b64.split(',')[1]); var mime = it.b64.split(';')[0].split(':')[1];
   var ab = new ArrayBuffer(bs.length), ia = new Uint8Array(ab); for (var i = 0; i < bs.length; i++) ia[i] = bs.charCodeAt(i);
   storage.ref(it.path).put(new Blob([ab], { type: mime })).then(function (sn) { return sn.ref.getDownloadURL(); })
-    .then(function (url) { return db.ref('odometer/' + DRV + '/' + it.date + '/' + it.mode + '/photo').set(url); })
+    .then(function (url) { return db.ref(it.dbp || odoPhotoDbPath(DRV, it.date, it.mode, it.ts)).set(url); })
     .then(function () { odoQ.shift(); saveOdoQ(); setTimeout(odoProcessQ, 1000); })
     .catch(function () { it._p = false; setTimeout(odoProcessQ, 15000); });
 }
@@ -984,10 +1066,15 @@ setInterval(function () { if (odoQ.length && navigator.onLine) odoProcessQ(); },
 // число «км» — своя надёжная очередь (localStorage), чтобы не потерять при слабой сети / закрытии приложения
 var odoKmQ = JSON.parse(localStorage.getItem('odoKmQ_' + DRV) || '[]');
 function saveOdoKmQ() { localStorage.setItem('odoKmQ_' + DRV, JSON.stringify(odoKmQ)); }
-function odoWriteKm(date, mode, km, ts) { odoKmQ.push({ date: date, mode: mode, km: km, ts: ts }); saveOdoKmQ(); odoFlushKm(); }
+function odoWriteKm(date, mode, km, ts, van) { odoKmQ.push({ date: date, mode: mode, km: km, ts: ts, van: van || null }); saveOdoKmQ(); odoFlushKm(); }
 function odoFlushKm() {
   odoKmQ.slice().forEach(function (it) {
-    db.ref('odometer/' + DRV + '/' + it.date + '/' + it.mode).update({ km: it.km, ts: it.ts }).then(function () {
+    var p = odoPaths(DRV, it);
+    var first = p.legacy ? db.ref(p.legacy).update({ km: it.km, ts: it.ts, van: it.van || null }) : Promise.resolve();
+    first.then(function () {
+      // журнал событий: из него строятся отрезки «водитель × машина» за день
+      return db.ref(p.ev).update({ kind: it.mode, van: it.van || null, km: it.km, ts: it.ts });
+    }).then(function () {
       var i = odoKmQ.indexOf(it); if (i > -1) { odoKmQ.splice(i, 1); saveOdoKmQ(); }
     }).catch(function () {});
   });
