@@ -212,6 +212,8 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .inc-badge{font-size:13px;color:#e24b4a;font-weight:700;margin-left:6px}
 .inc-fresh{display:block;font-size:11px;color:#80786e;margin-top:2px}
 .inc-ret{display:inline-block;font-size:10px;font-weight:700;color:#9a3d00;background:#ffe8d6;border:1px solid #ffcfa8;border-radius:8px;padding:0 6px;margin-left:4px;white-space:nowrap;cursor:help}
+.inc-forget{font-size:10px;font-weight:700;color:#5a6470;background:#fff;border:1px solid #cdd6e0;border-radius:8px;padding:1px 6px;margin-left:3px;cursor:pointer;font-family:inherit}
+.inc-forget:hover{border-color:#9a3d00;color:#9a3d00}
 .deliv-mismatch{background:#fff4f4;border:1px solid #f3b0b0;border-left:5px solid #d0342c;border-radius:10px;margin:0 0 14px;padding:10px 12px}
 .dm-hd{font-size:14px;font-weight:800;color:#a51e14}
 .dm-sub{font-size:11.5px;color:#8a5a55;margin:2px 0 8px}
@@ -2826,6 +2828,10 @@ var incSel={};        // {invoice:true} — отмеченные
 var incPlaced={};     // /1c/delivery/placed/{invoice} — реестр «взято в план» (raper НЕ трогает)
 var incShowTaken=false;
 var incReturned={};    // /1c/delivery/returned/{invoice} — снятые с плана, которых рапер уже НЕ шлёт (наш оверлей, чтобы «вернуть» всегда работало)
+// Настоящий номер накладной 1С = LK- и восемь цифр (проверено на всех 159 живых записях 30.07).
+// Поле накладной в строке плана сохраняется на КАЖДОМ символе ручного ввода, поэтому без этой
+// проверки в реестр попадали промежуточные обрывки: 1 → 10 → 106 → 1065 → 10652.
+function incInvValid(inv){ return /^LK-\d{8}$/.test((''+(inv||'')).trim()); }
 function incRec(inv){ return incAll[inv]||incReturned[inv]||null; }
 function incList(){
   var out=Object.keys(incAll).map(function(k){return incAll[k];}).filter(function(r){return r&&r.invoice;});
@@ -2836,7 +2842,9 @@ function incList(){
 function incUnplace(inv){
   inv=(''+(inv||'')).trim(); if(!inv)return;
   var p=incPlaced[inv];
-  if(p&&!incAll[inv]){
+  // недописанный номер копией-оверлеем не сохраняем — иначе каждый символ ручного ввода
+  // оседает в базе как «накладная, которую надо проверить»
+  if(p&&!incAll[inv]&&incInvValid(inv)){
     var cp;
     if(p.snap){ cp={}; for(var kk in p.snap){cp[kk]=p.snap[kk];} }
     else { cp={invoice:inv,address:(p.address||''),city:(p.city||''),ship_date:(p.date||''),ready_status:''}; } // старые записи без копии — минимальная карточка, чтобы не исчезали
@@ -2847,6 +2855,17 @@ function incUnplace(inv){
 }
 // когда рапер снова присылает накладную — наш оверлей-копия больше не нужен
 function incCleanReturned(){ Object.keys(incReturned).forEach(function(k){ if(incAll[k]) db.ref('1c/delivery/returned/'+k).remove(); }); }
+// Автоочистка выше срабатывает, только если накладная СНОВА придёт из 1С. Если её там уже
+// доставили/отменили — она не придёт никогда, и метка «проверить» висит вечно. Поэтому нужна
+// явная кнопка: человек посмотрел в 1С, убедился — убрал.
+function incForget(btn){
+  if(IS_VIEWER)return;
+  var inv=btn&&btn.getAttribute?btn.getAttribute('data-inv'):''; // через data-атрибут: в ключе Firebase допустим апостроф, в inline-JS его нельзя
+  if(!inv)return;
+  db.ref('1c/delivery/returned/'+inv).remove();
+  db.ref('1c/delivery/placed/'+inv).remove();
+  toast('Убрано из списка: '+inv);
+}
 // свежесть: отмечаем, когда данные incoming в последний раз МЕНЯЛИСЬ (в этом браузере)
 function incSignature(){ var keys=Object.keys(incAll).sort(); var h=keys.length; for(var i=0;i<keys.length;i++){ var r=incAll[keys[i]]||{}; var s=keys[i]+'|'+(r.ready_status||'')+'|'+(r.ship_date||''); for(var j=0;j<s.length;j++){ h=(h*31+s.charCodeAt(j))|0; } } return keys.length+'#'+h; }
 var incMeta={};       // /1c/delivery/meta — общая метка «когда данные incoming в последний раз менялись»
@@ -2870,7 +2889,7 @@ function incReconcile(){
   if(!rows||!rows.length)return;
   rows.forEach(function(r){ if(!r||!r.invs)return;
     (r.invs||[]).forEach(function(inv){ inv=(''+(inv||'')).trim();
-      if(inv&&!incPlaced[inv]){ db.ref('1c/delivery/placed/'+inv).set({rowId:r.id,date:r.date||'',invoice:inv,address:r.addr||'',city:r.city||'',ts:Date.now(),snap:(incRec(inv)||null)}); }
+      if(inv&&incInvValid(inv)&&!incPlaced[inv]){ db.ref('1c/delivery/placed/'+inv).set({rowId:r.id,date:r.date||'',invoice:inv,address:r.addr||'',city:r.city||'',ts:Date.now(),snap:(incRec(inv)||null)}); }
     });
   });
 }
@@ -2996,7 +3015,7 @@ function renderInc(){
     var w=(typeof r.weight_kg==='number')?wkg(r.weight_kg):'—';
     h+='<tr class="'+incColor(r)+'">'+
       '<td>'+cb+'</td>'+
-      '<td>'+xe(r.ready_status||'')+(r._returned?' <span class="inc-ret" title="Снята с плана; из 1С сейчас не приходит — проверьте актуальность в 1С">&#8617;проверить</span>':'')+'</td>'+
+      '<td>'+xe(r.ready_status||'')+(r._returned?' <span class="inc-ret" title="Снята с плана; из 1С сейчас не приходит — проверьте актуальность в 1С">&#8617;проверить</span><button class="inc-forget" data-inv="'+xe(r.invoice||'')+'" onclick="incForget(this)" title="Проверено в 1С — убрать из списка">&#10005;</button>':'')+'</td>'+
       '<td><span class="inc-invlink" onclick="incShowPos(\''+r.invoice+'\')" title="Показать состав накладной">'+xe(r.invoice)+'</span></td>'+
       '<td>'+xe(r.warehouse||'—')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
