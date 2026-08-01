@@ -848,7 +848,9 @@ __startVoiceListener();
 var odoAll={};
 // nord_driver/{date} = {drv,name} — кто из Норд-водителей вошёл водителем сегодня (для колонки «Норд»)
 var nordDriver={};
-function nordColName(){ var nd=nordDriver[curD]; return (nd&&nd.name)?nd.name:'Норд'; }
+// «Норд» — это МАШИНА/маршрут, а не человек. Поэтому не подменяем название, а дописываем
+// имя того, кто сегодня за рулём: «Норд · Микола». Нет отметки — остаётся просто «Норд».
+function nordColName(){ var nd=nordDriver[curD]; return (nd&&nd.name)?('Норд · '+nd.name):'Норд'; }
 function dcolName(d){ return d==='C' ? nordColName() : dname(d); }
 function odoFmtD(d){var p=(''+(d||'')).split('-');return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):d;}
 function odoFmtT(ts){if(typeof ts!=='number')return '';var d=new Date(ts);return (d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();}

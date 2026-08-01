@@ -1005,6 +1005,11 @@ function odoSave() {
   if (mode === 'start' && wtState(wtToday()) === 'idle') wtStartSeg(); // взял руль в начале дня = ещё и клок-ин; «сдать руль» день НЕ завершает
   try { if (mode === 'start' || mode === 'swap_in') localStorage.setItem('odoDrv_' + DRV + '_' + date, '1'); else if (mode === 'end') localStorage.removeItem('odoDrv_' + DRV + '_' + date); } catch (e) {}
   if (isNordDrv()) { try { if (mode === 'start' || mode === 'swap_in') db.ref('nord_wheel/' + date).set({ drv: DRV, name: myName(), ts: ts }); else if (mode === 'end') db.ref('nord_wheel/' + date).remove(); } catch (e) {} } // общий руль Норд-машины: взял/сдал
+  // ⛔Раньше «водитель дня» писался ТОЛЬКО при выборе роли в диалоге «Кто ты сегодня?», а он
+  // показывается лишь при свежем открытии приложения. Водители держат вкладку неделями — за
+  // новый день записи не появлялось, и в диспетчере всегда висело «Норд». Пишем и здесь:
+  // взял машину = ты и есть водитель дня.
+  if (mode === 'start' || mode === 'swap_in') nordPtr('driver');
   var vanEv = (mode === 'swap_out') ? odoVan : (odoVanSel || odoVan);
   odoWriteKm(date, mode, km, ts, vanEv);
   odoUploadPhoto(odoPhotoFile, date, mode, ts);
@@ -1179,9 +1184,11 @@ function valBadge() {
   el.innerHTML = (valMode === 'loader') ? '&#128230; Грузчик' : '&#128666; Водитель';
 }
 function valEnsureRole(cb) {
-  if (valMode) { if (cb) cb(); return; }
+  // роль уже выбрана (вкладка живёт с прошлого дня) — диалога не будет, но «водитель дня»
+  // за СЕГОДНЯ всё равно надо отметить, иначе в диспетчере останется безымянный «Норд»
+  if (valMode) { if (valMode === 'driver') nordPtr('driver'); if (cb) cb(); return; }
   var saved = localStorage.getItem(valModeKey());
-  if (saved === 'driver' || saved === 'loader') { valMode = saved; valBadge(); renderWtBtn(); if (cb) cb(); return; }
+  if (saved === 'driver' || saved === 'loader') { valMode = saved; valBadge(); renderWtBtn(); if (saved === 'driver') nordPtr('driver'); if (cb) cb(); return; }
   if (cb) _valPendingCb = cb;
   if (_valAsked) return;
   _valAsked = true; valOpenPicker();
