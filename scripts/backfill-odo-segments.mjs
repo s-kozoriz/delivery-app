@@ -75,26 +75,37 @@ const all = odo.odoSegments(cluster).filter((s) => s.date >= from && s.date <= t
 
 const byKey = {};
 all.forEach((s) => { const k = s.drv + '|' + s.date; (byKey[k] = byKey[k] || []).push(s); });
+// Дни с заездами, но БЕЗ одометра, тоже нужны: отчёт о выполненных работах существует и
+// без показаний пробега. Раньше их не было — отсюда «в выгрузке всего 10 дней».
+rows.forEach((r) => {
+  if (!r || !r.drv || !r.date) return;
+  if (r.date < from || r.date > to) return;
+  if (!r.addr || !String(r.addr).trim()) return;
+  if (r.inRoute === false) return;
+  const k = r.drv + '|' + r.date;
+  if (!byKey[k]) byKey[k] = [];
+});
 const keys = Object.keys(byKey).sort();
-console.log('Диапазон ' + from + '…' + to + ' · дней-водителей с пробегом: ' + keys.length + (dry ? ' (СУХОЙ ПРОГОН)' : ''));
+console.log('Диапазон ' + from + '…' + to + ' · дней-водителей: ' + keys.length + (dry ? ' (СУХОЙ ПРОГОН)' : ''));
 
-let saved = 0, declared = 0, guessed = 0;
+let saved = 0, declared = 0, guessed = 0, noOdo = 0;
 for (const k of keys) {
   const list = byKey[k];
   const [drv, date] = k.split('|');
   let km = 0, dec = true, clean = true;
   list.forEach((s) => { if (s.km > 0) km += s.km; if (!s.declared) dec = false; if (s.clean === false) clean = false; });
-  if (dec) declared++; else guessed++;
+  const hasOdo = list.length > 0;
+  if (!hasOdo) noOdo++; else if (dec) declared++; else guessed++;
   const rec = {
-    drv, date, ts: Date.now(), km,
-    source: dec ? 'declared' : 'guessed',
-    flag: clean ? (dec ? 'ok' : 'guessed') : 'check',
+    drv, date, ts: Date.now(), km: (hasOdo ? km : null),
+    source: hasOdo ? (dec ? 'declared' : 'guessed') : 'no_odo',
+    flag: hasOdo ? (clean ? (dec ? 'ok' : 'guessed') : 'check') : 'no_odo',
     segments: list.map((s) => ({ van: s.van, odo_start: s.kmFrom, odo_end: s.kmTo, km: s.km, ts_from: s.tsFrom, ts_to: s.tsTo, clean: s.clean !== false })),
     stops: odo.klStops(rows, drv, date)
   };
-  if (dry) { console.log('  ' + date + ' ' + drv + ' km=' + km + ' ' + rec.flag + ' отрезков=' + list.length); continue; }
+  if (dry) { console.log('  ' + date + ' ' + drv + ' km=' + (hasOdo ? km : '—') + ' ' + rec.flag + ' отрезков=' + list.length + ' адресов=' + rec.stops.length); continue; }
   const st = await put('odo_segments/' + drv + '/' + date, rec);
   if (st >= 200 && st < 300) saved++;
   else console.log('  ✗ ' + k + ' статус ' + st);
 }
-console.log(dry ? 'Сухой прогон: ничего не записано.' : ('Записано: ' + saved + ' из ' + keys.length + ' · с указанной машиной: ' + declared + ', угадано: ' + guessed));
+console.log(dry ? 'Сухой прогон: ничего не записано.' : ('Записано: ' + saved + ' из ' + keys.length + ' · с указанной машиной: ' + declared + ', угадано: ' + guessed + ', без одометра: ' + noOdo));
