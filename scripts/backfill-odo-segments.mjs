@@ -36,9 +36,9 @@ function grabFn(src, name) {
 }
 const cronSrc = readFileSync(join(HERE, 'route-analysis-cron.mjs'), 'utf8');
 const consts = (cronSrc.match(/var ODO_TOL_BACK[^\n]*/) || [''])[0];
-const names = ['odoMachines', 'odoIsNordDrv', 'odoDayNum', 'odoTsEff', 'odoEvents', 'odoCluster', 'odoSegments'];
+const names = ['odoMachines', 'odoIsNordDrv', 'odoDayNum', 'odoTsEff', 'odoEvents', 'odoCluster', 'odoSegments', 'klStops'];
 const odo = new Function(consts + '\n' + names.map((n) => grabFn(cronSrc, n)).join('\n') +
-  '\nreturn {odoCluster:odoCluster,odoSegments:odoSegments};')();
+  '\nreturn {odoCluster:odoCluster,odoSegments:odoSegments,klStops:klStops};')();
 
 // ── Firebase service account -> access token ──
 const sa = JSON.parse(readFileSync(SA_PATH, 'utf8'));
@@ -69,6 +69,7 @@ const put = async (p, v) => (await fetch(DB + '/' + p + '.json', {
 
 const cfg = (await g('cfg')) || {};
 const odoAll = (await g('odometer')) || {};
+const rows = Object.values((await g('rows')) || {});
 const cluster = odo.odoCluster(odoAll, cfg);
 const all = odo.odoSegments(cluster).filter((s) => s.date >= from && s.date <= to);
 
@@ -88,7 +89,8 @@ for (const k of keys) {
     drv, date, ts: Date.now(), km,
     source: dec ? 'declared' : 'guessed',
     flag: clean ? (dec ? 'ok' : 'guessed') : 'check',
-    segments: list.map((s) => ({ van: s.van, odo_start: s.kmFrom, odo_end: s.kmTo, km: s.km, ts_from: s.tsFrom, ts_to: s.tsTo, clean: s.clean !== false }))
+    segments: list.map((s) => ({ van: s.van, odo_start: s.kmFrom, odo_end: s.kmTo, km: s.km, ts_from: s.tsFrom, ts_to: s.tsTo, clean: s.clean !== false })),
+    stops: odo.klStops(rows, drv, date)
   };
   if (dry) { console.log('  ' + date + ' ' + drv + ' km=' + km + ' ' + rec.flag + ' отрезков=' + list.length); continue; }
   const st = await put('odo_segments/' + drv + '/' + date, rec);

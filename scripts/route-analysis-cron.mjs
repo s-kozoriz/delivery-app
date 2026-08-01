@@ -24,6 +24,28 @@ async function saToken(){
 function raNum(v){ var n=Number(v); return (v===null||v===''||typeof v==='boolean'||!isFinite(n))?null:n; }
 function cleanAddr(a){ return String(a||'').replace(/\s*\d*[A-Za-zА-Яа-я]*_[A-Za-zА-Яа-я]+\s*$/,'').replace(/,?\s*\d+\s*(OG|EG|DG)\w*\s*$/i,'').trim(); }
 function addrQ(p){ return cleanAddr(p.addr)+', '+(p.city||'')+', Germany'; }
+// Точки за день для отчёта KL о выполненных работах: адрес, город, время, признак выполнения.
+// Дубли по адресу схлопываем: несколько накладных на один адрес — это один заезд.
+// Время берём по отметке «выполнено», а если её нет — по самому раннему фото на адресе.
+function klStops(rowsArr,drv,date){
+  var uniq={};
+  (rowsArr||[]).forEach(function(r){
+    if(!r||r.drv!==drv||r.date!==date)return;
+    if(!r.addr||!String(r.addr).trim())return;
+    if(r.inRoute===false)return;
+    var key=((r.city||'')+'|'+(r.addr||'')).toLowerCase().replace(/\s+/g,' ').trim();
+    var ts=(typeof r.doneTs==='number'&&r.doneTs>0)?r.doneTs:null;
+    if(!ts&&r.photoTs&&r.photoTs.length){ var a=r.photoTs.filter(Boolean).map(Number).sort(function(x,y){return x-y;}); ts=a[0]||null; }
+    if(!uniq[key]){ uniq[key]={city:(r.city||''),address:String(r.addr).trim(),order:(r.order!=null?r.order:1e9),ts:ts,done:!!r.done}; return; }
+    var u=uniq[key];
+    if(r.order!=null&&r.order<u.order)u.order=r.order;
+    if(ts&&(!u.ts||ts<u.ts))u.ts=ts;
+    if(r.done)u.done=true;
+  });
+  var out=[]; for(var k in uniq){ if(uniq.hasOwnProperty(k))out.push(uniq[k]); }
+  out.sort(function(a,b){ if(a.ts&&b.ts&&a.ts!==b.ts)return a.ts-b.ts; return a.order-b.order; });
+  return out;
+}
 function raPoints(rowsArr,drv,date){
   var uniq={};
   (rowsArr||[]).forEach(function(r){
@@ -245,18 +267,23 @@ for(const drv of drvs){
 // берёт только водителей с маршрутом). Считает тот же odoSegments, что и экран диспетчера.
 const _segDay=odoSegments(cluster).filter(s=>s.date===date);
 const _byDrv={}; _segDay.forEach(s=>{ (_byDrv[s.drv]=_byDrv[s.drv]||[]).push(s); });
+// День пишем и тем, у кого одометра нет, но есть заезды: KL нужен отчёт о выполненных
+// работах, а он существует и без показаний пробега.
+const _drvRows=[...new Set(rows.filter(r=>r&&r.date===date&&r.addr&&String(r.addr).trim()&&r.inRoute!==false).map(r=>r.drv))].filter(Boolean);
+const _drvAll=[...new Set(Object.keys(_byDrv).concat(_drvRows))];
 let _segSaved=0;
-for(const _d of Object.keys(_byDrv)){
-  const _list=_byDrv[_d];
+for(const _d of _drvAll){
+  const _list=_byDrv[_d]||[];
   let _km=0,_declared=true,_clean=true;
   _list.forEach(s=>{ if(s.km>0)_km+=s.km; if(!s.declared)_declared=false; if(s.clean===false)_clean=false; });
   // ЧЕСТНО: если машину не указывали, она УГАДАНА алгоритмом — вешать на такие данные
   // ответственность за пробег и штрафы нельзя, поэтому помечаем источник явно.
   await put('odo_segments/'+_d+'/'+date,{
-    drv:_d, date:date, ts:Date.now(), km:_km,
-    source:(_declared?'declared':'guessed'),
-    flag:(_clean?(_declared?'ok':'guessed'):'check'),
-    segments:_list.map(s=>({van:s.van,odo_start:s.kmFrom,odo_end:s.kmTo,km:s.km,ts_from:s.tsFrom,ts_to:s.tsTo,clean:(s.clean!==false)}))
+    drv:_d, date:date, ts:Date.now(), km:(_list.length?_km:null),
+    source:(_list.length?(_declared?'declared':'guessed'):'no_odo'),
+    flag:(_list.length?(_clean?(_declared?'ok':'guessed'):'check'):'no_odo'),
+    segments:_list.map(s=>({van:s.van,odo_start:s.kmFrom,odo_end:s.kmTo,km:s.km,ts_from:s.tsFrom,ts_to:s.tsTo,clean:(s.clean!==false)})),
+    stops:klStops(rows,_d,date)
   });
   _segSaved++;
 }
