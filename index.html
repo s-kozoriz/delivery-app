@@ -2834,6 +2834,18 @@ var incReturned={};    // /1c/delivery/returned/{invoice} — снятые с п
 // Поле накладной в строке плана сохраняется на КАЖДОМ символе ручного ввода, поэтому без этой
 // проверки в реестр попадали промежуточные обрывки: 1 → 10 → 106 → 1065 → 10652.
 function incInvValid(inv){ return /^LK-\d{8}$/.test((''+(inv||'')).trim()); }
+// 1С дописывает в комментарий служебное «Дополнение к заказу № LK-00106795 от 03.08.2026 8:15:15».
+// Для водителя и техника это шум: ни описания работ, ни адреса — только ссылка на другой документ,
+// вплоть до секунд. Режем РОВНО этот шаблон — с номером, датой и временем, не жадно: в склеенном
+// комментарии заявки сразу за ним может идти текст человека («…15:59:54 будут тянуть в другой щит»),
+// и его терять нельзя. В отдельной накладной фраза обычно стоит одна — тогда остаётся пусто.
+var _DOP_RE=/Дополнение\s+к\s+заказу\s*№?\s*LK-\d+\s*от\s*\d{1,2}\.\d{1,2}\.\d{4}(\s+\d{1,2}:\d{2}(:\d{2})?)?/gi;
+function cleanNote(s){
+  s=(''+(s==null?'':s)).replace(_DOP_RE,'');
+  // после выреза остаются осиротевшие запятые: «Малярные, , Сантехника, ,» → чистим
+  s=s.replace(/\s*[,;]\s*(?=[,;])/g,'').replace(/^[\s,;]+|[\s,;]+$/g,'').replace(/\s{2,}/g,' ');
+  return s.trim();
+}
 function incRec(inv){ return incAll[inv]||incReturned[inv]||null; }
 function incList(){
   var out=Object.keys(incAll).map(function(k){return incAll[k];}).filter(function(r){return r&&r.invoice;});
@@ -3024,7 +3036,7 @@ function renderInc(){
       '<td>'+xe(r.address||'')+(r.work_type?'<div class="inc-sub">'+xe(r.work_type)+'</div>':'')+'</td>'+
       '<td>'+(r.ship_date?incFmtDate(r.ship_date):'—')+(r.desired_date?'<div class="inc-sub">план '+incFmtDate(r.desired_date)+'</div>':'')+'</td>'+
       '<td>'+w+'</td>'+
-      '<td>'+xe(r.note||'')+'</td>'+
+      '<td>'+xe(cleanNote(r.note))+'</td>'+
       '</tr>';
   });
   h+='</tbody></table>';
@@ -3042,7 +3054,7 @@ function incAccept(){
     var g=groups[key]; var first=g[0];
     var wsum=g.reduce(function(a,r){return a+(typeof r.weight_kg==='number'?r.weight_kg:0);},0);
     maxOrder+=10;
-    var _seen={}; var _parts=[]; g.forEach(function(r){ [(r.work_type||'').trim(),(r.note||'').trim()].forEach(function(p){ if(p&&!_seen[p]){_seen[p]=1;_parts.push(p);} }); }); var cmt=_parts.join(', ');
+    var _seen={}; var _parts=[]; g.forEach(function(r){ [(r.work_type||'').trim(),cleanNote(r.note)].forEach(function(p){ if(p&&!_seen[p]){_seen[p]=1;_parts.push(p);} }); }); var cmt=_parts.join(', ');
     var _sd=(first.ship_date||'').trim(); var _td=isoD(0);
     var _dt=_sd?((_sd<_td)?_td:_sd):_td; // прошлая/пустая дата отгрузки из 1С → сегодня; будущая/сегодняшняя → на свой день (диспетчер может изменить вручную)
     var row={
