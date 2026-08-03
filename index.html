@@ -241,6 +241,14 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .ra-kpi.good .v{color:#1a7a40}
 .ra-kpi.warn .v{color:#E24B4A}
 .ra-map{padding:12px 16px 4px;overflow-x:auto}
+/* Карта маршрута. Маркеры — свои (divIcon), поэтому картинки Leaflet для них не нужны.
+   Номер/знак ВНУТРИ маркера: смысл читается без цвета (Сергей дальтоник). */
+.ra-mapbox{height:430px;max-width:880px;border-radius:12px;overflow:hidden;border:1px solid #e2e5ea;background:#eef1f5}
+.ra-mk{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.ra-mk-plan{background:#1856a0}
+.ra-mk-add{background:#E24B4A}
+.ra-mk-base{background:#141816;border-radius:6px;font-size:11px}
+.ra-mktime{position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;color:#a3302f;background:rgba(255,255,255,.85);border-radius:4px;padding:0 3px;white-space:nowrap}
 .ra-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#80786e;margin-top:9px}
 .ra-legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
 .ra-legend s{display:inline-block;width:18px;height:3px;background:#1856a0;margin-right:5px;vertical-align:3px;text-decoration:none}
@@ -763,6 +771,10 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 </div>
 <div class="toast" id="toast"></div>
 
+<!-- Leaflet 1.9.4 — интерактивная карта маршрута. Лежит В РЕПО (vendor/), не с CDN:
+     карта нужна и когда внешний CDN недоступен, а версия не должна меняться сама. -->
+<link rel="stylesheet" href="vendor/leaflet.css">
+<script src="vendor/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
@@ -3642,6 +3654,55 @@ function raPick(drv,date){
   raShowDay(drv,date);
   var b=document.getElementById('raBody'); if(b&&b.scrollIntoView){ try{ b.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }
 }
+// ── Карта маршрута на РЕАЛЬНОЙ карте (Leaflet + тайлы OpenStreetMap) ──────────────────
+// Раньше маршрут рисовался чистым SVG на пустом фоне: линия и точки «висели в воздухе»,
+// понять, где это на местности, было нельзя. Теперь под ними настоящая карта.
+// Если Leaflet почему-то не загрузился — ниже остаётся прежняя схема (raMapSvg) как запасной
+// путь: разбор маршрута не должен пропадать целиком из-за карты.
+var _raMap=null, _raMapData=null;
+function raMapPoints(d){
+  var pts=[];
+  if(d.base&&d.base.lat!=null)pts.push({lat:d.base.lat,lon:d.base.lon,kind:"base"});
+  (d.planned||[]).forEach(function(p){ if(p.glat!=null)pts.push({lat:p.glat,lon:p.glon,kind:"plan",addr:p.addr,city:p.city,t:p.ts}); });
+  (d.added||[]).forEach(function(p){ if(p.glat!=null)pts.push({lat:p.glat,lon:p.glon,kind:"add",addr:p.addr,city:p.city,t:p.ts}); });
+  return pts;
+}
+function raMapLegend(){
+  return '<div class="ra-legend"><span><s></s>Реальная дорога (план)</span><span><i style="background:#1856a0"></i>Плановые точки</span><span><i style="background:#E24B4A"></i>Добавлены в пути</span><span><i style="background:#141816"></i>Б — база</span></div>';
+}
+function raMapHtml(d){
+  var poly=raDecodePoly(d.poly||""), pts=raMapPoints(d);
+  if(poly.length<2&&!pts.length)return '<div class="ra-empty">Карта недоступна: координаты адресов не найдены.</div>';
+  _raMapData={poly:poly,pts:pts};
+  return '<div class="ra-map"><div id="raMapBox" class="ra-mapbox"></div>'+raMapLegend()+'</div>';
+}
+function raMapMount(){
+  var box=document.getElementById("raMapBox"); if(!box||!_raMapData||typeof L==="undefined")return;
+  if(_raMap){ try{ _raMap.remove(); }catch(e){} _raMap=null; }
+  _raMap=L.map(box,{scrollWheelZoom:true});
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap"}).addTo(_raMap);
+  var bounds=[];
+  if(_raMapData.poly.length>1){
+    L.polyline(_raMapData.poly,{color:"#1856a0",weight:4,opacity:.85}).addTo(_raMap);
+    _raMapData.poly.forEach(function(c){ bounds.push(c); });
+  }
+  var nPlan=0;
+  _raMapData.pts.forEach(function(s){
+    var cls,txt;
+    if(s.kind==="base"){ cls="ra-mk ra-mk-base"; txt="Б"; }
+    else if(s.kind==="plan"){ nPlan++; cls="ra-mk ra-mk-plan"; txt=String(nPlan); }
+    else { cls="ra-mk ra-mk-add"; txt="+"; }
+    var timeTag=(s.kind==="add"&&s.t)?('<span class="ra-mktime">'+raT(s.t)+'</span>'):"";
+    var ic=L.divIcon({className:"",html:'<div style="position:relative"><div class="'+cls+'">'+txt+'</div>'+timeTag+'</div>',iconSize:[26,26],iconAnchor:[13,13]});
+    var m=L.marker([s.lat,s.lon],{icon:ic}).addTo(_raMap);
+    var head=(s.kind==="base")?"База":((s.kind==="plan")?("Точка "+txt+" (план)"):"Добавлено водителем в пути");
+    m.bindPopup("<b>"+head+"</b>"+(s.addr?("<br>"+xe(s.addr)+(s.city?(", "+xe(s.city)):"")):"")+(s.t?("<br>фото "+raT(s.t)):""));
+    bounds.push([s.lat,s.lon]);
+  });
+  if(bounds.length)_raMap.fitBounds(bounds,{padding:[26,26]});
+  // контейнер получает размер уже после вставки — иначе карта считает себя нулевой
+  setTimeout(function(){ try{ _raMap.invalidateSize(); }catch(e){} },80);
+}
 function raMapSvg(d){
   var poly=raDecodePoly(d.poly||''), pts=[];
   if(d.base&&d.base.lat!=null)pts.push({lat:d.base.lat,lon:d.base.lon,kind:'base'});
@@ -3705,7 +3766,7 @@ function raRender(d){
   if(d.err)h+='<div class="ra-empty">Google вернул: '+xe(raErrRu(d.err))+' — цифры могут быть неполными.</div>';
   var noGeo=((d.planned||[]).concat(d.added||[])).filter(function(p){return p.glat==null;}).length;
   if(noGeo)h+='<div class="ra-meta">'+noGeo+' адрес(ов) не найдены на карте — в таблицах они есть, на карте не показаны.</div>';
-  h+=raMapSvg(d);
+  h+=((typeof L!=="undefined")?raMapHtml(d):raMapSvg(d)); // без Leaflet — прежняя схема
   var pl=(d.planned||[]).map(function(p,i){
     return '<tr><td class="n">'+(i+1)+'</td><td>'+xe(p.city||'')+'</td><td>'+xe(p.addr||'')+'</td><td class="t">'+(p.ts?raT(p.ts):'—')+'</td></tr>';
   }).join('');
@@ -3720,6 +3781,7 @@ function raRender(d){
   }
   h+='<div class="ra-meta">Расчёт сохранён '+raT(d.ts)+(d.ts?(' · '+new Date(Number(d.ts)).toLocaleDateString('ru-RU')):'')+'. Повторное открытие бесплатно; кнопка пересчитает заново.</div>';
   b.innerHTML=h;
+  raMapMount(); // Leaflet нужен реальный элемент в DOM, поэтому только после вставки
 }
 function _geocode(q){
   if(_geoCache[q])return Promise.resolve(_geoCache[q]);
