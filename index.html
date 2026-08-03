@@ -302,18 +302,22 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .inc-tbl th{background:#f6f8fb;text-align:left;padding:7px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#5a6470;border-bottom:1px solid #e3e8ee;white-space:nowrap}
 .inc-tbl td{padding:7px 8px;border-bottom:1px solid #eef1f5;vertical-align:top}
 /* Кольори статусів = як РЯДКИ в таблиці 1С (повний скріншот Сергія 2026-07-28):
-   Заказ рожевий, Собрано блакитний, К сборке насичено-зелений, Резерв світло-зелений,
-   Принят блідо-жовтий (з чіпа фільтра — рядків цього статусу на скріншоті нема); інше — без кольору. */
+   Заказ рожевий, Собрано блакитний, К сборке насичено-зелений, Резерв світло-зелений.
+   ⛔«Принято» — НЕЙТРАЛЬНИЙ: рядків цього статусу на скріншоті 1С не було. Раніше тут стояв
+   блідо-жовтий, узятий з ЧІПА ФІЛЬТРА 1С — а чіпи фільтра ≠ кольори рядків (на цьому ми з чатом
+   станції вже промахнулись 28.07). Вигадувати колір не можна: у 1С він може означати інше.
+   Станція тримає той самий нейтральний. Точний колір — коли Сергій дасть скрін рядка «Принято».
+   Текст статусу стоїть у колонці «Состояние» завжди, тож зміст читається і без кольору. */
 .inc-tbl tr.inc-ready{background:#bfe0f2}
 .inc-tbl tr.inc-reserve{background:#c2ecc2}
 .inc-tbl tr.inc-order{background:#f2c4d8}
 .inc-tbl tr.inc-tosb{background:#84b884}
-.inc-tbl tr.inc-accepted{background:#ffe599}
+.inc-tbl tr.inc-accepted{background:#f2f3f5}
 .inc-tbl tr.inc-ready td:first-child{box-shadow:inset 7px 0 0 #4a86c8}
 .inc-tbl tr.inc-reserve td:first-child{box-shadow:inset 7px 0 0 #5aa85a}
 .inc-tbl tr.inc-order td:first-child{box-shadow:inset 7px 0 0 #c76a96}
 .inc-tbl tr.inc-tosb td:first-child{box-shadow:inset 7px 0 0 #3d7a3d}
-.inc-tbl tr.inc-accepted td:first-child{box-shadow:inset 7px 0 0 #d9b545}
+.inc-tbl tr.inc-accepted td:first-child{box-shadow:inset 7px 0 0 #b9bec7}
 .inc-sub{font-size:11px;color:#80786e;margin-top:1px}
 .inc-lock{color:#c4ccd4}
 .inc-tbl input[type=checkbox]{width:18px;height:18px;cursor:pointer}
