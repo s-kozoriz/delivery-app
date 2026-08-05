@@ -2653,8 +2653,10 @@ function renderLiveBoard(){
   var el=document.getElementById('liveBoard');if(!el)return;
   if(wtDenied){el.innerHTML='<div class="tabel-soon">Доступно только в главном входе (Zentrum).</div>';return;}
   var today=isoD(0);var list=[];
-  (IS_PLANNER?nordDrvKeys():DRV_KEYS).forEach(function(k){var nm=dname(k);if(nm)list.push({id:k,name:nm});});
-  (IS_PLANNER?Object.keys(lagerStaff).filter(function(id){return (lagerStaff[id]||{}).nord===true;}):Object.keys(lagerStaff)).forEach(function(id){list.push({id:id,name:(lagerStaff[id]||{}).name||'грузчик'});});
+  // вкладка «Табель» = кадровый учёт → имя и фамилия полностью (tabelPersonName);
+  // в маршруте, панелях водителей и фильтрах остаются короткие имена
+  (IS_PLANNER?nordDrvKeys():DRV_KEYS).forEach(function(k){var nm=dname(k);if(nm)list.push({id:k,name:tabelPersonName(k)});});
+  (IS_PLANNER?Object.keys(lagerStaff).filter(function(id){return (lagerStaff[id]||{}).nord===true;}):Object.keys(lagerStaff)).forEach(function(id){list.push({id:id,name:tabelPersonName(id)||'грузчик'});});
   var items=list.map(function(r){var rec=(wtAll[r.id]||{})[today]||{};return {name:r.name,st:liveState(rec),rec:rec};});
   var order={run:0,pause:1,done:2,idle:3};
   items.sort(function(a,b){return (order[a.st]-order[b.st])||a.name.localeCompare(b.name);});
@@ -2686,7 +2688,7 @@ function renderTabel(){
     var days=wtAll[k]||{};
     var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
     var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
-    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-hd-right"><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span><button class="tabel-print" data-id="'+xe(k)+'" onclick="printTabel(this)" title="Печать табеля за месяц">&#128438; Печать</button></span></div>';
+    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(tabelPersonName(k))+'</span><span class="tabel-hd-right"><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span><button class="tabel-print" data-id="'+xe(k)+'" onclick="printTabel(this)" title="Печать табеля за месяц">&#128438; Печать</button></span></div>';
     if(!dates.length&&!(tabelEdit&&tabelEdit.drv===k&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
     dates.forEach(function(d){
       if(tabelEdit&&tabelEdit.drv===k&&!tabelEdit.nw&&tabelEdit.date===d)html+=tabelEditForm();
@@ -2705,7 +2707,7 @@ function renderTabelLag(){
     var days=wtAll[id]||{};
     var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
     var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
-    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-hd-right"><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span><button class="tabel-print" data-id="'+xe(id)+'" onclick="printTabel(this)" title="Печать табеля за месяц">&#128438; Печать</button></span></div>';
+    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(tabelPersonName(id))+'</span><span class="tabel-hd-right"><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span><button class="tabel-print" data-id="'+xe(id)+'" onclick="printTabel(this)" title="Печать табеля за месяц">&#128438; Печать</button></span></div>';
     if(!IS_PLANNER)html+='<div class="lag-meta">PIN: '+xe(String(st.pin||'—'))+(st.nord?' &middot; <b style="color:#1a7a40">Nord</b>':'')+'<button class="lag-edit" onclick="tabelEditLoader(\''+id+'\')">изменить</button><button class="lag-del" onclick="tabelDelLoader(\''+id+'\')">удалить</button></div>';
     if(!dates.length&&!(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
     dates.forEach(function(d){
