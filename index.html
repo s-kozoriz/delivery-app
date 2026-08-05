@@ -2557,21 +2557,59 @@ function tabelPersonName(id){
   var st=lagerStaff[id]||{};
   return (st.fullName&&String(st.fullName).trim())||st.name||dname(id)||id;
 }
+// Полное имя записи (пусто, если не заполнено).
+function tabelFullOf(id){
+  var o=(cfg&&cfg.drivers&&cfg.drivers[id])||lagerStaff[id]||{};
+  return (o.fullName&&String(o.fullName).trim())||"";
+}
+// Все ключи ОДНОГО человека: водитель и грузчик — разные записи, но человек один.
+// ⛔Склеиваем ТОЛЬКО по заполненному fullName: по коротким именам два разных «Саша»
+// слились бы в одного, и в табель попали бы чужие часы.
+function tabelPersonKeys(id){
+  var full=tabelFullOf(id);
+  if(!full)return [id];
+  var keys=[];
+  if(cfg&&cfg.drivers)Object.keys(cfg.drivers).forEach(function(k){ if(tabelFullOf(k)===full)keys.push(k); });
+  Object.keys(lagerStaff||{}).forEach(function(k){ if(keys.indexOf(k)===-1&&tabelFullOf(k)===full)keys.push(k); });
+  return keys.length?keys:[id];
+}
+// Дни месяца по ВСЕМ записям человека: {дата: [записи из разных ролей]}
+function tabelMergeDays(keys,ym){
+  var out={};
+  keys.forEach(function(k){
+    var src=wtAll[k]||{};
+    Object.keys(src).forEach(function(d){
+      if(d.indexOf(ym)!==0)return;
+      (out[d]=out[d]||[]).push(src[d]);
+    });
+  });
+  return out;
+}
 function printTabel(btn){
   var id=(btn&&btn.getAttribute)?btn.getAttribute("data-id"):btn; // через data-атрибут: в ключе Firebase допустим апостроф
   if(!id)return;
   var name=tabelPersonName(id);
-  var days=wtAll[id]||{};
-  var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
+  var keys=tabelPersonKeys(id);
+  var days=tabelMergeDays(keys,tabelMonth);
+  var dates=Object.keys(days).sort();
   if(!dates.length){ toast("За этот месяц отметок нет"); return; }
-  var total=0, nDays=0, rowsH="";
+  var total=0, nDays=0, rowsH="", nBoth=0;
   dates.forEach(function(d){
-    var L=tSegs(days[d]), h=wtHrs(days[d]);
+    var recs=days[d], L=[], h=0, got=false;
+    recs.forEach(function(rec){
+      tSegs(rec).forEach(function(g){ L.push(g); });
+      var hh=wtHrs(rec); if(hh){ h+=hh; got=true; }
+    });
+    // день, отмеченный сразу в двух ролях, помечаем: иначе двойные часы выглядели бы
+    // как обычная переработка, и никто бы не проверил
+    var both=(recs.length>1);
+    if(both)nBoth++;
+    h=got?(Math.round(h*10)/10):null;
     if(h){ total+=h; nDays++; }
     // \u2013 = НАСТОЯЩЕЕ тире, а не HTML-код: строка потом идёт через xe(), который экранирует
     // амперсанд, и такой код печатался бы буквально — «07:45» плюс код плюс «00:15».
     var seg=L.map(function(g){ return (g.s||"?")+"\u2013"+(g.e||"…"); }).join(", ");
-    rowsH+="<tr><td>"+d.slice(8)+"."+d.slice(5,7)+"."+d.slice(0,4)+"</td><td>"+xe(seg||"—")+"</td><td class=\"r\">"+(h!=null?h:"")+"</td></tr>";
+    rowsH+="<tr><td>"+d.slice(8)+"."+d.slice(5,7)+"."+d.slice(0,4)+"</td><td>"+xe(seg||"—")+(both?" <b>*</b>":"")+"</td><td class=\"r\">"+(h!=null?h:"")+"</td></tr>";
   });
   var html="<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
   html+="<title>Табель — "+xe(name)+" — "+xe(tabelMonthName(tabelMonth))+"</title><style>";
@@ -2599,6 +2637,7 @@ function printTabel(btn){
   html+="<tfoot><tr><td>Рабочих дней: "+nDays+"</td><td></td><td class=\"r\">"+(Math.round(total*10)/10)+" ч</td></tr></tfoot></table>";
   html+="<div class=\"sign\"><div><div class=\"line\">Подпись сотрудника · дата</div></div>";
   html+="<div><div class=\"line\">Подпись руководителя · дата</div></div></div>";
+  if(keys.length>1)html+="<div style=\"margin-top:10px;font-size:11px;color:#555\">Сведено по всем ролям сотрудника (водитель и грузчик)"+(nBoth?(". <b>*</b> — в этот день есть отметки сразу в двух ролях: "+nBoth+" дн., проверьте"):"")+"</div>";
   html+="<div style=\"margin-top:14px;font-size:11px;color:#888\">Распечатано: "+new Date().toLocaleString("ru")+"</div>";
   html+="</body></html>";
   var w=window.open("","_blank");
