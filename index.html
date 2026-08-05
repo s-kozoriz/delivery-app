@@ -142,6 +142,12 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .tabel-drv{border:1px solid #e3e8ee;border-radius:12px;margin:10px 12px;overflow:hidden}
 .tabel-drv-hd{display:flex;justify-content:space-between;align-items:center;background:#f6f8fb;padding:10px 14px;font-weight:700;font-size:15px;color:#1a2a3a}
 .tabel-hd-right{display:flex;gap:10px;align-items:center}
+.tabel-hd-click{cursor:pointer;user-select:none}
+.tabel-hd-click:hover{background:#eef2f8}
+.tabel-caret{display:inline-block;width:14px;color:#5a6470;font-size:11px}
+.tabel-role{font-size:11px;font-weight:600;color:#5a6470;background:#e9eef6;border-radius:20px;padding:1px 8px;margin-left:8px;white-space:nowrap}
+.tabel-cnt{font-size:11.5px;font-weight:600;color:#80786e;white-space:nowrap}
+.live-role{font-size:10.5px;font-weight:600;color:#5a6470;background:#eef1f5;border-radius:20px;padding:1px 7px;margin-left:7px;white-space:nowrap}
 .tabel-print{border:1px solid #aec6ef;background:#f0f4fc;color:#1856a0;border-radius:7px;padding:3px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .tabel-print:hover{background:#e2ebfa}
 .tabel-total{color:#1a7a40;font-size:15px}
@@ -544,10 +550,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
         <button class="btn btn-sm" onclick="tabelShift(1)">&#8250;</button>
       </div>
     </div>
-    <div style="display:flex;gap:8px;padding:0 12px 10px">
-      <button class="tabel-seg on" id="tabelSegDrv" onclick="tabelSeg('drv')">Водители</button>
-      <button class="tabel-seg" id="tabelSegLag" onclick="tabelSeg('lag')">Грузчики</button>
-    </div>
+    <div style="padding:0 14px 8px;font-size:12px;color:var(--mu)">Нажмите на имя, чтобы раскрыть дни</div>
     <div id="tabelBody"></div>
   </div>
 </div>
@@ -798,7 +801,7 @@ var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRow
 // фильтры колонок главной таблицы + свёрнутые даты (состояние запоминается в браузере)
 var colFilter={drv:'',city:'',status:'',doneF:''};
 var collapsedDates={}; try{ collapsedDates=JSON.parse(localStorage.getItem('dispCollapsed')||'{}'); }catch(e){ collapsedDates={}; }
-var wtAll={},tabelMonth='',tabelView='drv',tabelEdit=null,lagerStaff={},nordPlanners={},wtDenied=false;
+var wtAll={},tabelMonth='',tabelEdit=null,lagerStaff={},nordPlanners={},wtDenied=false;
 
 firebase.initializeApp({
   apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
@@ -2646,10 +2649,10 @@ function printTabel(btn){
 }
 function tabelMonthName(ym){var mn=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];var p=ym.split('-');return mn[(parseInt(p[1],10)||1)-1]+' '+p[0];}
 function tabelShift(d){var p=tabelMonth.split('-');var dt=new Date(parseInt(p[0],10),(parseInt(p[1],10)-1)+d,1);tabelMonth=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');tabelEdit=null;renderTabel();}
-function tabelSeg(s){tabelView=s;tabelEdit=null;renderTabel();}
+// tabelSeg удалён вместе с разделением на «Водители/Грузчики» — теперь один список
 var tabelEditSegs=[],tabelEditDone=false,tabelEditDate='';
-function tabelEditDay(k,d){if(IS_VIEWER)return;var rec=(wtAll[k]||{})[d]||{};tabelEdit={drv:k,date:d};tabelEditSegs=tSegs(rec).map(function(g){return {s:g.s||'',e:g.e||''};});if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];tabelEditDone=!!rec.done;tabelEditDate=d;renderTabel();}
-function tabelAddDay(k){if(IS_VIEWER)return;tabelEdit={drv:k,nw:true};tabelEditSegs=[{s:'',e:''}];tabelEditDone=false;tabelEditDate=isoD(0);renderTabel();}
+function tabelEditDay(k,d){if(IS_VIEWER)return;tabelOpen[k]=1;var rec=(wtAll[k]||{})[d]||{};tabelEdit={drv:k,date:d};tabelEditSegs=tSegs(rec).map(function(g){return {s:g.s||'',e:g.e||''};});if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];tabelEditDone=!!rec.done;tabelEditDate=d;renderTabel();}
+function tabelAddDay(k){if(IS_VIEWER)return;tabelOpen[k]=1;tabelEdit={drv:k,nw:true};tabelEditSegs=[{s:'',e:''}];tabelEditDone=false;tabelEditDate=isoD(0);renderTabel();}
 function tabelCancel(){tabelEdit=null;renderTabel();}
 function tabelReadInputs(){tabelEditSegs.forEach(function(g,i){var es=document.getElementById('tseg_s_'+i),ee=document.getElementById('tseg_e_'+i);if(es)g.s=es.value;if(ee)g.e=ee.value;});var dt=document.getElementById('tabelNewDate');if(dt)tabelEditDate=dt.value;}
 function tabelAddSeg(){tabelReadInputs();tabelEditSegs.push({s:'',e:''});renderTabel();}
@@ -2694,9 +2697,9 @@ function renderLiveBoard(){
   var today=isoD(0);var list=[];
   // вкладка «Табель» = кадровый учёт → имя и фамилия полностью (tabelPersonName);
   // в маршруте, панелях водителей и фильтрах остаются короткие имена
-  (IS_PLANNER?nordDrvKeys():DRV_KEYS).forEach(function(k){var nm=dname(k);if(nm)list.push({id:k,name:tabelPersonName(k)});});
-  (IS_PLANNER?Object.keys(lagerStaff).filter(function(id){return (lagerStaff[id]||{}).nord===true;}):Object.keys(lagerStaff)).forEach(function(id){list.push({id:id,name:tabelPersonName(id)||'грузчик'});});
-  var items=list.map(function(r){var rec=(wtAll[r.id]||{})[today]||{};return {name:r.name,st:liveState(rec),rec:rec};});
+  (IS_PLANNER?nordDrvKeys():DRV_KEYS).forEach(function(k){var nm=dname(k);if(nm)list.push({id:k,name:tabelPersonName(k),role:tabelRoleOf(k)});});
+  (IS_PLANNER?Object.keys(lagerStaff).filter(function(id){return (lagerStaff[id]||{}).nord===true;}):Object.keys(lagerStaff)).forEach(function(id){list.push({id:id,name:tabelPersonName(id)||'грузчик',role:tabelRoleOf(id)});});
+  var items=list.map(function(r){var rec=(wtAll[r.id]||{})[today]||{};return {name:r.name,role:r.role||"",st:liveState(rec),rec:rec};});
   var order={run:0,pause:1,done:2,idle:3};
   items.sort(function(a,b){return (order[a.st]-order[b.st])||a.name.localeCompare(b.name);});
   var html='';
@@ -2706,67 +2709,80 @@ function renderLiveBoard(){
     else if(it.st==='pause'){cls='live-pause';info='перерыв &middot; '+liveFmt(w);}
     else if(it.st==='done'){cls='live-done';info='завершил &middot; '+(Math.round(w/6)/10)+' ч';}
     else{cls='live-idle';info='не на смене';}
-    html+='<div class="live-row '+cls+'"><span class="live-dot"></span><span class="live-nm">'+xe(it.name)+'</span><span class="live-info">'+info+'</span></div>';
+    html+='<div class="live-row '+cls+'"><span class="live-dot"></span><span class="live-nm">'+xe(it.name)+(it.role?'<span class="live-role">'+xe(it.role)+'</span>':'')+'</span><span class="live-info">'+info+'</span></div>';
   });
   el.innerHTML=html||'<div class="tabel-empty">нет сотрудников</div>';
 }
 setInterval(function(){var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderLiveBoard();},30000);
+// ── ТАБЕЛЬ: один список ВСЕХ сотрудников ──────────────────────────────────────────────
+// Раньше водители и грузчики жили на разных вкладках, и грузчиков было легко не заметить.
+// Теперь все в одном списке; клик по имени разворачивает и сворачивает дни месяца —
+// иначе девять человек с полными календарями не помещаются на экран.
+var tabelOpen={};
+function tabelToggle(el){
+  var id=(el&&el.getAttribute)?el.getAttribute("data-id"):el; if(!id)return;
+  if(tabelOpen[id])delete tabelOpen[id]; else tabelOpen[id]=1;
+  renderTabel();
+}
+// Роль сотрудника: один человек может быть и водителем, и грузчиком — это разные записи.
+function tabelRoleOf(id){
+  var isDrv=!!(cfg&&cfg.drivers&&cfg.drivers[id]), isLag=!!lagerStaff[id];
+  if(isDrv&&isLag)return "водитель · грузчик";
+  return isDrv?"водитель":(isLag?"грузчик":"");
+}
+function tabelPeople(){
+  var out=[],seen={};
+  (IS_PLANNER?nordDrvKeys():DRV_KEYS).forEach(function(k){ if(dname(k)&&!seen[k]){seen[k]=1;out.push({id:k,lag:false});} });
+  var lids=IS_PLANNER?Object.keys(lagerStaff).filter(function(id){return (lagerStaff[id]||{}).nord===true;}):Object.keys(lagerStaff);
+  lids.forEach(function(id){ if(!seen[id]){seen[id]=1;out.push({id:id,lag:true});} });
+  return out;
+}
 function renderTabel(){
   if(!tabelMonth)tabelMonth=isoD(0).slice(0,7);
-  var lbl=document.getElementById('tabelMonthLbl');if(lbl)lbl.textContent=tabelMonthName(tabelMonth);
-  var segD=document.getElementById('tabelSegDrv'),segL=document.getElementById('tabelSegLag');
-  if(segD)segD.classList.toggle('on',tabelView==='drv');
-  if(segL)segL.classList.toggle('on',tabelView==='lag');
+  var lbl=document.getElementById("tabelMonthLbl");if(lbl)lbl.textContent=tabelMonthName(tabelMonth);
   renderLiveBoard();
-  var body=document.getElementById('tabelBody');if(!body)return;
+  var body=document.getElementById("tabelBody");if(!body)return;
   if(wtDenied){body.innerHTML='<div class="tabel-soon">Табель и список доступны только в главном входе (Zentrum). Сейчас вход как второй диспетчер.</div>';return;}
-  if(tabelView==='lag'){body.innerHTML=renderTabelLag();return;}
-  var html='';
-  (IS_PLANNER?nordDrvKeys():DRV_KEYS).forEach(function(k){
-    var nm=dname(k);if(!nm)return;
-    var days=wtAll[k]||{};
-    var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
-    var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
-    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(tabelPersonName(k))+'</span><span class="tabel-hd-right"><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span><button class="tabel-print" data-id="'+xe(k)+'" onclick="printTabel(this)" title="Печать табеля за месяц">&#128438; Печать</button></span></div>';
-    if(!dates.length&&!(tabelEdit&&tabelEdit.drv===k&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
-    dates.forEach(function(d){
-      if(tabelEdit&&tabelEdit.drv===k&&!tabelEdit.nw&&tabelEdit.date===d)html+=tabelEditForm();
-      else html+=tabelRow(k,d,days[d]);
-    });
-    if(tabelEdit&&tabelEdit.drv===k&&tabelEdit.nw)html+=tabelEditForm();
-    html+=(IS_PLANNER?'':'<button class="tabel-add" onclick="tabelAddDay(\''+k+'\')">+ добавить день</button>')+'</div>';
-  });
-  body.innerHTML=html||'<div class="tabel-soon">Нет водителей</div>';
-}
-
-function renderTabelLag(){
-  var html='';var suspTotal=0;var ids=IS_PLANNER?Object.keys(lagerStaff).filter(function(id){return (lagerStaff[id]||{}).nord===true;}):Object.keys(lagerStaff);
-  ids.forEach(function(id){
-    var st=lagerStaff[id]||{};var nm=st.name||'без имени';
+  var html="",suspTotal=0;
+  tabelPeople().forEach(function(p){
+    var id=p.id, st=p.lag?(lagerStaff[id]||{}):null;
     var days=wtAll[id]||{};
     var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
     var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
-    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(tabelPersonName(id))+'</span><span class="tabel-hd-right"><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span><button class="tabel-print" data-id="'+xe(id)+'" onclick="printTabel(this)" title="Печать табеля за месяц">&#128438; Печать</button></span></div>';
-    if(!IS_PLANNER)html+='<div class="lag-meta">PIN: '+xe(String(st.pin||'—'))+(st.nord?' &middot; <b style="color:#1a7a40">Nord</b>':'')+'<button class="lag-edit" onclick="tabelEditLoader(\''+id+'\')">изменить</button><button class="lag-del" onclick="tabelDelLoader(\''+id+'\')">удалить</button></div>';
-    if(!dates.length&&!(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
-    dates.forEach(function(d){
-      if(tabelEdit&&tabelEdit.drv===id&&!tabelEdit.nw&&tabelEdit.date===d){html+=tabelEditForm();return;}
-      html+=tabelRow(id,d,days[d]);
-      var ot=lagOvertimeGap(st,id,d,days[d]);
-      if(ot){suspTotal++;
-        var _who=ot.drv?('водитель '+xe(dname(ot.drv)||ot.drv)):'последний водитель';
-        var _basis=ot.paired?(ot.hard?'по фото одометра':'по кнопке'):(ot.hard?'позже ВСЕХ (одометр)':'позже ВСЕХ');
+    // правка дня САМА разворачивает блок — иначе форма оказалась бы внутри свёрнутого
+    var editing=!!(tabelEdit&&tabelEdit.drv===id);
+    var open=!!tabelOpen[id]||editing;
+    var role=tabelRoleOf(id);
+    html+='<div class="tabel-drv"><div class="tabel-drv-hd tabel-hd-click" data-id="'+xe(id)+'" onclick="tabelToggle(this)" title="Показать/скрыть дни">'
+      +'<span><span class="tabel-caret">'+(open?"&#9662;":"&#9656;")+'</span> '+xe(tabelPersonName(id))+(role?'<span class="tabel-role">'+xe(role)+'</span>':"")+'</span>'
+      +'<span class="tabel-hd-right"><span class="tabel-cnt">'+dates.length+' дн.</span><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span>'
+      +'<button class="tabel-print" data-id="'+xe(id)+'" onclick="event.stopPropagation();printTabel(this)" title="Печать табеля за месяц">&#128438;</button></span></div>';
+    // переработку грузчиков считаем ВСЕГДА, даже когда блок свёрнут: иначе баннер сверху
+    // показывал бы неправду
+    if(p.lag){ dates.forEach(function(d){ if(lagOvertimeGap(st,id,d,days[d]))suspTotal++; }); }
+    if(open){
+      if(p.lag&&!IS_PLANNER)html+='<div class="lag-meta">PIN: '+xe(String(st.pin||"—"))+(st.nord?' &middot; <b style="color:#1a7a40">Nord</b>':"")+'<button class="lag-edit" onclick="tabelEditLoader(\''+id+'\')">изменить</button><button class="lag-del" onclick="tabelDelLoader(\''+id+'\')">удалить</button></div>';
+      if(!dates.length&&!(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
+      dates.forEach(function(d){
+        if(tabelEdit&&tabelEdit.drv===id&&!tabelEdit.nw&&tabelEdit.date===d){html+=tabelEditForm();return;}
+        html+=tabelRow(id,d,days[d]);
+        if(!p.lag)return;
+        var ot=lagOvertimeGap(st,id,d,days[d]);
+        if(!ot)return;
+        var _who=ot.drv?("водитель "+xe(dname(ot.drv)||ot.drv)):"последний водитель";
+        var _basis=ot.paired?(ot.hard?"по фото одометра":"по кнопке"):(ot.hard?"позже ВСЕХ (одометр)":"позже ВСЕХ");
         var _corr=ot.drvEndMin+LAG_BUFFER_MIN;
-        var _fix=(_hm2m(ot.loaderEnd)>_corr)?(' <button class="lag-fix" onclick="lagFixTime(\''+id+'\',\''+d+'\','+_corr+')">обрезать до '+_m2hm(_corr)+'</button>'):'';
+        var _fix=(_hm2m(ot.loaderEnd)>_corr)?(' <button class="lag-fix" onclick="lagFixTime(\''+id+'\',\''+d+'\','+_corr+')">обрезать до '+_m2hm(_corr)+'</button>'):"";
         html+='<div class="lag-flag">&#9888; на '+_gapTxt(ot.gap)+' позже, чем '+_who+' ('+_m2hm(ot.drvEndMin)+' · '+_basis+') · грузчик до '+xe(ot.loaderEnd)+_fix+'</div>';
-      }
-    });
-    if(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw)html+=tabelEditForm();
-    html+=(IS_PLANNER?'':'<button class="tabel-add" onclick="tabelAddDay(\''+id+'\')">+ добавить день</button>')+'</div>';
+      });
+      if(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw)html+=tabelEditForm();
+      html+=(IS_PLANNER?"":'<button class="tabel-add" onclick="tabelAddDay(\''+id+'\')">+ добавить день</button>');
+    }
+    html+="</div>";
   });
   if(!IS_PLANNER)html+='<button class="lag-addbtn" onclick="tabelAddLoader()">+ добавить грузчика</button>';
   if(suspTotal>0)html='<div class="lag-susp-hd">&#9888; Подозрительная переработка за месяц: '+suspTotal+' дн. — таймер выключен намного позже последнего водителя</div>'+html;
-  return html;
+  body.innerHTML=html||'<div class="tabel-soon">Нет сотрудников</div>';
 }
 function tabelLagDup(pin,exceptId){return Object.keys(lagerStaff).some(function(x){return x!==exceptId&&String((lagerStaff[x]||{}).pin)===pin;});}
 function tabelAddLoader(){
