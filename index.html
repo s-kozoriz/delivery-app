@@ -141,6 +141,9 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .tabel-soon{padding:24px 16px;text-align:center;color:#80786e;font-size:14px;line-height:1.5}
 .tabel-drv{border:1px solid #e3e8ee;border-radius:12px;margin:10px 12px;overflow:hidden}
 .tabel-drv-hd{display:flex;justify-content:space-between;align-items:center;background:#f6f8fb;padding:10px 14px;font-weight:700;font-size:15px;color:#1a2a3a}
+.tabel-hd-right{display:flex;gap:10px;align-items:center}
+.tabel-print{border:1px solid #aec6ef;background:#f0f4fc;color:#1856a0;border-radius:7px;padding:3px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.tabel-print:hover{background:#e2ebfa}
 .tabel-total{color:#1a7a40;font-size:15px}
 .tabel-empty{padding:10px 14px;color:#9aa5b1;font-size:13px}
 .tabel-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid #eef1f5;font-size:14px}
@@ -2541,6 +2544,59 @@ function lagFixTime(id,date,cm){
   segs[segs.length-1].e=newE;
   db.ref('worktime/'+id+'/'+date+'/seg').set(segs).then(function(){toast('Исправлено ✓');}).catch(function(){toast('Нет прав / ошибка');});
 }
+// ── Печать табеля ОДНОГО сотрудника за ВЫБРАННЫЙ месяц ──────────────────────────────
+// Arbeitszeitnachweis: нужны подписи сотрудника и руководителя, поэтому в бланке есть места
+// под подпись. Месяц берётся тот, что сейчас выбран переключателем ‹ ›.
+function tabelPersonName(id){
+  if(cfg&&cfg.drivers&&cfg.drivers[id])return dname(id)||id;
+  var st=lagerStaff[id]||{}; return st.name||dname(id)||id;
+}
+function printTabel(btn){
+  var id=(btn&&btn.getAttribute)?btn.getAttribute("data-id"):btn; // через data-атрибут: в ключе Firebase допустим апостроф
+  if(!id)return;
+  var name=tabelPersonName(id);
+  var days=wtAll[id]||{};
+  var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
+  if(!dates.length){ toast("За этот месяц отметок нет"); return; }
+  var total=0, nDays=0, rowsH="";
+  dates.forEach(function(d){
+    var L=tSegs(days[d]), h=wtHrs(days[d]);
+    if(h){ total+=h; nDays++; }
+    var seg=L.map(function(g){ return (g.s||"?")+"&#8211;"+(g.e||"…"); }).join(", ");
+    rowsH+="<tr><td>"+d.slice(8)+"."+d.slice(5,7)+"."+d.slice(0,4)+"</td><td>"+xe(seg||"—")+"</td><td class=\"r\">"+(h!=null?h:"")+"</td></tr>";
+  });
+  var html="<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
+  html+="<title>Табель — "+xe(name)+" — "+xe(tabelMonthName(tabelMonth))+"</title><style>";
+  html+="*{box-sizing:border-box;margin:0;padding:0}";
+  html+="body{font-family:Arial,sans-serif;font-size:13px;color:#000;padding:18px}";
+  html+="h1{font-size:16px;font-weight:700;margin-bottom:2px}";
+  html+=".sub{font-size:14px;font-weight:700;margin-bottom:2px}";
+  html+=".meta{font-size:12px;color:#555;margin-bottom:14px}";
+  html+=".print-btn{margin-bottom:14px;padding:8px 20px;background:#1856a0;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}";
+  html+="table{width:100%;border-collapse:collapse;font-size:12.5px}";
+  html+="th,td{border:1px solid #999;padding:5px 8px;text-align:left}";
+  html+="th{background:#eef1f5;font-size:11px;text-transform:uppercase}";
+  html+="td.r,th.r{text-align:right;white-space:nowrap}";
+  html+="tfoot td{font-weight:700;background:#f6f8fb}";
+  html+=".sign{margin-top:34px;display:flex;gap:40px;font-size:12.5px}";
+  html+=".sign div{flex:1}";
+  html+=".line{margin-top:26px;border-top:1px solid #000;padding-top:3px;color:#555;font-size:11px}";
+  html+="@media print{.print-btn{display:none}body{padding:8px}th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}";
+  html+="</style></head><body>";
+  html+="<button class=\"print-btn\" onclick=\"window.print()\">&#128438; Распечатать</button>";
+  html+="<h1>LK Bauservice GmbH — Табель рабочего времени</h1>";
+  html+="<div class=\"sub\">"+xe(name)+"</div>";
+  html+="<div class=\"meta\">"+xe(tabelMonthName(tabelMonth))+"</div>";
+  html+="<table><thead><tr><th>Дата</th><th>Время работы</th><th class=\"r\">Часов</th></tr></thead><tbody>"+rowsH+"</tbody>";
+  html+="<tfoot><tr><td>Рабочих дней: "+nDays+"</td><td></td><td class=\"r\">"+(Math.round(total*10)/10)+" ч</td></tr></tfoot></table>";
+  html+="<div class=\"sign\"><div><div class=\"line\">Подпись сотрудника · дата</div></div>";
+  html+="<div><div class=\"line\">Подпись руководителя · дата</div></div></div>";
+  html+="<div style=\"margin-top:14px;font-size:11px;color:#888\">Распечатано: "+new Date().toLocaleString("ru")+"</div>";
+  html+="</body></html>";
+  var w=window.open("","_blank");
+  if(!w){ toast("Браузер заблокировал окно печати"); return; }
+  w.document.write(html); w.document.close();
+}
 function tabelMonthName(ym){var mn=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];var p=ym.split('-');return mn[(parseInt(p[1],10)||1)-1]+' '+p[0];}
 function tabelShift(d){var p=tabelMonth.split('-');var dt=new Date(parseInt(p[0],10),(parseInt(p[1],10)-1)+d,1);tabelMonth=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');tabelEdit=null;renderTabel();}
 function tabelSeg(s){tabelView=s;tabelEdit=null;renderTabel();}
@@ -2622,7 +2678,7 @@ function renderTabel(){
     var days=wtAll[k]||{};
     var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
     var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
-    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span></div>';
+    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-hd-right"><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span><button class="tabel-print" data-id="'+xe(k)+'" onclick="printTabel(this)" title="Печать табеля за месяц">&#128438; Печать</button></span></div>';
     if(!dates.length&&!(tabelEdit&&tabelEdit.drv===k&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
     dates.forEach(function(d){
       if(tabelEdit&&tabelEdit.drv===k&&!tabelEdit.nw&&tabelEdit.date===d)html+=tabelEditForm();
@@ -2641,7 +2697,7 @@ function renderTabelLag(){
     var days=wtAll[id]||{};
     var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
     var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
-    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span></div>';
+    html+='<div class="tabel-drv"><div class="tabel-drv-hd"><span>'+xe(nm)+'</span><span class="tabel-hd-right"><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span><button class="tabel-print" data-id="'+xe(id)+'" onclick="printTabel(this)" title="Печать табеля за месяц">&#128438; Печать</button></span></div>';
     if(!IS_PLANNER)html+='<div class="lag-meta">PIN: '+xe(String(st.pin||'—'))+(st.nord?' &middot; <b style="color:#1a7a40">Nord</b>':'')+'<button class="lag-edit" onclick="tabelEditLoader(\''+id+'\')">изменить</button><button class="lag-del" onclick="tabelDelLoader(\''+id+'\')">удалить</button></div>';
     if(!dates.length&&!(tabelEdit&&tabelEdit.drv===id&&tabelEdit.nw))html+='<div class="tabel-empty">нет отметок за месяц</div>';
     dates.forEach(function(d){
