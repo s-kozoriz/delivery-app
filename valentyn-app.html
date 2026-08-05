@@ -560,21 +560,21 @@ function triggerPhoto(rowId) {
   if (isIOS) {
     document.getElementById('photoSheet').style.display = '';
   } else {
-    document.getElementById('photoInputCamera').value = '';
+    // ⛔НЕ трогаем .value перед click(): на части мобильных браузеров присвоение value
+    // файловому полю гасит «жест пользователя», и камера молча не открывается.
+    // Сброс делает обработчик change — этого достаточно.
     document.getElementById('photoInputCamera').click();
   }
 }
 function triggerCamera() {
   closePhotoSheet();
   setTimeout(function(){
-    document.getElementById('photoInputCamera').value = '';
     document.getElementById('photoInputCamera').click();
   }, 100);
 }
 function triggerGallery() {
   closePhotoSheet();
   setTimeout(function(){
-    document.getElementById('photoInputGallery').value = '';
     document.getElementById('photoInputGallery').click();
   }, 100);
 }
@@ -585,7 +585,6 @@ function triggerPhotoGallery(rowId) {
   activeUploadRowId = rowId;
   var g = document.getElementById('photoInputGallery');
   if (!g) { showToast('Не удалось открыть галерею'); return; }
-  g.value = '';
   g.click();
 }
 function closePhotoSheet() {
@@ -593,10 +592,11 @@ function closePhotoSheet() {
 }
 function handlePhotoFile(e) {
   var file = e.target.files[0];
-  if (!file || !activeUploadRowId) return;
-  var rowId = activeUploadRowId;
-  uploadPhotoWithQueue(file, rowId);
+  // сбрасываем СРАЗУ: иначе повторный выбор того же файла не даст события change,
+  // а при отмене выбора старое значение осталось бы висеть
   e.target.value = '';
+  if (!file || !activeUploadRowId) return;
+  uploadPhotoWithQueue(file, activeUploadRowId);
 }
 document.getElementById('photoInputCamera').addEventListener('change', handlePhotoFile);
 document.getElementById('photoInputGallery').addEventListener('change', handlePhotoFile);
