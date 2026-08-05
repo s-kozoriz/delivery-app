@@ -2725,10 +2725,11 @@ function tabelToggle(el){
   renderTabel();
 }
 // Роль сотрудника: один человек может быть и водителем, и грузчиком — это разные записи.
+// У нас КАЖДЫЙ водитель одновременно и грузчик — отдельной роли «водитель» не бывает.
+// Поэтому ролей всего две: «водитель грузчик» (кто есть в cfg/drivers) и «грузчик» (остальные).
 function tabelRoleOf(id){
-  var isDrv=!!(cfg&&cfg.drivers&&cfg.drivers[id]), isLag=!!lagerStaff[id];
-  if(isDrv&&isLag)return "водитель грузчик";
-  return isDrv?"водитель":(isLag?"грузчик":"");
+  if(cfg&&cfg.drivers&&cfg.drivers[id])return "водитель грузчик";
+  return lagerStaff[id]?"грузчик":"";
 }
 function tabelPeople(){
   var out=[],seen={};
