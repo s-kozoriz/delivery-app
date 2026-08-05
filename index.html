@@ -2547,9 +2547,15 @@ function lagFixTime(id,date,cm){
 // ── Печать табеля ОДНОГО сотрудника за ВЫБРАННЫЙ месяц ──────────────────────────────
 // Arbeitszeitnachweis: нужны подписи сотрудника и руководителя, поэтому в бланке есть места
 // под подпись. Месяц берётся тот, что сейчас выбран переключателем ‹ ›.
+// В ПЕЧАТНОМ табеле нужны имя и фамилия полностью — это документ для бухгалтерии.
+// В самом интерфейсе (списки, панели, маршрут) везде остаётся короткое имя, как было.
+// Полное берём из cfg.drivers[id].fullName или lager_staff[id].fullName; не заполнено —
+// печатаем короткое, чтобы бланк не остался безымянным.
 function tabelPersonName(id){
-  if(cfg&&cfg.drivers&&cfg.drivers[id])return dname(id)||id;
-  var st=lagerStaff[id]||{}; return st.name||dname(id)||id;
+  var o=(cfg&&cfg.drivers&&cfg.drivers[id])||null;
+  if(o)return (o.fullName&&String(o.fullName).trim())||dname(id)||id;
+  var st=lagerStaff[id]||{};
+  return (st.fullName&&String(st.fullName).trim())||st.name||dname(id)||id;
 }
 function printTabel(btn){
   var id=(btn&&btn.getAttribute)?btn.getAttribute("data-id"):btn; // через data-атрибут: в ключе Firebase допустим апостроф
@@ -2562,7 +2568,9 @@ function printTabel(btn){
   dates.forEach(function(d){
     var L=tSegs(days[d]), h=wtHrs(days[d]);
     if(h){ total+=h; nDays++; }
-    var seg=L.map(function(g){ return (g.s||"?")+"&#8211;"+(g.e||"…"); }).join(", ");
+    // \u2013 = НАСТОЯЩЕЕ тире, а не HTML-код: строка потом идёт через xe(), который экранирует
+    // амперсанд, и такой код печатался бы буквально — «07:45» плюс код плюс «00:15».
+    var seg=L.map(function(g){ return (g.s||"?")+"\u2013"+(g.e||"…"); }).join(", ");
     rowsH+="<tr><td>"+d.slice(8)+"."+d.slice(5,7)+"."+d.slice(0,4)+"</td><td>"+xe(seg||"—")+"</td><td class=\"r\">"+(h!=null?h:"")+"</td></tr>";
   });
   var html="<!DOCTYPE html><html><head><meta charset=\"UTF-8\">";
