@@ -2727,7 +2727,7 @@ function tabelToggle(el){
 // Роль сотрудника: один человек может быть и водителем, и грузчиком — это разные записи.
 function tabelRoleOf(id){
   var isDrv=!!(cfg&&cfg.drivers&&cfg.drivers[id]), isLag=!!lagerStaff[id];
-  if(isDrv&&isLag)return "водитель · грузчик";
+  if(isDrv&&isLag)return "водитель грузчик";
   return isDrv?"водитель":(isLag?"грузчик":"");
 }
 function tabelPeople(){
