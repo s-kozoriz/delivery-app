@@ -147,6 +147,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .tabel-caret{display:inline-block;width:14px;color:#5a6470;font-size:11px}
 .tabel-role{font-size:11px;font-weight:600;color:#5a6470;background:#e9eef6;border-radius:20px;padding:1px 8px;margin-left:8px;white-space:nowrap}
 .tabel-cnt{font-size:11.5px;font-weight:600;color:#80786e;white-space:nowrap}
+.tabel-openc{font-size:11px;font-weight:700;color:#8a4200;background:#fff2e6;border-radius:20px;padding:1px 8px;white-space:nowrap}
 .live-role{font-size:10.5px;font-weight:600;color:#5a6470;background:#eef1f5;border-radius:20px;padding:1px 7px;margin-left:7px;white-space:nowrap}
 .tabel-print{border:1px solid #aec6ef;background:#f0f4fc;color:#1856a0;border-radius:7px;padding:3px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .tabel-print:hover{background:#e2ebfa}
@@ -2749,14 +2750,23 @@ function renderTabel(){
     var id=p.id, st=p.lag?(lagerStaff[id]||{}):null;
     var days=wtAll[id]||{};
     var dates=Object.keys(days).filter(function(d){return d.indexOf(tabelMonth)===0;}).sort();
-    var total=0;dates.forEach(function(d){var h=wtHrs(days[d]);if(h)total+=h;});
+    // Час считается только по ЗАКРЫТЫМ сменам: если работник не нажал «завершить», система
+    // не знает, когда он закончил. Такие дни попадают в счётчик дней, но дают 0 часов —
+    // без пометки это выглядит как сломанный подсчёт.
+    var total=0,openDays=0;
+    dates.forEach(function(d){
+      var h=wtHrs(days[d]);
+      if(h){ total+=h; return; }
+      var L=tSegs(days[d]);
+      for(var i=0;i<L.length;i++){ if(L[i]&&L[i].s&&!L[i].e){ openDays++; break; } }
+    });
     // правка дня САМА разворачивает блок — иначе форма оказалась бы внутри свёрнутого
     var editing=!!(tabelEdit&&tabelEdit.drv===id);
     var open=!!tabelOpen[id]||editing;
     var role=tabelRoleOf(id);
     html+='<div class="tabel-drv"><div class="tabel-drv-hd tabel-hd-click" data-id="'+xe(id)+'" onclick="tabelToggle(this)" title="Показать/скрыть дни">'
       +'<span><span class="tabel-caret">'+(open?"&#9662;":"&#9656;")+'</span> '+xe(tabelPersonName(id))+(role?'<span class="tabel-role">'+xe(role)+'</span>':"")+'</span>'
-      +'<span class="tabel-hd-right"><span class="tabel-cnt">'+dates.length+' дн.</span><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span>'
+      +'<span class="tabel-hd-right">'+(openDays?'<span class="tabel-openc" title="Смена начата, но не завершена — часы по этим дням не посчитаны">&#9203; '+openDays+' не закрыто</span>':"")+'<span class="tabel-cnt">'+dates.length+' дн.</span><span class="tabel-total">'+(Math.round(total*10)/10)+' ч</span>'
       +'<button class="tabel-print" data-id="'+xe(id)+'" onclick="event.stopPropagation();printTabel(this)" title="Печать табеля за месяц">&#128438;</button></span></div>';
     // переработку грузчиков считаем ВСЕГДА, даже когда блок свёрнут: иначе баннер сверху
     // показывал бы неправду
