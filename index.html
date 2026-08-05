@@ -1464,6 +1464,70 @@ function panelMoveRow(id,drv,dir){
   db.ref().update(updates);
   _lastEdit=Date.now();
 }
+// ── Склейка дублей одного адреса ─────────────────────────────────────────────────────
+// Из «Входящих 1С» накладные группируются по адресу И ДАТЕ отгрузки. Если у накладных были
+// РАЗНЫЕ даты, вышло две строки; потом дату правят руками — и остаются два ряда на один
+// адрес и одну дату, хотя это ОДИН заезд. Их и склеиваем.
+// ⛔Выполненные строки НЕ трогаем: там фото и время доставки — это история, а не план,
+//   переписывать её задним числом нельзя.
+function rowKeyAddr(r){
+  var c=(""+((r&&r.city)||"")).trim().toLowerCase();
+  var a=(""+((r&&r.addr)||"")).trim().toLowerCase().replace(/\s+/g," ");
+  return c+"|"+a+"|"+((r&&r.date)||"");
+}
+function rowMergeCandidates(r){
+  if(!r||!r.addr||!String(r.addr).trim()||!r.date)return [];
+  if(r.done===true||r.inRoute===false)return [];
+  var k=rowKeyAddr(r);
+  return rows.filter(function(x){
+    return x&&x.id!==r.id&&x.done!==true&&x.inRoute!==false&&x.addr&&String(x.addr).trim()&&rowKeyAddr(x)===k;
+  });
+}
+// Сливаем src в dst и удаляем src.
+function mergeRowInto(dstId,srcId){
+  var dst=rows.find(function(x){return x.id===dstId;}), src=rows.find(function(x){return x.id===srcId;});
+  if(!dst||!src||dstId===srcId)return false;
+  if(!canEditRow(dst)||!canEditRow(src))return false;
+  var inv=[],seen={};
+  [].concat(dst.invs||[],src.invs||[]).forEach(function(i){ i=(""+(i||"")).trim(); if(i&&!seen[i]){seen[i]=1;inv.push(i);} });
+  var cparts=[],cs={};
+  [dst.comment,src.comment].forEach(function(c){ (""+(c||"")).split(",").forEach(function(p){ p=p.trim(); if(p&&!cs[p]){cs[p]=1;cparts.push(p);} }); });
+  var upd={invs:inv,comment:cparts.join(", ")};
+  if(typeof dst.weight==="number"||typeof src.weight==="number")upd.weight=Math.round(((dst.weight||0)+(src.weight||0))*100)/100;
+  if(!dst.timeSlot&&src.timeSlot)upd.timeSlot=src.timeSlot;
+  if(src.order!=null&&(dst.order==null||src.order<dst.order))upd.order=src.order;
+  // фото водителя со СНИМАЕМОЙ строки нельзя терять: он их уже сделал
+  var ph=[].concat(dst.photos||[],src.photos||[]);
+  if(ph.length){
+    upd.photos=ph;
+    upd.photoTs=[].concat(dst.photoTs||[],src.photoTs||[]);
+    var pb=[].concat(dst.photoBy||[],src.photoBy||[]);
+    while(pb.length<ph.length)pb.push("");
+    upd.photoBy=pb;
+  }
+  db.ref("rows/"+dstId).update(upd);
+  // накладные снятой строки должны указывать на оставшуюся, иначе «уже в плане» и кнопка
+  // «вернуть во Входящие» перестанут работать
+  (src.invs||[]).forEach(function(i){ i=(""+(i||"")).trim(); if(i&&incPlaced[i])db.ref("1c/delivery/placed/"+i+"/rowId").set(dstId); });
+  db.ref("rows/"+srcId).remove();
+  return true;
+}
+// Полное совпадение (адрес+дата+водитель) — сливаем молча. Если совпало всё, КРОМЕ водителя,
+// это может быть реально другой заезд другого человека — спрашиваем.
+function rowAutoMerge(id){
+  var r=rows.find(function(x){return x.id===id;}); if(!r)return;
+  var c=rowMergeCandidates(r); if(!c.length)return;
+  var n=0;
+  c.filter(function(x){return (x.drv||"")===(r.drv||"");}).forEach(function(x){ if(mergeRowInto(id,x.id))n++; });
+  if(n)toast("Объединено: один адрес и дата — заявок в одну: "+(n+1));
+  var other=c.filter(function(x){return (x.drv||"")!==(r.drv||"");});
+  if(other.length){
+    var o=other[0];
+    if(confirm("На этот адрес и дату уже есть заявка у водителя "+(dcolName(o.drv)||o.drv||"—")+".\n\nОбъединить в одну?")){
+      if(mergeRowInto(id,o.id))toast("Объединено");
+    }
+  }
+}
 function ur(id,f,v){
   if(IS_VIEWER)return;
   var _re=rows.find(function(x){return x.id===id;});
@@ -1474,6 +1538,8 @@ function ur(id,f,v){
   var r=rows.find(function(x){return x.id===id;});if(r)r[f]=v;
   if(f==='date'&&v){ db.ref('rows/'+id+'/date_pending').remove(); if(r)r.date_pending=null; }
   if(f==='city'&&CITIESC.indexOf(v)!==-1){ db.ref('rows/'+id+'/nord').set(true); if(r)r.nord=true; }
+  // правка даты/адреса/водителя может СДЕЛАТЬ строку дублем другой — проверяем сразу
+  if(f==='date'||f==='city'||f==='addr'||f==='drv'){ setTimeout(function(){ rowAutoMerge(id); },400); }
 }
 function _applyPending(){
   var now=Date.now();
