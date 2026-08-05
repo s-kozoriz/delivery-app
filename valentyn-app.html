@@ -58,6 +58,7 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .photo-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .photo-thumb{width:56px;height:56px;border-radius:8px;object-fit:cover;cursor:pointer;border:2px solid #d8ede2;transition:.15s}
 .photo-thumb:active{transform:scale(.95)}
+.photo-gal{width:56px;height:56px;border-radius:8px;border:2px dashed #c8d4e8;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;color:#8ba3c7;flex-shrink:0}
 .photo-add{width:56px;height:56px;border-radius:8px;border:2px dashed #d8ede2;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;color:#aaa;flex-shrink:0}
 .photo-hint{font-size:11px;color:#e07000;margin-bottom:6px;display:flex;align-items:center;gap:4px}
 .photo-count{font-size:11px;color:#5a7060;margin-top:4px}
@@ -577,6 +578,16 @@ function triggerGallery() {
     document.getElementById('photoInputGallery').click();
   }, 100);
 }
+// Запасной путь: камера может НЕ открыться (отозвано разрешение, сбой браузера, PWA-режим).
+// Тогда водитель снимает обычной камерой телефона и добавляет фото отсюда — иначе он в тупике
+// и отчёт сдать нечем (случай 05.08: у водителя кнопка не включала камеру, обхода не было).
+function triggerPhotoGallery(rowId) {
+  activeUploadRowId = rowId;
+  var g = document.getElementById('photoInputGallery');
+  if (!g) { showToast('Не удалось открыть галерею'); return; }
+  g.value = '';
+  g.click();
+}
 function closePhotoSheet() {
   document.getElementById('photoSheet').style.display = 'none';
 }
@@ -640,6 +651,10 @@ function processQueue() {
     setTimeout(processQueue, 1000);
   }).catch(function() {
     item._processing = false;
+    // Молчащая ошибка = водитель думает, что кнопка не работает. Говорим честно, но без спама.
+    item._tries = (item._tries || 0) + 1;
+    if (item._tries === 1 || item._tries % 5 === 0) showToast('Фото не уходит (' + offlineQueue.length + ' в очереди) — проверьте интернет. Оно сохранено');
+    if (item._tries === 3 && typeof _refreshAuth === 'function') _refreshAuth();  // возможно, протухла сессия
     setTimeout(processQueue, 15000);
   });
 }
@@ -1307,6 +1322,7 @@ function renderRow(r, num) {
       h += '<div style="width:56px;height:56px;border-radius:8px;background:#e8f5e9;border:2px dashed #9fe0be;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#6a1a7a;text-align:center">⏳</div>';
     });
     h += '<button class="photo-add" data-upload="' + r.id + '">&#128247;</button>';
+    h += '<button class="photo-gal" data-upload="' + r.id + '" title="Из галереи">&#128444;</button>';
     h += '</div>';
     if (!isDone && !hasPhoto) {
       h += '<div style="font-size:10px;color:#e07000;margin-top:4px">⚠ Сделайте фото после вывоза</div>';
@@ -1330,6 +1346,7 @@ function renderRow(r, num) {
       }
     });
     h += '<button class="photo-add" data-upload="' + r.id + '">&#128247;</button>';
+    h += '<button class="photo-gal" data-upload="' + r.id + '" title="Из галереи">&#128444;</button>';
     h += '</div>';
     if (pendingPhotos.length > 0) {
       h += '<div class="photo-count">⏳ ' + pendingPhotos.length + ' фото ожидает загрузки</div>';
@@ -1393,6 +1410,9 @@ function render() {
   });
   wrap.querySelectorAll('.photo-add').forEach(function(btn) {
     btn.addEventListener('click', function() { triggerPhoto(this.getAttribute('data-upload')); });
+  });
+  wrap.querySelectorAll('.photo-gal').forEach(function(btn) {
+    btn.addEventListener('click', function() { triggerPhotoGallery(this.getAttribute('data-upload')); });
   });
   wrap.querySelectorAll('.photo-thumb').forEach(function(img) {
     img.addEventListener('click', function() { openLightbox(this.getAttribute('data-url')); });
