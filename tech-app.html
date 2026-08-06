@@ -126,24 +126,6 @@ body{background:#f0efe9;color:#141816;font-family:'Segoe UI',sans-serif;font-siz
 </head>
 <body>
 
-<div class="pin-wrap" id="pinWrap">
-  <div class="pin-logo">LK</div>
-  <div class="pin-name">LK Техник</div>
-  <div class="pin-sub" id="pinSub">Введите PIN-код</div>
-  <div class="pin-dots">
-    <div class="pdot" id="pd0"></div><div class="pdot" id="pd1"></div>
-    <div class="pdot" id="pd2"></div><div class="pdot" id="pd3"></div>
-  </div>
-  <div class="pin-err" id="pinErr"></div>
-  <div class="pad">
-    <button class="pb" onclick="pp('1')">1</button><button class="pb" onclick="pp('2')">2</button><button class="pb" onclick="pp('3')">3</button>
-    <button class="pb" onclick="pp('4')">4</button><button class="pb" onclick="pp('5')">5</button><button class="pb" onclick="pp('6')">6</button>
-    <button class="pb" onclick="pp('7')">7</button><button class="pb" onclick="pp('8')">8</button><button class="pb" onclick="pp('9')">9</button>
-    <button class="pb" onclick="pp('X')" style="font-size:16px">&#9003;</button><button class="pb" onclick="pp('0')">0</button>
-    <button class="pb" style="opacity:0" disabled></button>
-  </div>
-</div>
-
 <div id="app" style="display:none">
   <div class="hdr">
     <h1 id="techName">LK Техник</h1>
@@ -313,7 +295,7 @@ firebase.initializeApp({
 var db=firebase.database();
 var storage=firebase.storage();
 
-var currentTechId=null,currentTech=null,cfg={},pinBuf='',photos=[],selectedDate='',dateOffset=1;
+var currentTechId=null,currentTech=null,cfg={},photos=[],selectedDate='',dateOffset=1;
 var _reqPhotos={};
 
 function isoD(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
@@ -323,34 +305,6 @@ function dname(k){return cfg&&cfg.drivers&&cfg.drivers[k]?cfg.drivers[k].name:k;
 function xe(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
 
 // PIN
-function pp(d){
-  if(d==='X'){pinBuf=pinBuf.slice(0,-1);}else if(pinBuf.length<4){pinBuf+=d;}
-  [0,1,2,3].forEach(function(i){var el=document.getElementById('pd'+i);if(el){el.style.background=i<pinBuf.length?'#fff':'transparent';el.style.borderColor=i<pinBuf.length?'#fff':'rgba(255,255,255,.4)';}});
-  if(pinBuf.length===4){
-    // Check against all techs
-    db.ref('cfg/techs').once('value',function(s){
-      var techs=s.val()||{};
-      var found=null,foundId=null;
-      Object.keys(techs).forEach(function(id){
-        if(techs[id].pin===pinBuf){found=techs[id];foundId=id;}
-      });
-      if(found){
-        currentTechId=foundId;currentTech=found;
-        document.getElementById('pinWrap').style.display='none';
-        document.getElementById('app').style.display='';
-        sessionStorage.setItem('techId',foundId);
-        sessionStorage.setItem('techPin',pinBuf);
-        initApp();
-      } else {
-        document.getElementById('pinErr').textContent='Неверный PIN';
-        pinBuf='';
-        [0,1,2,3].forEach(function(i){var el=document.getElementById('pd'+i);if(el){el.style.background='transparent';el.style.borderColor='rgba(255,255,255,.4)';}});
-        setTimeout(function(){document.getElementById('pinErr').textContent='';},1500);
-      }
-    });
-  }
-}
-
 // Auth gate (Варіант A): techId береться з custom-token claim
 // Чужой/старый вход открыл эту страницу → НЕ показываем чужой интерфейс молча, а даём явно перезайти под нужный PIN.
 function _roleName(c){var r=c&&c.role;if(r==='zentrum')return 'Диспетчер';if(r==='norden')return 'Планировщик Норд';if(r==='lager')return 'Просмотр';if(r==='driver')return 'Водитель'+(c&&c.drv?' ('+c.drv+')':'');if(r==='tech')return 'Техник';if(r==='loader')return 'Грузчик';return 'Не распознан';}
@@ -395,7 +349,7 @@ firebase.auth().onAuthStateChanged(function(user){
     currentTechId=c.techId||sessionStorage.getItem('login_techId')||sessionStorage.getItem('techId');
     sessionStorage.setItem('techId',currentTechId||'');
     if(!currentTech)currentTech={name:''};
-    document.getElementById('pinWrap').style.display='none';
+    var _pw=document.getElementById('pinWrap'); if(_pw)_pw.style.display='none';
     document.getElementById('app').style.display='';
     initApp();
   });

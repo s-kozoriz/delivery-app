@@ -186,22 +186,6 @@ body{background:#f0f4fc;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 </style>
 </head>
 <body>
-<div class="pin-wrap" id="pinWrap">
-  <div style="color:#fff;font-size:20px;font-weight:700;margin-bottom:4px" id="driverPinName">Маршрут</div>
-  <p style="color:rgba(255,255,255,.7);font-size:13px;margin-bottom:16px">Введите PIN-код</p>
-  <div style="display:flex;gap:12px;margin-bottom:8px" id="pinDots">
-    <div class="pdot" id="pd0"></div><div class="pdot" id="pd1"></div>
-    <div class="pdot" id="pd2"></div><div class="pdot" id="pd3"></div>
-  </div>
-  <div style="color:#ffaaaa;font-size:13px;height:18px;margin-bottom:8px" id="pinErr"></div>
-  <div style="display:grid;grid-template-columns:repeat(3,72px);gap:10px">
-    <button class="ppb" onclick="dpp('1')">1</button><button class="ppb" onclick="dpp('2')">2</button><button class="ppb" onclick="dpp('3')">3</button>
-    <button class="ppb" onclick="dpp('4')">4</button><button class="ppb" onclick="dpp('5')">5</button><button class="ppb" onclick="dpp('6')">6</button>
-    <button class="ppb" onclick="dpp('7')">7</button><button class="ppb" onclick="dpp('8')">8</button><button class="ppb" onclick="dpp('9')">9</button>
-    <button class="ppb" onclick="dpp('X')" style="font-size:16px">&#9003;</button><button class="ppb" onclick="dpp('0')">0</button>
-    <button class="ppb" style="opacity:0" disabled></button>
-  </div>
-</div>
 <div id="driverApp" style="display:none">
 <div class="hdr">
   <div class="hdr-top">
@@ -1433,26 +1417,6 @@ renderWtBtn();
 
 curD = isoD(0);
 render();
-}
-var _pinBuf = '';
-var _defaultPin = '5555';
-function dpp(d) {
-  if(d==='X'){_pinBuf=_pinBuf.slice(0,-1);}
-  else if(_pinBuf.length<4){_pinBuf+=d;}
-  [0,1,2,3].forEach(function(i){document.getElementById('pd'+i).className='pdot'+(_pinBuf.length>i?' on':'');  });
-  if(_pinBuf.length===4){
-    var correct=(cfg.pinD&&cfg.pinD['C'])||_defaultPin;
-    if(_pinBuf===correct){
-      document.getElementById('pinWrap').style.display='none';
-      document.getElementById('driverApp').style.display='';
-      sessionStorage.setItem('dpin_C','1');
-    } else {
-      document.getElementById('pinErr').textContent='Неверный PIN';
-      _pinBuf='';
-      [0,1,2,3].forEach(function(i){document.getElementById('pd'+i).className='pdot';});
-      setTimeout(function(){document.getElementById('pinErr').textContent='';},1500);
-    }
-  }
 }
 // Auth gate (Варіант A): доступ лише з валідною Firebase-сесією
 // Чужой/старый вход открыл эту страницу → НЕ показываем чужой интерфейс молча, а даём явно перезайти под нужный PIN.

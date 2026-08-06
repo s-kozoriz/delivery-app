@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -385,33 +385,6 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 </head>
 <body>
 
-<div id="pinWrap" style="position:fixed;inset:0;background:#0d2340;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;z-index:1000;padding:20px">
-  <div style="width:70px;height:70px;background:#1856a0;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:#fff;letter-spacing:-1px;margin-bottom:14px">LK</div>
-  <div style="color:#fff;font-size:18px;font-weight:700;letter-spacing:.02em;margin-bottom:4px">LK Bauservice</div>
-  <div style="color:rgba(255,255,255,.4);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:28px" id="pinLabel">Система доставок</div>
-  <div style="display:flex;gap:12px;margin-bottom:10px">
-    <div id="d0" style="width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:transparent;transition:.15s"></div>
-    <div id="d1" style="width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:transparent;transition:.15s"></div>
-    <div id="d2" style="width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:transparent;transition:.15s"></div>
-    <div id="d3" style="width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:transparent;transition:.15s"></div>
-  </div>
-  <div id="perr" style="color:#ff8a80;font-size:13px;height:20px;margin-bottom:8px;text-align:center"></div>
-  <div style="display:grid;grid-template-columns:repeat(3,72px);gap:10px;margin-bottom:20px">
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:26px;font-weight:400;cursor:pointer" onclick="pp('1')">1</button>
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:26px;font-weight:400;cursor:pointer" onclick="pp('2')">2</button>
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:26px;font-weight:400;cursor:pointer" onclick="pp('3')">3</button>
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:26px;font-weight:400;cursor:pointer" onclick="pp('4')">4</button>
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:26px;font-weight:400;cursor:pointer" onclick="pp('5')">5</button>
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:26px;font-weight:400;cursor:pointer" onclick="pp('6')">6</button>
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:26px;font-weight:400;cursor:pointer" onclick="pp('7')">7</button>
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:26px;font-weight:400;cursor:pointer" onclick="pp('8')">8</button>
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:26px;font-weight:400;cursor:pointer" onclick="pp('9')">9</button>
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:22px;cursor:pointer" onclick="pp('X')">&#9003;</button>
-    <button style="height:72px;border-radius:14px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-size:26px;font-weight:400;cursor:pointer" onclick="pp('0')">0</button>
-    <button style="height:72px;border-radius:14px;border:none;background:transparent;cursor:default"></button>
-  </div>
-</div>
-
 <div id="app" style="display:none">
 <div class="hdr">
   <div style="display:flex;align-items:center">
@@ -672,25 +645,25 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
           <div style="font-size:10px;font-weight:700;color:#1a7a40;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">ВОД&#1030;Й 1</div>
           <div class="fl">&#1030;м'я</div><input class="fi" id="cNL" placeholder="Л&#1105;ша" style="margin-bottom:6px">
           <div class="fl">Телефон</div><input class="fi" id="cPL" placeholder="+49151..." type="tel" style="margin-bottom:6px">
-          <div class="fl">PIN</div><input class="fi" id="cPinDL" type="text" maxlength="4" inputmode="numeric" placeholder="3333" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
+          <div class="fl">PIN</div><input class="fi" id="cPinDL" type="text" maxlength="4" inputmode="numeric" placeholder="••••" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
         </div>
         <div style="border:1px solid #ffcdd2;border-radius:10px;padding:10px">
           <div style="font-size:10px;font-weight:700;color:#a03018;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">ВОД&#1030;Й 2</div>
           <div class="fl">&#1030;м'я</div><input class="fi" id="cNR" placeholder="Рома" style="margin-bottom:6px">
           <div class="fl">Телефон</div><input class="fi" id="cPR" placeholder="+49151..." type="tel" style="margin-bottom:6px">
-          <div class="fl">PIN</div><input class="fi" id="cPinDR" type="text" maxlength="4" inputmode="numeric" placeholder="4444" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
+          <div class="fl">PIN</div><input class="fi" id="cPinDR" type="text" maxlength="4" inputmode="numeric" placeholder="••••" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
         </div>
         <div style="border:1px solid #bbdefb;border-radius:10px;padding:10px">
           <div style="font-size:10px;font-weight:700;color:#1856a0;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">ВОД&#1030;Й 3</div>
           <div class="fl">&#1030;м'я</div><input class="fi" id="cNC" placeholder="Саша" style="margin-bottom:6px">
           <div class="fl">Телефон</div><input class="fi" id="cPC" placeholder="+49151..." type="tel" style="margin-bottom:6px">
-          <div class="fl">PIN</div><input class="fi" id="cPinDC" type="text" maxlength="4" inputmode="numeric" placeholder="5555" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
+          <div class="fl">PIN</div><input class="fi" id="cPinDC" type="text" maxlength="4" inputmode="numeric" placeholder="••••" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
         </div>
         <div style="border:1px solid #e1bee7;border-radius:10px;padding:10px">
           <div style="font-size:10px;font-weight:700;color:#6a1a7a;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">ВОД&#1030;Й 4</div>
           <div class="fl">&#1030;м'я</div><input class="fi" id="cNV" placeholder="Валентин" style="margin-bottom:6px">
           <div class="fl">Телефон</div><input class="fi" id="cPV" placeholder="+49151..." type="tel" style="margin-bottom:6px">
-          <div class="fl">PIN</div><input class="fi" id="cPinDV" type="text" maxlength="4" inputmode="numeric" placeholder="1100" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
+          <div class="fl">PIN</div><input class="fi" id="cPinDV" type="text" maxlength="4" inputmode="numeric" placeholder="••••" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
         </div>
       </div>
       <div style="padding:0 14px 14px" id="dynDrvBox"></div>
@@ -724,15 +697,15 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
           <div>
             <div class="fl">LK Zentrum</div>
-            <input class="fi" id="cPin" type="text" maxlength="4" inputmode="numeric" placeholder="1234" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
+            <input class="fi" id="cPin" type="text" maxlength="4" inputmode="numeric" placeholder="••••" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
           </div>
           <div>
             <div class="fl">LK Norden</div>
-            <input class="fi" id="cPin2" type="text" maxlength="4" inputmode="numeric" placeholder="2222" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
+            <input class="fi" id="cPin2" type="text" maxlength="4" inputmode="numeric" placeholder="••••" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
           </div>
           <div>
             <div class="fl">LK Lager</div>
-            <input class="fi" id="cPinV" type="text" maxlength="4" inputmode="numeric" placeholder="0000" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
+            <input class="fi" id="cPinV" type="text" maxlength="4" inputmode="numeric" placeholder="••••" style="font-family:monospace;letter-spacing:4px;font-size:16px;font-weight:700">
           </div>
         </div>
       </div>
@@ -789,15 +762,14 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 <script>
 var STATS=['—','вывоз мусора','срочно','забрать товар','доставка материала','перевезти инструмент','перевезти мастера'];
 var DRV_KEYS=['L','R','C','V'];
-var PIN_DEFAULT='1234';
 var cfg={
   drivers:{L:{name:'Лёша',phone:''},R:{name:'Рома',phone:''},C:{name:'',phone:''},V:{name:'Валентин',phone:''}},
   cities:['Wolfsburg','Braunschweig','Hannover','Göttingen','Aurich','Wilhelmshaven'],citiesC:['Aurich','Wilhelmshaven','Varel'],
-  hdr:'Маршрут на {date}',ftr:'Удачной дороги!',pin:PIN_DEFAULT,pinView:'0000',pin2:'2222',pinD:{L:'3333',R:'4444',C:'5555',V:'1100'}
+  hdr:'Маршрут на {date}',ftr:'Удачной дороги!'
 };
 var CITIES=cfg.cities.slice();
 var CITIESC=cfg.citiesC?cfg.citiesC.slice():['Aurich','Wilhelmshaven','Varel'];
-var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRowId=null,newRowDraft=null,pinBuf='',viewOnly=false,disp2Mode=false,IS_VIEWER=false,IS_PLANNER=false,PLANNER_ID='',PLANNER_NAME='',pinMode='dispatcher',_lastEdit=0,_pending={};
+var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRowId=null,newRowDraft=null,viewOnly=false,disp2Mode=false,IS_VIEWER=false,IS_PLANNER=false,PLANNER_ID='',PLANNER_NAME='',pinMode='dispatcher',_lastEdit=0,_pending={};
 // фильтры колонок главной таблицы + свёрнутые даты (состояние запоминается в браузере)
 var colFilter={drv:'',city:'',status:'',doneF:''};
 var collapsedDates={}; try{ collapsedDates=JSON.parse(localStorage.getItem('dispCollapsed')||'{}'); }catch(e){ collapsedDates={}; }
@@ -1093,23 +1065,9 @@ function odoCsv(){
   var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});var u=URL.createObjectURL(blob);var el=document.createElement('a');el.href=u;el.download='probeg_'+isoD(0)+'.csv';el.click();setTimeout(function(){URL.revokeObjectURL(u);},1000);
 }
 
-function pp(d){
-  if(d==='X'){pinBuf=pinBuf.slice(0,-1);}else if(pinBuf.length<4){pinBuf+=d;}
-  [0,1,2,3].forEach(function(i){var el=document.getElementById('d'+i);if(el){el.style.background=i<pinBuf.length?'#fff':'transparent';el.style.borderColor=i<pinBuf.length?'#fff':'rgba(255,255,255,.35)';}});
-  if(pinBuf.length===4){
-    if(pinBuf===(cfg.pin||PIN_DEFAULT)){disp2Mode=false;enter(false);}
-    else if(pinBuf===(cfg.pinView||'0000')){disp2Mode=false;enter(true);}
-    else if(pinBuf===(cfg.pin2||'2222')){disp2Mode=true;viewOnly=false;enter(false);}
-    else{
-      document.getElementById('perr').textContent='Неверный PIN';
-      pinBuf='';[0,1,2,3].forEach(function(i){var el=document.getElementById('d'+i);if(el){el.style.background='transparent';el.style.borderColor='rgba(255,255,255,.35)';}});
-      setTimeout(function(){document.getElementById('perr').textContent='';},1500);
-    }
-  }
-}
 function enter(vo){
   viewOnly=vo;
-  document.getElementById('pinWrap').style.display='none';
+  var _pw=document.getElementById('pinWrap'); if(_pw)_pw.style.display='none';
   document.getElementById('app').style.display='';
   sessionStorage.setItem('ok','1');
   sessionStorage.setItem('vo',vo?'1':'0');
