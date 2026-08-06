@@ -798,6 +798,7 @@ function odoRec() { return odoData[wtDate()] || {}; }
     + '#odoGate .ocam img{max-width:88%;max-height:100%;border-radius:12px;border:2px solid #263346}'
     + '#odoGate .ohint{color:#7c8aa0;font-size:14px;text-align:center;padding:24px;font-weight:600}'
     + '#odoGate .oform{padding:14px 16px 20px;display:flex;flex-direction:column;gap:11px}'
+    + '#odoGate .oshotg{width:100%;border:1px solid #33465e;background:none;color:#8ea3c4;border-radius:12px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:-4px}'
     + '#odoGate .oshot{width:100%;border:2px dashed #3a5a86;background:none;color:#8fb4e6;border-radius:12px;padding:15px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
     + '#odoGate .oshot.done{border-style:solid;border-color:#1a7a40;color:#8ef0b0;background:#0f2417}'
     + '#odoGate .okm{display:flex;align-items:center;gap:10px;background:#131c28;border:1px solid #2a3a50;border-radius:12px;padding:9px 12px}'
@@ -820,12 +821,16 @@ function odoRec() { return odoData[wtDate()] || {}; }
   g.innerHTML = '<div class="ohd" id="odoHd"></div><div class="osub" id="odoSub"></div>'
     + '<div class="ocam" id="odoCam"></div>'
     + '<div class="oform"><div class="ovans" id="odoVans"></div><button class="oshot" id="odoShot" onclick="odoShoot()">&#128247; Сфотографировать пробег</button>'
+    + '<button class="oshotg" id="odoShotG" onclick="odoShootGal()">&#128444; Взять фото из галереи</button>'
     + '<div class="okm"><label>Пробег, км</label><input id="odoKm" type="number" inputmode="numeric" placeholder="напр. 123456" oninput="odoValidate()"></div>'
     + '<button class="ogo" id="odoGo" disabled onclick="odoSave()"></button>'
     + '<button class="opeek" id="odoPeek" onclick="odoPeek()">Только посмотреть маршрут</button></div>';
   document.body.appendChild(g);
   var inp = document.createElement('input'); inp.id = 'odoInput'; inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment'); inp.style.display = 'none';
   inp.addEventListener('change', odoOnFile); document.body.appendChild(inp);
+  // без capture → системний вибір/галерея: запасний шлях, коли камера не відкривається
+  var inpg = document.createElement('input'); inpg.id = 'odoInputGal'; inpg.type = 'file'; inpg.accept = 'image/*'; inpg.style.display = 'none';
+  inpg.addEventListener('change', odoOnFile); document.body.appendChild(inpg);
   var ban = document.createElement('div'); ban.id = 'odoBanner';
   ban.innerHTML = '<span>&#9888; Пробег не зафиксирован</span><button onclick="odoOpen(\'start\')">Начать день</button>';
   var app = document.getElementById('driverApp'); if (app) app.insertBefore(ban, app.firstChild);
@@ -905,7 +910,10 @@ function odoOpen(mode) {
   odoValidate();
   document.getElementById('odoGate').classList.add('on');
 }
-function odoShoot() { var i = document.getElementById('odoInput'); i.value = ''; i.click(); }
+// ⛔НЕ трогаем .value перед click(): присвоение value файловому полю гасит «жест
+// пользователя», и камера молча не открывается. Сброс делает обработчик change.
+function odoShoot() { document.getElementById('odoInput').click(); }
+function odoShootGal() { document.getElementById('odoInputGal').click(); }
 function odoOnFile(e) {
   var f = e.target.files[0]; if (!f) return;
   odoPhotoFile = f;
