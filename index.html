@@ -802,7 +802,10 @@ var rows=[],sent={},tripStatus={},warehouseStatus={},notes={},curD='',editingRow
 // фильтры колонок главной таблицы + свёрнутые даты (состояние запоминается в браузере)
 var colFilter={drv:'',city:'',status:'',doneF:''};
 var collapsedDates={}; try{ collapsedDates=JSON.parse(localStorage.getItem('dispCollapsed')||'{}'); }catch(e){ collapsedDates={}; }
-var wtAll={},tabelMonth='',tabelEdit=null,lagerStaff={},nordPlanners={},wtDenied=false;
+// ⛔pairsAll объявляем ЗДЕСЬ, а не внутри __startDB(): его читает глобальная lagOvertimeGap().
+// Пока объявление было внутри функции, переменная оставалась локальной → ReferenceError →
+// renderTabel() падал целиком, и вкладка «Табель» оказывалась пустой.
+var wtAll={},tabelMonth='',tabelEdit=null,lagerStaff={},nordPlanners={},wtDenied=false,pairsAll={};
 
 firebase.initializeApp({
   apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
@@ -851,7 +854,6 @@ if(IS_VIEWER){
 } else {
   db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 }
-var pairsAll={};
 db.ref('pairs').on('value',function(s){pairsAll=s.val()||{};var tt2=document.getElementById('ttab');if(tt2&&tt2.style.display!=='none')renderTabel();},function(){});
 // ── Пробег (одометр) — временное хранилище для сверки с топливом (Zoll); фото уходит контролёру позже ──
 db.ref('odometer').on('value',function(s){odoAll=s.val()||{};var t=document.getElementById('tOdo');if(t&&t.style.display!=='none')renderOdo();},function(){});
