@@ -667,6 +667,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
         </div>
       </div>
       <div style="padding:0 14px 14px" id="dynDrvBox"></div>
+      <div style="padding:0 14px 14px" id="peopleBox"></div>
       <div style="margin:0 14px 14px;border:1px solid #cfd8e3;border-radius:10px;padding:10px;background:#f7f9fc">
         <div style="font-size:10px;font-weight:700;color:#37516e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">&#128666; Машина (одинаковая у всех)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -777,6 +778,8 @@ var collapsedDates={}; try{ collapsedDates=JSON.parse(localStorage.getItem('disp
 // Пока объявление было внутри функции, переменная оставалась локальной → ReferenceError →
 // renderTabel() падал целиком, и вкладка «Табель» оказывалась пустой.
 var wtAll={},tabelMonth='',tabelEdit=null,lagerStaff={},nordPlanners={},wtDenied=false,pairsAll={};
+// Єдиний реєстр людей: імена, ролі, активність. Кодів тут немає — вони в закритому вузлі.
+var peopleAll={};
 
 firebase.initializeApp({
   apiKey:'AIzaSyBfqRn_BJlHnDvxytfB4sdwK0YulR87j4Q',
@@ -823,7 +826,10 @@ db.ref('worktime').on('value',function(s){wtAll=s.val()||{};wtDenied=false;var t
 if(IS_VIEWER){
   db.ref('loaders_pub').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 } else {
-  db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
+  // ЄДИНИЙ РЕЄСТР ЛЮДЕЙ. Тут лежать імена, ролі й активність — але НЕ коди.
+// Коди в people_pin, і їх не читає ніхто, включно з диспетчером: він може лише задати новий.
+db.ref('people').on('value',function(s){peopleAll=s.val()||{};var pb=document.getElementById('peopleBox');if(pb)renderPeople();},function(){});
+db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();},function(){wtDenied=true;var tt=document.getElementById('ttab');if(tt&&tt.style.display!=='none')renderTabel();});
 }
 db.ref('pairs').on('value',function(s){pairsAll=s.val()||{};var tt2=document.getElementById('ttab');if(tt2&&tt2.style.display!=='none')renderTabel();},function(){});
 // ── Пробег (одометр) — временное хранилище для сверки с топливом (Zoll); фото уходит контролёру позже ──
@@ -2426,7 +2432,7 @@ function swCfg(name){
     if(b)b.className='cfg-tab'+(t===name?' active':'');
   });
   if(name==='nord')renderNordPlanners();
-  if(name==='drivers')renderDynDrivers();
+  if(name==='drivers'){renderDynDrivers();renderPeople();}
 }
 
 function sw(n){
@@ -2504,6 +2510,105 @@ function renderNordMirror(){
   el.innerHTML=h;
 }
 // ─── ДИНАМИЧЕСКИЕ ВОДИТЕЛИ (доп. машины; появляются колонкой автоматически) ──
+// ── ЛЮДИ ────────────────────────────────────────────────────────────────────────────
+// Один список вместо пяти. Раньше, чтобы завести человека, надо было знать, в какой именно
+// список он попадает: динамические водители, грузчики, планировщики Норда, «Просмотр» или
+// секрет сервера. Теперь — одна карточка с галочками ролей.
+//
+// ⛔PIN тут НЕ показывается и не читается. Узел с кодами закрыт правилами для всех ролей;
+//   диспетчер может ЗАДАТЬ новый код, но не увидит ни своего, ни чужого. Именно этим новая
+//   схема отличается от прежней, где коды лежали в базе открытым текстом.
+var ROLE_LABELS={zentrum:'Диспетчер',norden:'Планировщик Норд',lager:'Склад',viewer:'Просмотр',driver:'Водитель',loader:'Грузчик',tech:'Техник'};
+function peopleName(p){ return ((p.lastName||'')+' '+(p.firstName||'')).trim()||p.shortName||'без имени'; }
+function renderPeople(){
+  var box=document.getElementById('peopleBox'); if(!box)return;
+  var ids=Object.keys(peopleAll||{}).sort(function(a,b){ return peopleName(peopleAll[a]).localeCompare(peopleName(peopleAll[b])); });
+  var h='<div style="font-size:11px;font-weight:700;color:#5a6470;text-transform:uppercase;letter-spacing:.04em;margin:6px 0 8px">Люди &middot; вход и роли</div>';
+  if(!ids.length)h+='<div style="font-size:12px;color:var(--mu);margin-bottom:8px">Пока пусто.</div>';
+  ids.forEach(function(id){
+    var p=peopleAll[id]||{}, r=p.roles||{}, off=(p.active===false);
+    var roles=Object.keys(ROLE_LABELS).filter(function(k){return r[k];}).map(function(k){return ROLE_LABELS[k];}).join(', ')||'без роли';
+    h+='<div class="lag-meta" style="'+(off?'opacity:.45':'')+'">'
+      +'<b style="color:#1a2a3a">'+xe(peopleName(p))+'</b>'
+      +'<span>'+xe(roles)+'</span>'
+      +(p.slot?'<span>слот '+xe(String(p.slot))+'</span>':'')
+      +(off?'<span style="color:#a03018;font-weight:700">не работает</span>':'')
+      +'<button class="lag-edit" onclick="peopleEditRoles(\''+xe(id)+'\')" title="Роли">&#9998; роли</button>'
+      +'<button class="lag-edit" onclick="peopleSetPin(\''+xe(id)+'\')" title="Задать новый код">&#128273; код</button>'
+      +'<button class="lag-edit" onclick="peopleToggleActive(\''+xe(id)+'\')">'+(off?'вернуть':'уволен')+'</button>'
+      +'</div>';
+  });
+  h+='<button class="lag-addbtn" onclick="peopleAdd()">+ добавить человека</button>';
+  box.innerHTML=h;
+}
+// Занять код: пишем сразу в три места. Индекс — последним, он же и есть замок:
+// правило базы разрешает запись только на свободный код, поэтому дубль физически невозможен.
+function peoplePinWrite(id,pin,cb){
+  db.ref('pin_index/'+pin).set(id).then(function(){
+    return db.ref('people_pin/'+id).set({pin:pin});
+  }).then(function(){ if(cb)cb(true); })
+  .catch(function(){ toast('Этот код уже занят — введите другой'); if(cb)cb(false); });
+}
+function peopleAdd(){
+  if(IS_VIEWER)return;
+  var ln=prompt('Фамилия:'); if(ln===null)return; ln=ln.trim();
+  var fn=prompt('Имя:'); if(fn===null)return; fn=fn.trim();
+  if(!fn&&!ln){ toast('Имя пустое'); return; }
+  var roles=peopleAskRoles({});
+  if(!roles)return;
+  if(!Object.keys(roles).length){ toast('Выберите хотя бы одну роль'); return; }
+  var slot=null;
+  if(roles.driver){ slot=(prompt('Слот водителя (L, R, C, V — или оставьте пустым для нового):','')||'').trim()||('d'+Date.now().toString(36)); }
+  var pin=prompt('Код для входа (4 цифры):'); if(pin===null)return; pin=String(pin).trim();
+  if(!/^\d{4}$/.test(pin)){ toast('Код — 4 цифры'); return; }
+  var id='p_'+Date.now().toString(36);
+  var rec={firstName:fn,lastName:ln,shortName:(fn||ln),roles:roles,active:true};
+  if(slot)rec.slot=slot;
+  db.ref('people/'+id).set(rec).then(function(){
+    peoplePinWrite(id,pin,function(okk){ toast(okk?'Человек добавлен ✓':'Добавлен, но код не занят — задайте другой'); });
+  }).catch(function(){ toast('Нет прав. Войдите главным диспетчером.'); });
+}
+// Роли спрашиваем по одной: в проекте нет своей формы с галочками, а confirm понятен всем.
+function peopleAskRoles(cur){
+  var out={},keys=Object.keys(ROLE_LABELS);
+  for(var i=0;i<keys.length;i++){
+    var k=keys[i];
+    var was=!!(cur&&cur[k]);
+    var ans=confirm(ROLE_LABELS[k]+'?\n\nОК — да, Отмена — нет'+(was?'\n(сейчас: да)':''));
+    if(ans)out[k]=true;
+  }
+  return out;
+}
+function peopleEditRoles(id){
+  if(IS_VIEWER)return;
+  var p=peopleAll[id]||{};
+  var roles=peopleAskRoles(p.roles||{});
+  if(!roles)return;
+  if(!Object.keys(roles).length){ toast('Хотя бы одна роль нужна'); return; }
+  var upd={roles:roles};
+  if(roles.driver&&!p.slot){ upd.slot=(prompt('Слот водителя (L, R, C, V — или пусто для нового):','')||'').trim()||('d'+Date.now().toString(36)); }
+  db.ref('people/'+id).update(upd).then(function(){ toast('Роли обновлены ✓'); }).catch(function(){ toast('Нет прав'); });
+}
+// ⛔Старый код НЕ подставляем в поле — его никто не должен видеть, включая диспетчера.
+function peopleSetPin(id){
+  if(IS_VIEWER)return;
+  var p=peopleAll[id]||{};
+  var pin=prompt('Новый код для «'+peopleName(p)+'» (4 цифры).\nСтарый код не показывается — он закрыт.');
+  if(pin===null)return; pin=String(pin).trim();
+  if(!/^\d{4}$/.test(pin)){ toast('Код — 4 цифры'); return; }
+  // старый код освобождаем ПОСЛЕ того, как занят новый: иначе при ошибке человек останется без входа
+  db.ref('people_pin/'+id).once('value').then(function(){
+    peoplePinWrite(id,pin,function(okk){ if(okk)toast('Код изменён ✓ — сообщите человеку'); });
+  });
+}
+// Уволен — это признак, а не удаление: на человеке висят часы, пробег и отметки за месяцы.
+function peopleToggleActive(id){
+  if(IS_VIEWER)return;
+  var p=peopleAll[id]||{}, off=(p.active===false);
+  if(!confirm(off?('Вернуть «'+peopleName(p)+'» в работу?'):('«'+peopleName(p)+'» больше не работает?\n\nЗаписи и часы сохранятся, вход перестанет действовать.')))return;
+  db.ref('people/'+id+'/active').set(off).then(function(){ toast(off?'Возвращён ✓':'Отключён ✓'); }).catch(function(){ toast('Нет прав'); });
+}
+
 function renderDynDrivers(){
   var box=document.getElementById('dynDrvBox'); if(!box)return;
   var base=['L','R','C','V'];
