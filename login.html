@@ -69,6 +69,13 @@ var AUTH_URL = 'https://lk-auth.s-kozorizz.workers.dev/auth';
 var buf = '';
 var busy = false;
 
+// ⛔Диспетчерские входы держим ПОВКЛАДОЧНО (sessionStorage), остальные — длинно (localStorage).
+// Зачем: браузер хранит ОДИН вход на все вкладки, поэтому вход под вторым PIN выбивал первый,
+// хотя его вкладка оставалась открытой — работать с двух аккаунтов было невозможно.
+// Водителям/техникам/грузчикам повкладочный вход ставить НЕЛЬЗЯ: они держат вкладку неделями,
+// а такой вход умирает вместе с закрытой вкладкой и остановил бы им работу.
+var DISP_ROLES = { zentrum: 1, norden: 1, lager: 1, viewer: 1 };
+
 function upd(){
   [0,1,2,3].forEach(function(i){
     var el = document.getElementById('d'+i);
@@ -98,8 +105,15 @@ function check(){
   .then(function(r){ return r.json(); })
   .then(function(res){
     if(!res || !res.ok || !res.token){ throw new Error('bad pin'); }
-    // Чистимо БУДЬ-ЯКУ попередню сесію (щоб чужий вхід не «протік» у наступний), тоді входимо новим токеном
-    return firebase.auth().signOut().catch(function(){}).then(function(){
+    var P = (firebase.auth.Auth && firebase.auth.Auth.Persistence) || {};
+    var isDisp = !!DISP_ROLES[res.role];
+    // Диспетчерский вход кладём в хранилище ВКЛАДКИ → соседняя вкладка с другим PIN остаётся жива.
+    // Если браузер этого не умеет — молча работаем как раньше, вход не должен ломаться из-за настройки.
+    return firebase.auth().setPersistence(isDisp ? P.SESSION : P.LOCAL).catch(function(){}).then(function(){
+      // Чистим прежнюю сессию только для ОБЩЕГО на браузер входа. Для диспетчерского это
+      // выбило бы соседнюю вкладку — ровно то, что мы здесь и лечим.
+      return isDisp ? null : firebase.auth().signOut().catch(function(){});
+    }).then(function(){
       return firebase.auth().signInWithCustomToken(res.token);
     }).then(function(){
       sessionStorage.setItem('login_from','login');
