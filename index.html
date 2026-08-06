@@ -1241,12 +1241,24 @@ function showWrongRole(c, needTxt){
     ['app','driverApp','pinWrap','loading'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
   }catch(e){ location.replace('login.html'); }
 }
+// ⛔onAuthStateChanged срабатывает НЕ только при входе: ещё при каждом обновлении токена
+// (≈раз в час) и при входе в СОСЕДНЕЙ вкладке — сессия в браузере одна на все вкладки.
+// Раньше каждое срабатывание заново звало enter() и __startDB(): +19 подписок на базу за раз.
+// После четырёх событий висело 76 подписок, и любое изменение данных перерисовывало экран
+// четырежды — это и есть «экран скачет и мерцает».
+var _authRole=null, _dbStarted=false;
 firebase.auth().onAuthStateChanged(function(user){
   if(!user){ location.replace('login.html'); return; }
   user.getIdTokenResult().then(function(res){
-    var _wr=document.getElementById('wrongRole'); if(_wr){ _wr.style.display='none'; }
     var c=res.claims||{}; var role=c.role||'';
     if(!(role==='zentrum'||role==='norden'||role==='lager'||role==='viewer')){ showWrongRole(c, 'Эта страница — для диспетчера.'); return; }
+    // Роль ТА ЖЕ — это просто продление токена. Ничего не трогаем: интерфейс уже построен.
+    if(_authRole===role){ var _w0=document.getElementById('wrongRole'); if(_w0)_w0.style.display='none'; return; }
+    // Роль СМЕНИЛАСЬ — значит в другой вкладке вошли под другим PIN. Молча перестраивать
+    // интерфейс под чужой вход нельзя: человек не поймёт, куда делись его вкладки.
+    if(_authRole&&_authRole!==role){ showWrongRole(c, 'В другой вкладке выполнен вход под другой ролью. Здесь можно продолжить только после повторного входа.'); return; }
+    var _wr=document.getElementById('wrongRole'); if(_wr){ _wr.style.display='none'; }
+    _authRole=role;
     sessionStorage.removeItem('login_role');
     if(role==='norden'){disp2Mode=true;enter(false);}
     else if(role==='lager'){disp2Mode=false;enter(true);}
@@ -1254,7 +1266,7 @@ firebase.auth().onAuthStateChanged(function(user){
     else{disp2Mode=false;enter(false);}
     if(c.plannerId){ IS_PLANNER=true; PLANNER_ID=c.plannerId; PLANNER_NAME=c.plannerName||''; ['tabVoice','tabCalib','tabOdo','tabRoute'].forEach(function(id){var b=document.getElementById(id);if(b)b.style.display='none';}); } // tabRoute показывает те же данные одометра, что и tabOdo — прячем вместе
     if(role==='zentrum'){ var _tn=document.getElementById('tabNordM'); if(_tn)_tn.style.display=''; }
-    __startDB();
+    if(!_dbStarted){ _dbStarted=true; __startDB(); }   // подписки на базу — ровно один раз за жизнь страницы
     setTimeout(restoreTab,250); // после того как роль скрыла/показала вкладки — вернуть последнюю открытую
   });
 });
