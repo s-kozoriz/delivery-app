@@ -1483,12 +1483,18 @@ function showWrongRole(c, needTxt){
     ['app','driverApp','pinWrap','loading'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
   }catch(e){ location.replace('login.html'); }
 }
+// ⛔Токен обновляется не только при входе: при каждом возврате в приложение, при появлении
+// сети и раз в 25 минут. Раньше КАЖДОЕ обновление заново запускало вход — __startDB() с нуля
+// (+19 подписок на базу) и полная перерисовка. На телефоне это давало постоянное мерцание.
+var _authOk=false;
 firebase.auth().onAuthStateChanged(function(user){
   if(!user){ location.replace('login.html'); return; }
   user.getIdTokenResult().then(function(res){
     var _wr=document.getElementById('wrongRole'); if(_wr){ _wr.style.display='none'; }
     var c=res.claims||{};
     if(!(c.role==='driver'&&c.drv===DRV)){ showWrongRole(c, 'Эта страница — для водителя.'); return; }
+    if(_authOk){ var _w0=document.getElementById('wrongRole'); if(_w0)_w0.style.display='none'; return; }
+    _authOk=true;
     sessionStorage.removeItem('login_from');
     var __pw=document.getElementById('pinWrap'); if(__pw) __pw.style.display='none';
     document.getElementById('driverApp').style.display='';
