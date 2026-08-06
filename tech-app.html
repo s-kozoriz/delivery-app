@@ -352,7 +352,6 @@ function pp(d){
 }
 
 // Auth gate (Варіант A): techId береться з custom-token claim
-function pageFor(c){c=c||{};var r=c.role;if(r==='zentrum'||r==='norden'||r==='lager')return 'index.html';if(r==='driver')return ({L:'lesha-app.html',R:'roma-app.html',C:'driver3-app.html',V:'valentyn-app.html'})[c.drv]||(c.drv?('driver.html?drv='+encodeURIComponent(c.drv)):'login.html');if(r==='tech')return 'tech-app.html';if(r==='loader')return 'lager-app.html';return 'login.html';}
 // Чужой/старый вход открыл эту страницу → НЕ показываем чужой интерфейс молча, а даём явно перезайти под нужный PIN.
 function _roleName(c){var r=c&&c.role;if(r==='zentrum')return 'Диспетчер';if(r==='norden')return 'Планировщик Норд';if(r==='lager')return 'Просмотр';if(r==='driver')return 'Водитель'+(c&&c.drv?' ('+c.drv+')':'');if(r==='tech')return 'Техник';if(r==='loader')return 'Грузчик';return 'Не распознан';}
 function wrongRoleRelogin(){ try{ firebase.auth().signOut().then(function(){ location.replace('login.html'); }).catch(function(){ location.replace('login.html'); }); }catch(e){ location.replace('login.html'); } }
