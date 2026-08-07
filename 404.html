@@ -1,6 +1,12 @@
 <!DOCTYPE html><html><head><meta charset="UTF-8"><script>
-var p=window.location.pathname;
-if(p.indexOf('/lesha')!==-1){window.location.replace('/delivery-app/lesha-app.html');}
-else if(p.indexOf('/roma')!==-1){window.location.replace('/delivery-app/roma-app.html');}
-else{window.location.replace('/delivery-app/index.html');}
-</script></head></html>
+// Значки на телефонах ведут на короткие адреса вида /delivery-app/roma/ — их не существует,
+// поэтому хостинг отдаёт эту страницу, а она уводит куда надо.
+// ⛔Раньше правил было только два (roma и lesha), а всё остальное падало в диспетчерскую —
+//   поэтому значок Виталика открывал чужой интерфейс.
+var p = window.location.pathname;
+var SLOT = { lesha: 'L', roma: 'R', valentyn: 'V', driver3: 'C', vitalik: 'C' };
+var hit = null;
+for (var k in SLOT) { if (p.indexOf('/' + k) !== -1) { hit = SLOT[k]; break; } }
+if (hit) { window.location.replace('/delivery-app/driver.html?drv=' + hit); }
+else { window.location.replace('/delivery-app/index.html'); }
+</script></head><body></body></html>
