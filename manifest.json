@@ -1,1 +1,22 @@
-{"name":"Доставки — Диспетчер","short_name":"Диспетчер","start_url":"/delivery-app/","display":"standalone","background_color":"#f0efe9","theme_color":"#1856a0","lang":"ru","icons":[{"src":"/delivery-app/icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},{"src":"/delivery-app/icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}
+{
+  "name": "LK Диспетчер",
+  "short_name": "Диспетчер",
+  "start_url": "/delivery-app/index.html",
+  "display": "standalone",
+  "background_color": "#171d26",
+  "theme_color": "#4a3570",
+  "icons": [
+    {
+      "src": "/delivery-app/icons/icon-disp-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/delivery-app/icons/icon-disp-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

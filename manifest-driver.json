@@ -1,7 +1,7 @@
 {
   "name": "LK Маршрут",
   "short_name": "Маршрут",
-  "start_url": "/delivery-app/driver.html?drv=L",
+  "start_url": "/delivery-app/driver.html",
   "display": "standalone",
   "background_color": "#171d26",
   "theme_color": "#1a7a40",
