@@ -2577,6 +2577,7 @@ function peopleAdd(){
   var rec={firstName:fn,lastName:ln,shortName:(fn||ln),roles:roles,active:true};
   if(slot)rec.slot=slot;
   db.ref('people/'+id).set(rec).then(function(){
+    peopleSyncCanLoad(slot,roles);
     peoplePinWrite(id,pin,function(okk){ toast(okk?'Человек добавлен ✓':'Добавлен, но код не занят — задайте другой'); });
   }).catch(function(){ toast('Нет прав. Войдите главным диспетчером.'); });
 }
@@ -2599,7 +2600,17 @@ function peopleEditRoles(id){
   if(!Object.keys(roles).length){ toast('Хотя бы одна роль нужна'); return; }
   var upd={roles:roles};
   if(roles.driver&&!p.slot){ upd.slot=(prompt('Слот водителя (L, R, C, V — или пусто для нового):','')||'').trim()||('d'+Date.now().toString(36)); }
-  db.ref('people/'+id).update(upd).then(function(){ toast('Роли обновлены ✓'); }).catch(function(){ toast('Нет прав'); });
+  db.ref('people/'+id).update(upd).then(function(){ peopleSyncCanLoad(upd.slot||p.slot,roles); toast('Роли обновлены ✓'); }).catch(function(){ toast('Нет прав'); });
+}
+// Приложение водителя спрашивает «кто ты сегодня» ТОЛЬКО у тех, кто работает в двух ролях.
+// Само приложение реестр людей не читает (там коды, он закрыт), поэтому признак кладём
+// в настройки водителя — их читают все. Ставится сам, по галочкам в этом экране.
+// ⛔Без этого 08.08 Рома впервые увидел вопрос о роли после переезда на общее приложение
+//   и запутался: три попытки начать день за пять минут и три разных пробега.
+function peopleSyncCanLoad(slot,roles){
+  if(!slot)return;
+  var dual=!!(roles&&roles.driver&&roles.loader);
+  db.ref('cfg/drivers/'+slot+'/canLoader').set(dual?true:null).catch(function(){});
 }
 // ⛔Старый код НЕ подставляем в поле — его никто не должен видеть, включая диспетчера.
 function peopleSetPin(id){

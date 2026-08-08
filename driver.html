@@ -1194,6 +1194,16 @@ var valMode = null, _valAsked = false, _valPendingCb = null;
   document.body.appendChild(g);
 })();
 function valModeKey() { return 'valMode_' + DRV + '_' + wtDate(); }
+// ⛔Спрашивать «кто ты сегодня» имеет смысл ТОЛЬКО у тех, кто реально работает в двух
+//   ролях. 08.08 Рома впервые увидел этот экран после переезда на общее приложение —
+//   в его прежней странице такого вопроса не было никогда — и запутался: три попытки
+//   начать день за пять минут и три разных пробега.
+// Признак берём из настроек (его ставит диспетчер галочками в экране «Люди»),
+// а не зашиваем в код: состав людей меняется, код — нет.
+function valCanLoad() {
+  try { return !!(cfg && cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].canLoader); }
+  catch (e) { return false; }
+}
 function valOpenPicker() { var p = document.getElementById('valPick'); if (p) p.classList.add('on'); }
 function valBadge() {
   var el = document.getElementById('valBadge');
@@ -1210,6 +1220,8 @@ function valEnsureRole(cb) {
   if (valMode) { if (valMode === 'driver') nordPtr('driver'); if (cb) cb(); return; }
   var saved = localStorage.getItem(valModeKey());
   if (saved === 'driver' || saved === 'loader') { valMode = saved; valBadge(); renderWtBtn(); if (saved === 'driver') nordPtr('driver'); if (cb) cb(); return; }
+  // Человек работает только водителем — вопроса нет вообще, сразу за руль.
+  if (!valCanLoad()) { valMode = 'driver'; nordPtr('driver'); valBadge(); renderWtBtn(); if (cb) cb(); return; }
   if (cb) _valPendingCb = cb;
   if (_valAsked) return;
   _valAsked = true; valOpenPicker();
@@ -1228,6 +1240,7 @@ function valSetRole(m) {
   var f = _valPendingCb; _valPendingCb = null; if (f) f();
 }
 function valSwitch() {
+  if (!valCanLoad()) return;   // у кого одна роль — переключать нечего
   valMode = null; _valAsked = false; _odoGateChecked = false;
   try { localStorage.removeItem(valModeKey()); } catch (e) {}
   valEnsureRole(odoMaybeGate);
