@@ -252,7 +252,12 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .ra-kpi .h{font-size:11px;color:#80786e;margin-top:2px}
 .ra-kpi.good .v{color:#1a7a40}
 .ra-kpi.warn .v{color:#E24B4A}
-.ra-map{padding:12px 16px 4px;overflow-x:auto}
+/* Карта и объяснение значков — рядом: читать легенду под картой неудобно, взгляд
+   каждый раз уходит вниз и обратно. На узком экране объяснение уходит под карту,
+   чтобы не сжимать её (диспетчер иногда смотрит с планшета). */
+.ra-map{padding:12px 16px 8px;display:flex;gap:14px;align-items:flex-start}
+.ra-map>.ra-mapbox{flex:1 1 auto;min-width:0}
+@media(max-width:900px){.ra-map{flex-direction:column}.ra-map>.ra-legend{width:auto;max-width:none}}
 /* Карта маршрута. Маркеры — свои (divIcon), поэтому картинки Leaflet для них не нужны.
    Номер/знак ВНУТРИ маркера: смысл читается без цвета (Сергей дальтоник). */
 .ra-mapbox{height:430px;max-width:880px;border-radius:12px;overflow:hidden;border:1px solid #e2e5ea;background:#eef1f5}
@@ -261,9 +266,14 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .ra-mk-add{background:#E24B4A}
 .ra-mk-base{background:#141816;border-radius:6px;font-size:11px}
 .ra-mktime{position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;color:#a3302f;background:rgba(255,255,255,.85);border-radius:4px;padding:0 3px;white-space:nowrap}
-.ra-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#80786e;margin-top:9px}
-.ra-legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
-.ra-legend s{display:inline-block;width:18px;height:3px;background:#1856a0;margin-right:5px;vertical-align:3px;text-decoration:none}
+.ra-legend{display:flex;flex-direction:column;gap:12px;font-size:12px;color:#5a6470;width:212px;flex:0 0 auto;
+  background:#fbfbf9;border:1px solid #e2e5ea;border-radius:12px;padding:13px 14px}
+.ra-legend .lg-hd{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8a939c}
+.ra-legend .lg-row{display:flex;gap:9px;align-items:flex-start;line-height:1.35}
+/* ⛔Значок в объяснении — тот же класс, что на карте: иначе объясняем не то, что видно */
+.ra-legend .ra-mk{flex:0 0 auto;width:22px;height:22px;font-size:11px;box-shadow:none;border-width:2px}
+.ra-legend .lg-tx b{display:block;color:#1a2a3a;font-weight:650;font-size:12.5px}
+.ra-legend .lg-line{flex:0 0 22px;height:4px;background:#1856a0;border-radius:2px;margin-top:8px}
 .ra-sec{padding:10px 16px 2px}
 .ra-sec h3{font-size:13.5px;font-weight:800;margin:0 0 7px}
 .ra-tbl{width:100%;border-collapse:collapse;font-size:13px}
@@ -3942,8 +3952,16 @@ function raMapPoints(d){
   (d.added||[]).forEach(function(p){ if(p.glat!=null)pts.push({lat:p.glat,lon:p.glon,kind:"add",addr:p.addr,city:p.city,t:p.ts}); });
   return pts;
 }
+// Объяснение значков. Показываем ТЕ ЖЕ кружки, что и на карте (те же классы), и говорим,
+// что каждый означает — а не просто называем цвет: «синий» само по себе ничего не объясняет.
 function raMapLegend(){
-  return '<div class="ra-legend"><span><s></s>Реальная дорога (план)</span><span><i style="background:#1856a0"></i>Плановые точки</span><span><i style="background:#E24B4A"></i>Добавлены в пути</span><span><i style="background:#141816"></i>Б — база</span></div>';
+  return '<div class="ra-legend">'
+    + '<div class="lg-hd">Что на карте</div>'
+    + '<div class="lg-row"><div class="ra-mk ra-mk-base">Б</div><div class="lg-tx"><b>База</b>Откуда машина выезжает утром</div></div>'
+    + '<div class="lg-row"><div class="ra-mk ra-mk-plan">1</div><div class="lg-tx"><b>Точки плана</b>Номер — порядок объезда, который построил диспетчер</div></div>'
+    + '<div class="lg-row"><div class="ra-mk ra-mk-add">+</div><div class="lg-tx"><b>Добавлено в пути</b>Водитель заехал сам; сверху — время фото</div></div>'
+    + '<div class="lg-row"><div class="lg-line"></div><div class="lg-tx"><b>Дорога</b>Реальный путь по плану, а не по прямой</div></div>'
+    + '</div>';
 }
 function raMapHtml(d){
   var poly=raDecodePoly(d.poly||""), pts=raMapPoints(d);
