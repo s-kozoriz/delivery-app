@@ -890,6 +890,9 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '#odoBanner{display:none;align-items:center;justify-content:space-between;gap:8px;background:#b23b2e;color:#fff;padding:10px 12px;font-size:13px;font-weight:800}'
     + '#odoBanner.on{display:flex}'
     + '#odoBanner button{background:#fff;color:#b23b2e;border:none;border-radius:8px;padding:7px 13px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}'
+    + '#odoGate .orole{display:flex;gap:9px;padding:0 16px 4px}'
+    + '#odoGate .orole-b{flex:1;border:1px solid #3a4a60;background:#131c28;color:#c9d6e8;border-radius:12px;padding:15px 8px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
+    + '#odoGate .orole-b.on{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
     + '#odoGate .ovans{display:flex;gap:8px;flex-wrap:wrap}'
     + '#odoGate .ovan{flex:1;min-width:98px;border:1px solid #3a4a60;background:#131c28;color:#c9d6e8;border-radius:11px;padding:13px 10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
     + '#odoGate .ovan.on{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
@@ -899,11 +902,16 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   var g = document.createElement('div'); g.id = 'odoGate';
   g.innerHTML = '<div class="ohd" id="odoHd"></div><div class="osub" id="odoSub"></div>'
+    + '<div class="orole" id="odoRole" style="display:none">'
+    +   '<button type="button" class="orole-b" id="odoRoleDrv" onclick="odoPickRole(\'driver\')">&#128666; За рулём</button>'
+    +   '<button type="button" class="orole-b" id="odoRoleLoad" onclick="odoPickRole(\'loader\')">&#128230; Грузчиком</button>'
+    + '</div>'
     + '<div class="ocam" id="odoCam"></div>'
     + '<div class="oform"><div class="ovans" id="odoVans"></div><button class="oshot" id="odoShot" onclick="odoShoot()">&#128247; Сфотографировать пробег</button>'
     + '<button class="oshotg" id="odoShotG" onclick="odoShootGal()">&#128444; Взять фото из галереи</button>'
     + '<div class="okm"><label>Пробег, км</label><input id="odoKm" type="number" inputmode="numeric" placeholder="напр. 123456" oninput="odoValidate()"></div>'
     + '<button class="ogo" id="odoGo" disabled onclick="odoSave()"></button>'
+    + '<button class="ogo" id="odoGoL" style="display:none" onclick="odoStartLoader()">Начать смену</button>'
     + '<button class="opeek" id="odoPeek" onclick="odoPeek()">Только посмотреть маршрут</button></div>';
   document.body.appendChild(g);
   var inp = document.createElement('input'); inp.id = 'odoInput'; inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment'); inp.style.display = 'none';
@@ -973,7 +981,7 @@ function odoPhotoDbPath(drv, date, mode, ts) {
   return (mode === 'start' || mode === 'end') ? (base + '/' + mode + '/photo') : (base + '/ev/' + ts + '/photo');
 }
 function odoOpen(mode) {
-  if (valMode === 'loader') return; // грузчик не за рулём — одометр не открываем
+  if (valMode === 'loader') return; // грузчик уже выбрал роль — одометр ему не нужен
   if (mode === 'start' && isNordDrv() && nordWheel && nordWheel.drv && nordWheel.drv !== DRV) { showToast('Руль сейчас у ' + xe(nordWheel.name || nordWheel.drv)); return; } // общий руль Норд-машины занят другим
   if (mode === 'end' && isNordDrv() && !(nordWheel && nordWheel.drv === DRV)) { showToast('Руль уже не за вами'); return; } // нельзя сдать руль, который уже не у меня (устаревшая панель)
   odoMode = mode; odoPhotoFile = null;
@@ -984,6 +992,15 @@ function odoOpen(mode) {
   else { _hd.textContent = end ? 'Конец дня — пробег' : 'Начало дня — пробег'; _sub.textContent = 'Сфотографируйте одометр и впишите км' + (end ? ', чтобы завершить день.' : ', чтобы начать день.'); }
   document.getElementById('odoGo').textContent = so ? 'Дальше →' : si ? 'Готово ✓' : end ? 'Завершить день' : 'Начать рабочий день';
   document.getElementById('odoPeek').style.display = (end || so || si) ? 'none' : '';
+  // Вибір ролі — лише на старті дня і лише тим, хто працює у двох ролях.
+  // Хто тільки водій — бачить одразу поля пробігу, як і раніше.
+  var _role = document.getElementById('odoRole');
+  var askRole = (mode === 'start' && valCanLoad() && !valMode);
+  if (_role) _role.style.display = askRole ? '' : 'none';
+  odoFields(!askRole);   // пока роль не выбрана — полей пробега на экране нет
+  document.getElementById('odoGo').style.display = askRole ? 'none' : '';
+  document.getElementById('odoGoL').style.display = 'none';
+  if (askRole) document.getElementById('odoPeek').style.display = 'none';
   odoVanSel = si ? null : odoVan;
   odoRenderVans(mode === 'start' || si, si ? odoVan : null);
   var sh = document.getElementById('odoShot'); sh.className = 'oshot'; sh.innerHTML = '&#128247; Сфотографировать пробег';
@@ -1004,6 +1021,38 @@ function odoOnFile(e) {
   var sh = document.getElementById('odoShot'); sh.className = 'oshot done'; sh.textContent = '✓ Фото есть · переснять';
   e.target.value = ''; odoValidate();
 }
+// Поля пробега (машина, фото, км) — только для того, кто за рулём.
+function odoFields(show) {
+  var ids = ['odoCam', 'odoVans', 'odoShot', 'odoShotG', 'odoKm'];
+  for (var i = 0; i < ids.length; i++) {
+    var el = document.getElementById(ids[i]); if (!el) continue;
+    var box = (ids[i] === 'odoKm') ? el.parentNode : el;   // у поля км прячем всю строку с подписью
+    box.style.display = show ? '' : 'none';
+  }
+}
+// Роль обирається ТУТ ЖЕ, на екрані початку дня, а не окремим кроком перед ним.
+// ⛔Окремий екран «Кто ты сегодня?» 08.08 збив Рому: він побачив його вперше після
+//   переїзду на спільний застосунок і зробив три спроби почати день, увівши три
+//   різні числа пробігу.
+function odoPickRole(r) {
+  var drv = (r !== 'loader');
+  var bd = document.getElementById('odoRoleDrv'), bl = document.getElementById('odoRoleLoad');
+  if (bd) bd.className = 'orole-b' + (drv ? ' on' : '');
+  if (bl) bl.className = 'orole-b' + (drv ? '' : ' on');
+  // ⛔Тап по роли смену НЕ начинает: промах по кнопке иначе закрепил бы грузчика на
+  //   весь день, а грузчику одометр уже не открыть — пробег было бы не ввести.
+  odoFields(drv);
+  var go = document.getElementById('odoGo'); if (go) go.style.display = drv ? '' : 'none';
+  var gl = document.getElementById('odoGoL'); if (gl) gl.style.display = drv ? 'none' : '';
+  var pk = document.getElementById('odoPeek'); if (pk) pk.style.display = drv ? '' : 'none';
+  if (drv) odoValidate();
+}
+// Грузчик за руль не садится — ни машины, ни фото, ни километров: одна кнопка.
+function odoStartLoader() {
+  valSetRole('loader');   // закрывает экран и баннер «пробег не зафиксирован»
+  if (wtState(wtToday()) === 'idle') wtStartSeg();
+  showToast('Смена начата · грузчик');
+}
 function odoValidate() {
   var km = (document.getElementById('odoKm').value || '').trim();
   // на старте дня и на «беру машину» без выбора дальше нельзя — иначе снова придётся гадать,
@@ -1022,6 +1071,7 @@ function odoSave() {
   var kmv = (document.getElementById('odoKm').value || '').trim(); var km = Number(kmv);
   if (!odoPhotoFile || kmv === '' || !(km >= 0)) return;
   var mode = odoMode, date = wtDate(), ts = Date.now();
+  if (mode === 'start' && valMode !== 'driver') valSetRole('driver'); // роль выбрана на этом же экране
   if (mode === 'start' && wtState(wtToday()) === 'idle') wtStartSeg(); // взял руль в начале дня = ещё и клок-ин; «сдать руль» день НЕ завершает
   try { if (mode === 'start' || mode === 'swap_in') localStorage.setItem('odoDrv_' + DRV + '_' + date, '1'); else if (mode === 'end') localStorage.removeItem('odoDrv_' + DRV + '_' + date); } catch (e) {}
   if (isNordDrv()) { try { if (mode === 'start' || mode === 'swap_in') db.ref('nord_wheel/' + date).set({ drv: DRV, name: myName(), ts: ts }); else if (mode === 'end') db.ref('nord_wheel/' + date).remove(); } catch (e) {} } // общий руль Норд-машины: взял/сдал
@@ -1222,9 +1272,8 @@ function valEnsureRole(cb) {
   if (saved === 'driver' || saved === 'loader') { valMode = saved; valBadge(); renderWtBtn(); if (saved === 'driver') nordPtr('driver'); if (cb) cb(); return; }
   // Человек работает только водителем — вопроса нет вообще, сразу за руль.
   if (!valCanLoad()) { valMode = 'driver'; nordPtr('driver'); valBadge(); renderWtBtn(); if (cb) cb(); return; }
-  if (cb) _valPendingCb = cb;
-  if (_valAsked) return;
-  _valAsked = true; valOpenPicker();
+  // Роль тепер питається НА ЕКРАНІ ПРОБІГУ, а не окремим кроком перед ним.
+  if (cb) cb();
 }
 function valSetRole(m) {
   valMode = m; _valAsked = false;
@@ -1243,7 +1292,9 @@ function valSwitch() {
   if (!valCanLoad()) return;   // у кого одна роль — переключать нечего
   valMode = null; _valAsked = false; _odoGateChecked = false;
   try { localStorage.removeItem(valModeKey()); } catch (e) {}
-  valEnsureRole(odoMaybeGate);
+  // Смена роли СРЕДИ дня — отдельный выбор: экран начала дня к этому моменту уже
+  // закрыт, а спрашивать роль больше негде.
+  _valAsked = true; _valPendingCb = odoMaybeGate; valOpenPicker();
 }
 // ===================== /РОЛЬ =====================
 
