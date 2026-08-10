@@ -1927,6 +1927,43 @@ function submitAddTask(){
 
 
 
+
+// ─── ВЕРСИЯ ПРИЛОЖЕНИЯ ───────────────────────────────────────────────────────────
+// ⛔10.08 Виталий целый день работал со старой вкладки: код в памяти телефона был
+//   допереездный, и половины механизмов дня там просто не было. Вкладки живут неделями —
+//   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
+// ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
+//   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
+var APP_V = '2026-08-10-1';
+var _verLast = 0, _verNew = null;
+function verCheck() {
+  var now = Date.now();
+  if (now - _verLast < 300000) return;   // не чаще раза в 5 минут
+  _verLast = now;
+  fetch('ver.txt?cb=' + now, { cache: 'no-store' }).then(function (r) { return r.text(); })
+    .then(function (t) { t = (t || '').trim(); if (t && t !== APP_V) { _verNew = t; verApply(); } })
+    .catch(function () {});
+}
+function verApply() {
+  if (!_verNew) return;
+  var st = wtState(wtToday());
+  var gateOpen = (document.getElementById('odoGate') || {}).classList && document.getElementById('odoGate').classList.contains('on');
+  var pending = 0;
+  try { pending = (offlineQueue || []).length + (odoKmQ || []).length + Object.keys(doneQueue || {}).length; } catch (e) { pending = 1; }
+  if (st === 'idle' && !gateOpen && !pending) { location.reload(); return; }   // терять нечего — берём новую версию сразу
+  verBar();   // работа идёт — решает человек
+}
+function verBar() {
+  if (document.getElementById('verBar')) return;
+  var b = document.createElement('div'); b.id = 'verBar';
+  b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9800;background:#1a7a40;color:#fff;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:700;font-size:14px';
+  b.innerHTML = '<span>Есть обновление приложения</span><button style="background:#fff;color:#0f2417;border:none;border-radius:8px;padding:8px 14px;font-weight:800;font-family:inherit" onclick="location.reload()">Обновить</button>';
+  document.body.appendChild(b);
+}
+document.addEventListener('visibilitychange', function () { if (!document.hidden) verCheck(); });
+setTimeout(verCheck, 20000);
+setInterval(verCheck, 600000);
+// ─── /ВЕРСИЯ ────────────────────────────────────────────────────────────────────
 </script>
 </body>
 </html>
