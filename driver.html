@@ -455,7 +455,16 @@ function wtFmt(m) { return Math.floor(m / 60) + ':' + String(Math.round(m) % 60)
 function wtHoursDec(rec) { return Math.round(wtWorkedMin(rec, false) / 6) / 10; }
 function wtState(rec) { if (rec && rec.done) return 'done'; if (wtOpenIdx(rec) >= 0) return 'run'; if (wtSegs(rec).length) return 'pause'; return 'idle'; }
 
+// ⛔Не пишем, пока не пришёл первый снимок дня из базы: запись идёт целым днём, и тап по
+//   кнопке на непрогруженных данных СТИРАЕТ уже отработанное. 10.08 так у Лёши пропали
+//   4,5 часа: руль взят в 10:38, а в табеле день начался с 15:11.
+//   Офлайн — исключение: там базы не будет вообще, а работать человеку надо.
+var wtLoaded = false;   // пришёл ли первый снимок табеля из базы
+// ⛔Ожидание данных НЕ должно превращаться в блокировку работы: если база молчит (плохая связь,
+//   протухшая сессия), через 8 секунд разрешаем писать — иначе человек не начнёт день вообще.
+setTimeout(function () { wtLoaded = true; }, 8000);
 function wtMutate(fn) {
+  if (!wtLoaded && navigator.onLine) { showToast('Секунду — загружаю ваш день…'); return; }
   var date = wtDate();
   var prev = wtClone(wtData[date]);
   var rec = wtClone(wtData[date]) || {};
@@ -463,7 +472,7 @@ function wtMutate(fn) {
   wtData[date] = rec;
   wtQueue[date] = rec; saveWtQueue();
   renderWtBtn(); wtRepanel();
-  db.ref('worktime/' + DRV + '/' + date).set(rec).then(function () {
+  db.ref('worktime/' + DRV + '/' + date).update(rec).then(function () {
     if (wtQueue[date] && JSON.stringify(wtQueue[date]) === JSON.stringify(rec)) { delete wtQueue[date]; saveWtQueue(); }
   }).catch(function () {
     if (!navigator.onLine) return; // офлайн — останется в очереди, долетит позже
@@ -471,14 +480,30 @@ function wtMutate(fn) {
     var u = firebase.auth().currentUser;
     if (!u) { _rollback('Сессия истекла — Выход и войдите заново'); return; }
     // протухшая сессия: обновляем токен и пробуем записать ещё раз, прежде чем откатывать
-    u.getIdToken(true).then(function(){ return db.ref('worktime/' + DRV + '/' + date).set(rec); }).then(function(){
+    u.getIdToken(true).then(function(){ return db.ref('worktime/' + DRV + '/' + date).update(rec); }).then(function(){
       if (wtQueue[date] && JSON.stringify(wtQueue[date]) === JSON.stringify(rec)) { delete wtQueue[date]; saveWtQueue(); }
     }).catch(function(){ _rollback('Сессия истекла — Выход и войдите заново'); });
   });
 }
+// Начало дня: за рулём — экран «пробег + роль», грузчику — сразу открытая смена.
+function dayStart() {
+  if (valMode === 'loader') { wtStartSeg(); return; }
+  odoOpen('start');   // там же выбирается роль, и оттуда же откроется смена
+}
 function wtStartSeg() { wtMutate(function (rec) { var L = wtSegs(rec); L.push({ s: nowTime() }); rec.seg = L; rec.done = null; }); if (navigator.vibrate) navigator.vibrate(60); }
 function wtPauseSeg() { wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; }); if (navigator.vibrate) navigator.vibrate(40); }
-function wtFinishDay() { wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; rec.done = true; }); if (navigator.vibrate) navigator.vibrate([60, 40, 60]); closeWtPanel(); showMonthSummary(); }
+// Закрыть день физически: время в табеле. Никаких проверок — их делает wtFinishDay.
+function wtCloseDay() {
+  wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; rec.done = true; });
+  if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+  closeWtPanel(); showMonthSummary();
+}
+// ⛔День НЕ закрывается, пока водитель не записал конечный пробег. Раньше «Конец» и одометр
+//   жили отдельными кнопками, и день закрывался без километров — 10.08 так у Виталия и Ромы.
+function wtFinishDay() {
+  if (odoDriving()) { closeWtPanel(); odoOpen('end'); return; }   // запишет км и закроет день сам
+  wtCloseDay();
+}
 // итог за текущий месяц (из уже загруженного wtData, без новых запросов)
 var wtSummaryTimer = null;
 function wtMonthSum() {
@@ -518,27 +543,16 @@ function renderWtBtn() {
     else line.innerHTML = '<span class="sd off"></span>Смена завершена &middot; ' + wtHoursDec(rec) + ' ч';
   }
   var END = 'onclick="openWtPanel();wtAsk(\'confirmFinish\')"';
+  // ⛔Ровно три действия и ни одного лишнего. Пробег — часть начала и конца дня, отдельных
+  //   «взять/сдать руль» больше нет: именно они и расходились с табелем.
   var b1, b2, b3;
-  if (st === 'idle') { b1 = '<button class="wt3 go" onclick="wtStartSeg()">&#9654; Начать</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
+  if (st === 'idle') { b1 = '<button class="wt3 go" onclick="dayStart()">&#9654; Начать день</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
   else if (st === 'run') { b1 = '<button class="wt3 dim">&#9654; Начать</button>'; b2 = '<button class="wt3 pause" onclick="wtPauseSeg()">&#9208; Перерыв</button>'; b3 = '<button class="wt3 end" ' + END + '>&#9209; Конец</button>'; }
   else if (st === 'pause') { b1 = '<button class="wt3 go" onclick="wtStartSeg()">&#9654; Продолжить</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 end" ' + END + '>&#9209; Конец</button>'; }
-  else { b1 = '<button class="wt3 go" onclick="wtStartSeg()">&#9654; Продолжить</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
+  // день закрыт: ⛔ни одна кнопка не открывает смену одним касанием — иначе в табеле
+  //   появляются обрывки вида 17:41–17:41 (за 14 дней их набралось шесть у четверых)
+  else { b1 = '<button class="wt3 dim">&#10003; День закрыт</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
   var html = '<div class="wt-3">' + b1 + b2 + b3 + '</div>';
-  var isDrv = (typeof valMode === 'undefined') || valMode !== 'loader';
-  if (isDrv && typeof odoOpen === 'function') {
-    if (isNordDrv()) {
-      // Общий руль Норд-машины: свободен → «Взять» (активна), у меня → «Сдать» (активна), у другого → неактивна «Руль у …»
-      var holder = nordWheel && nordWheel.drv;
-      if (!holder) html += '<button class="wt3 wheel" onclick="odoOpen(\'start\')">&#128666; Взять руль (пробег)</button>';
-      else if (holder === DRV) html += '<button class="wt3 wheel rel" onclick="odoOpen(\'end\')">&#127359;&#65039; Сдать руль (пробег)</button>';
-      else html += '<button class="wt3 wheel dim" disabled>&#128663; Руль у ' + xe(nordWheel.name || holder) + '</button>';
-    } else {
-      var driving = (typeof odoDriving === 'function') && odoDriving();
-      if (!(st === 'done' && !driving)) html += driving
-        ? '<button class="wt3 wheel rel" onclick="odoOpen(\'end\')">&#127359;&#65039; Сдать руль (пробег)</button>'
-        : '<button class="wt3 wheel" onclick="odoOpen(\'start\')">&#128666; Взять руль (пробег)</button>';
-    }
-  }
   box.innerHTML = html;
 }
 function wtBtnTap() {
@@ -571,36 +585,26 @@ function renderWtPanel() {
     return;
   }
   if (wtPanelMode === 'confirmFinish') {
-    var _finWarn = odoDriving() ? '<div class="wt-qs" style="color:#b06a12">Вы ещё «за рулём». Пробег закрытия запишите кнопкой «Сдать руль» (она есть и после завершения).</div>' : '';
+    var _finWarn = odoDriving() ? '<div class="wt-qs" style="color:#b06a12">Вы за рулём — дальше попросим фото одометра и километры, ими день и закроется.</div>' : '';
     box.innerHTML = '<div class="wt-q">Завершить день?</div><div class="wt-qs">Отработано <b>' + (Math.round(wtWorkedMin(rec, true) / 6) / 10) + ' ч</b></div>' + _finWarn +
       '<div class="wt-qbtns"><button class="wt-cancel" onclick="wtBack()">Отмена</button><button class="wt-yes" onclick="wtDoFinish()">Да</button></div>';
     return;
   }
   var worked = wtWorkedMin(rec, true);
   var _drv = (valMode !== 'loader');
-  var _wheel = _drv ? (odoDriving()
-    ? '<button class="wt-main" style="background:#b06a12" onclick="odoOpen(\'end\')">&#127359;&#65039; Сдать руль (записать пробег)</button>'
-    : '<button class="wt-main" style="background:#1856a0" onclick="odoOpen(\'start\')">&#128666; Взять руль (записать пробег)</button>') : '';
   if (st === 'idle') {
-    if (_drv) {
-      box.innerHTML = '<div class="wt-status">Начните смену. Садитесь за руль — «Взять руль» (заодно откроет смену).</div>' +
-        '<button class="wt-main" style="background:#1856a0" onclick="odoOpen(\'start\')">&#128666; Взять руль (пробег + смена)</button>' +
-        '<button class="wt-main start" onclick="wtStartSeg()">&#9654; Открыть смену без руля</button>';
-    } else {
-      box.innerHTML = '<div class="wt-status">Начните рабочий день</div>' +
-        '<button class="wt-main start" onclick="wtStartSeg()">&#9654; Начать рабочий день</button>';
-    }
+    box.innerHTML = '<div class="wt-status">' + (_drv ? 'Начните рабочий день. Если за рулём — понадобится фото одометра и километры.' : 'Начните рабочий день') + '</div>' +
+      '<button class="wt-main start" onclick="dayStart()">&#9654; Начать день</button>';
   } else if (st === 'run') {
-    box.innerHTML = '<div class="wt-status">Идёт смена<br>сегодня отработано <b id="wtWtxt">' + wtFmt(worked) + '</b></div>' + wtSegLine(rec) + _wheel +
+    box.innerHTML = '<div class="wt-status">Идёт смена<br>сегодня отработано <b id="wtWtxt">' + wtFmt(worked) + '</b></div>' + wtSegLine(rec) +
       '<div class="wt-two"><button class="wt-main pause" onclick="wtPauseSeg()">&#9208; Перерыв</button>' +
       '<button class="wt-main end" onclick="wtAsk(\'confirmFinish\')">&#9209; Завершить день</button></div>';
   } else if (st === 'pause') {
-    box.innerHTML = '<div class="wt-status">Перерыв<br>отработано <b>' + wtFmt(worked) + '</b></div>' + wtSegLine(rec) + _wheel +
+    box.innerHTML = '<div class="wt-status">Перерыв<br>отработано <b>' + wtFmt(worked) + '</b></div>' + wtSegLine(rec) +
       '<div class="wt-two"><button class="wt-main start" onclick="wtAsk(\'confirmStart\')">&#9654; Продолжить</button>' +
       '<button class="wt-main end" onclick="wtAsk(\'confirmFinish\')">&#9209; Завершить день</button></div>';
   } else {
     box.innerHTML = '<div class="wt-status">День завершён<br><b>' + wtHoursDec(rec) + ' ч</b> &#10003;</div>' + wtSegLine(rec) +
-      (odoDriving() ? _wheel : '') +
       '<button class="wt-main start" onclick="wtAsk(\'confirmStart\')">&#9654; Возобновить работу</button>' +
       '<div class="wt-done-note">Правки — у диспетчера.</div>';
   }
@@ -609,7 +613,7 @@ function wtLogout() { if (confirm('Выйти и сменить вход?')) { f
 function flushWtQueue() {
   Object.keys(wtQueue).forEach(function (date) {
     var val = wtQueue[date];
-    db.ref('worktime/' + DRV + '/' + date).set(val).then(function () {
+    db.ref('worktime/' + DRV + '/' + date).update(val).then(function () {
       if (wtQueue[date] && JSON.stringify(wtQueue[date]) === JSON.stringify(val)) { delete wtQueue[date]; saveWtQueue(); }
     }).catch(function () {});
   });
@@ -983,7 +987,8 @@ function odoPhotoDbPath(drv, date, mode, ts) {
 function odoOpen(mode) {
   if (valMode === 'loader') return; // грузчик уже выбрал роль — одометр ему не нужен
   if (mode === 'start' && isNordDrv() && nordWheel && nordWheel.drv && nordWheel.drv !== DRV) { showToast('Руль сейчас у ' + xe(nordWheel.name || nordWheel.drv)); return; } // общий руль Норд-машины занят другим
-  if (mode === 'end' && isNordDrv() && !(nordWheel && nordWheel.drv === DRV)) { showToast('Руль уже не за вами'); return; } // нельзя сдать руль, который уже не у меня (устаревшая панель)
+  // ⛔Конец дня НИКОГДА не блокируем меткой руля: 10.08 именно она (пустая) весь день не давала
+  //   Виталию записать конечный пробег. Право закрыть свой день даёт собственный одометр.
   odoMode = mode; odoPhotoFile = null;
   var end = mode === 'end', so = mode === 'swap_out', si = mode === 'swap_in';
   var _hd = document.getElementById('odoHd'), _sub = document.getElementById('odoSub');
@@ -1066,14 +1071,29 @@ function odoPeek() {
   document.getElementById('odoGate').classList.remove('on');
   if (wtState(wtToday()) === 'idle') document.getElementById('odoBanner').classList.add('on');
 }
-function odoDriving(){ if (isNordDrv()) return !!(nordWheel && nordWheel.drv === DRV); try { return localStorage.getItem('odoDrv_' + DRV + '_' + wtDate()) === '1'; } catch(e){ return false; } }
+// «Я сегодня за рулём» — это НЕ отдельная метка, а ВЫВОД из одометра: есть начало дня и нет
+// конца. ⛔Раньше правды было три — метка nord_wheel в базе, флажок odoDrv_* в телефоне и сам
+//   одометр, — и они расходились. 10.08 Виталий весь день не мог записать конечный пробег:
+//   кнопка смотрела в пустую метку, хотя начало дня лежало в базе.
+function odoDriving() {
+  var r = odoRec();
+  // офлайн: свежая запись ещё в очереди — она новее базы, поэтому смотрим её первой (с конца)
+  try {
+    for (var i = odoKmQ.length - 1; i >= 0; i--) {
+      var q = odoKmQ[i]; if (!q || q.date !== wtDate()) continue;
+      if (q.mode === 'end') return false;
+      if (q.mode === 'start' || q.mode === 'swap_in') return true;
+    }
+  } catch (e) {}
+  return !!(r && r.start != null && r.end == null);
+}
 function odoSave() {
   var kmv = (document.getElementById('odoKm').value || '').trim(); var km = Number(kmv);
   if (!odoPhotoFile || kmv === '' || !(km >= 0)) return;
   var mode = odoMode, date = wtDate(), ts = Date.now();
   if (mode === 'start' && valMode !== 'driver') valSetRole('driver'); // роль выбрана на этом же экране
   if (mode === 'start' && wtState(wtToday()) === 'idle') wtStartSeg(); // взял руль в начале дня = ещё и клок-ин; «сдать руль» день НЕ завершает
-  try { if (mode === 'start' || mode === 'swap_in') localStorage.setItem('odoDrv_' + DRV + '_' + date, '1'); else if (mode === 'end') localStorage.removeItem('odoDrv_' + DRV + '_' + date); } catch (e) {}
+  // ⛔флажок «за рулём» в телефоне убран: правда одна — сам одометр (см. odoDriving)
   if (isNordDrv()) { try { if (mode === 'start' || mode === 'swap_in') db.ref('nord_wheel/' + date).set({ drv: DRV, name: myName(), ts: ts }); else if (mode === 'end') db.ref('nord_wheel/' + date).remove(); } catch (e) {} } // общий руль Норд-машины: взял/сдал
   // ⛔Раньше «водитель дня» писался ТОЛЬКО при выборе роли в диалоге «Кто ты сегодня?», а он
   // показывается лишь при свежем открытии приложения. Водители держат вкладку неделями — за
@@ -1092,6 +1112,7 @@ function odoSave() {
     return;
   }
   if (mode === 'start' || mode === 'swap_in') odoSetVan(odoVanSel || odoVan); else if (mode === 'end') odoSetVan(null);
+  if (mode === 'end') wtCloseDay();   // конец дня = пробег и закрытие одной кнопкой
   try { render(); } catch (e) {}   // пробег снят → кнопки оживают сразу, без ожидания базы
   document.getElementById('odoGate').classList.remove('on');
   document.getElementById('odoBanner').classList.remove('on');
@@ -1637,6 +1658,7 @@ db.ref('trips').on('value', function(snap) {
 
 db.ref('worktime/' + DRV).on('value', function(snap) {
   wtData = snap.val() || {};
+  wtLoaded = true;
   renderWtBtn();
   if (document.getElementById('wtPanel') && document.getElementById('wtPanel').classList.contains('on')) renderWtPanel();
   valEnsureRole(odoMaybeGate);
