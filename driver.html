@@ -898,6 +898,9 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '#odoGate .orole-b{flex:1;border:1px solid #3a4a60;background:#131c28;color:#c9d6e8;border-radius:12px;padding:15px 8px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
     + '#odoGate .orole-b.on{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
     + '#odoGate .ovans{display:flex;gap:8px;flex-wrap:wrap}'
+    + '#odoGate .ovans-hd{width:100%;font-size:12.5px;color:#9fb0c8;margin:-2px 0 2px}'
+    + '#odoGate .ovans.need{outline:2px solid #d98324;outline-offset:4px;border-radius:12px}'
+    + '#odoGate .ogo.wait{opacity:.62}'
     + '#odoGate .ovan{flex:1;min-width:98px;border:1px solid #3a4a60;background:#131c28;color:#c9d6e8;border-radius:11px;padding:13px 10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
     + '#odoGate .ovan.on{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
     + '#odoVanBar{display:none;align-items:center;justify-content:space-between;gap:8px;background:#123a5c;color:#fff;padding:9px 12px;font-size:13px;font-weight:700}'
@@ -938,10 +941,36 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
 // пробег и штрафы персональная, поэтому машину теперь УКАЗЫВАЕТ водитель, а не угадывает код.
 var odoVanSel = null, odoVanEx = null;
 var odoVan = null; try { odoVan = localStorage.getItem('odoVan_' + DRV) || null; } catch (e) {}
+// ⛔Водители знают машины по НОМЕРУ на борту, а не по «Машина A». Номер берём из настроек
+//   (поле plate) — вписывает диспетчер; пока не вписан, показываем прежнее название.
+// ⛔Каждому — свои машины: у Норда одна, в центре другие. Раньше всем показывались все три,
+//   и человек выбирал наугад.
 function odoVans() {
   var m = (typeof cfg !== 'undefined' && cfg && cfg.machines) ? cfg.machines : null, out = [];
-  if (m) Object.keys(m).forEach(function (id) { out.push({ id: id, label: (m[id] && m[id].label) || ('Машина ' + id) }); });
+  if (!m) return out;
+  var mine = null;
+  try { mine = isNordDrv() ? 'nord' : 'main'; } catch (e) { mine = null; }
+  Object.keys(m).forEach(function (id) {
+    var v = m[id] || {};
+    if (mine && v.region && v.region !== mine) return;   // чужой регион
+    out.push({ id: id, label: v.plate || v.label || ('Машина ' + id) });
+  });
+  // ⛔Если фильтр не оставил ничего (регионы не заданы, машину переставили) — показываем все,
+  //   иначе человек просто не сможет начать день.
+  if (!out.length) Object.keys(m).forEach(function (id) {
+    var v = m[id] || {};
+    out.push({ id: id, label: v.plate || v.label || ('Машина ' + id) });
+  });
   return out;
+}
+// На какой машине человек ездил в прошлый раз — её и подставляем, чтобы не тыкать каждый день.
+function odoLastVan() {
+  try {
+    var v = localStorage.getItem('odoVan_' + DRV);
+    if (v && odoVans().filter(function (x) { return x.id === v; }).length) return v;
+  } catch (e) {}
+  var all = odoVans();
+  return all.length === 1 ? all[0].id : null;   // если машина одна — выбирать нечего
 }
 function odoVanLabel(id) {
   if (!id) return '';
@@ -955,7 +984,7 @@ function odoRenderVans(show, exclude) {
   var list = odoVans().filter(function (v) { return v.id !== odoVanEx; });
   if (!list.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = 'flex';
-  el.innerHTML = list.map(function (v) {
+  el.innerHTML = '<div class="ovans-hd">Нажмите машину, на которой поедете</div>' + list.map(function (v) {
     return '<button type="button" class="ovan' + (v.id === odoVanSel ? ' on' : '') + '" data-van="' + v.id + '" onclick="odoPickVan(this)">' + v.label + '</button>';
   }).join('');
 }
@@ -1006,7 +1035,7 @@ function odoOpen(mode) {
   document.getElementById('odoGo').style.display = askRole ? 'none' : '';
   document.getElementById('odoGoL').style.display = 'none';
   if (askRole) document.getElementById('odoPeek').style.display = 'none';
-  odoVanSel = si ? null : odoVan;
+  odoVanSel = si ? null : (odoVan || odoLastVan());
   odoRenderVans(mode === 'start' || si, si ? odoVan : null);
   var sh = document.getElementById('odoShot'); sh.className = 'oshot'; sh.innerHTML = '&#128247; Сфотографировать пробег';
   document.getElementById('odoCam').innerHTML = '<div class="ohint">Нажмите «Сфотографировать пробег»</div>';
@@ -1058,6 +1087,16 @@ function odoStartLoader() {
   if (wtState(wtToday()) === 'idle') wtStartSeg();
   showToast('Смена начата · грузчик');
 }
+// ⛔Сірая кнопка, которая молчит, — это «приложение не работает» с точки зрения водителя.
+//   11.08 Лёша так простоял: фото сделал, километры вписал, а машину не выбрал.
+function odoWhyBlocked() {
+  var km = (document.getElementById('odoKm').value || '').trim();
+  var needVan = (odoMode === 'start' || odoMode === 'swap_in') && odoVans().length > 0;
+  if (!odoPhotoFile) return 'Сначала сфотографируйте одометр';
+  if (!km.length) return 'Впишите километры с одометра';
+  if (needVan && !odoVanSel) return 'Выберите машину, на которой поедете';
+  return null;
+}
 function odoValidate() {
   var km = (document.getElementById('odoKm').value || '').trim();
   // на старте дня и на «беру машину» без выбора дальше нельзя — иначе снова придётся гадать,
@@ -1065,7 +1104,10 @@ function odoValidate() {
   // если cfg с машинами ещё не пришёл (нет сети на старте дня) — список пуст, и требовать
   // выбор НЕЛЬЗЯ: иначе водитель вообще не сможет начать день
   var needVan = (odoMode === 'start' || odoMode === 'swap_in') && odoVans().length > 0;
-  document.getElementById('odoGo').disabled = !(odoPhotoFile && km.length > 0 && (!needVan || odoVanSel));
+  // кнопка остаётся нажимаемой: на нажатие она ОБЪЯСНЯЕТ, чего не хватает (odoWhyBlocked)
+  var _go = document.getElementById('odoGo');
+  _go.disabled = false;
+  _go.classList.toggle('wait', !(odoPhotoFile && km.length > 0 && (!needVan || odoVanSel)));
 }
 function odoPeek() {
   document.getElementById('odoGate').classList.remove('on');
@@ -1089,7 +1131,9 @@ function odoDriving() {
 }
 function odoSave() {
   var kmv = (document.getElementById('odoKm').value || '').trim(); var km = Number(kmv);
-  if (!odoPhotoFile || kmv === '' || !(km >= 0)) return;
+  var _why = odoWhyBlocked();
+  if (_why) { showToast(_why); var _v = document.getElementById('odoVans'); if (_v) { _v.classList.add('need'); setTimeout(function () { _v.classList.remove('need'); }, 2500); } return; }
+  if (!(km >= 0)) { showToast('Километры вписаны неверно'); return; }
   var mode = odoMode, date = wtDate(), ts = Date.now();
   if (mode === 'start' && valMode !== 'driver') valSetRole('driver'); // роль выбрана на этом же экране
   if (mode === 'start' && wtState(wtToday()) === 'idle') wtStartSeg(); // взял руль в начале дня = ещё и клок-ин; «сдать руль» день НЕ завершает
@@ -1934,7 +1978,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-10-1';
+var APP_V = '2026-08-11-1';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
