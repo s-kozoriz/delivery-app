@@ -1064,15 +1064,6 @@ function odoVans() {
   });
   return out;
 }
-// На какой машине человек ездил в прошлый раз — её и подставляем, чтобы не тыкать каждый день.
-function odoLastVan() {
-  try {
-    var v = localStorage.getItem('odoVan_' + DRV);
-    if (v && odoVans().filter(function (x) { return x.id === v; }).length) return v;
-  } catch (e) {}
-  var all = odoVans();
-  return all.length === 1 ? all[0].id : null;   // если машина одна — выбирать нечего
-}
 function odoVanLabel(id) {
   if (!id) return '';
   var f = odoVans().filter(function (v) { return v.id === id; })[0];
@@ -1134,7 +1125,9 @@ function odoOpen(mode) {
   odoFields(!askRole);   // пока роль не выбрана — полей пробега на экране нет
   document.getElementById('odoGo').style.display = askRole ? 'none' : '';
   document.getElementById('odoGoL').style.display = 'none';
-  odoVanSel = si ? null : (odoVan || odoLastVan());
+  // ⛔Машину выбирают КАЖДЫЙ раз руками: подставленная кнопка провоцирует
+  //   «сфотографировал и поехал», а потом нестыковки в данных. Даже если машина одна.
+  odoVanSel = null;
   odoRenderVans(mode === 'start' || si, si ? odoVan : null);
   var sh = document.getElementById('odoShot'); sh.className = 'oshot'; sh.innerHTML = '&#128247; Сфотографировать пробег';
   document.getElementById('odoCam').innerHTML = '<div class="ohint">Нажмите «Сфотографировать пробег»</div>';
@@ -2142,7 +2135,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-5';
+var APP_V = '2026-08-11-6';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
