@@ -1256,6 +1256,43 @@ function odoWhyBlocked() {
   if (needVan && !odoVanSel) return 'Выберите машину, на которой поедете';
   return null;
 }
+// ⛔Пробег принимался ЛЮБОЙ. 4 августа у Виталия день записан как 641359 → 441480:
+//   конечный на двести тысяч МЕНЬШЕ утреннего. Такие дни ломают и выгрузку в KL,
+//   и любой расчёт перепробега — по ним ничего нельзя предъявить.
+// Сверяем с тем, что знаем сами: своё утреннее показание и своё последнее по этой машине.
+// ⛔Чужие одометры водителю читать нельзя (правила базы), поэтому если машину между тем
+//   брал другой — жёстко не блокируем, а переспрашиваем и помечаем день.
+var ODO_MAX_DAY = 900;   // км за день: больше — почти наверняка опечатка
+function odoPrevKm(van) {
+  var best = null, bestTs = 0;
+  try {
+    Object.keys(odoData || {}).forEach(function (day) {
+      var rec = odoData[day] || {};
+      ['start', 'end'].forEach(function (k) {
+        var e = rec[k];
+        if (!e || e.km == null) return;
+        if (van && e.van && e.van !== van) return;
+        if (Number(e.ts) > bestTs) { bestTs = Number(e.ts); best = Number(e.km); }
+      });
+    });
+  } catch (e) {}
+  return best;
+}
+// Вернёт {block} — записать нельзя, {ask} — спросить и пометить день, или null.
+function odoKmCheck(km, mode, van) {
+  var rec = odoRec();
+  if (mode === 'end' && rec && rec.start && rec.start.km != null) {
+    var st = Number(rec.start.km);
+    if (km < st) return { block: 'Меньше утреннего (' + st + ' км). Проверьте цифры на одометре' };
+    if (km - st > ODO_MAX_DAY) return { ask: 'За день ' + (km - st) + ' км — это точно так?' };
+    return null;
+  }
+  var prev = odoPrevKm(van);
+  if (prev == null) return null;
+  if (km < prev) return { ask: 'Прошлый раз на этой машине было ' + prev + ' км — сейчас меньше. Точно так?' };
+  if (km - prev > ODO_MAX_DAY * 3) return { ask: 'С прошлого раза ' + (km - prev) + ' км — это точно так?' };
+  return null;
+}
 function odoValidate() {
   var km = (document.getElementById('odoKm').value || '').trim();
   // на старте дня и на «беру машину» без выбора дальше нельзя — иначе снова придётся гадать,
@@ -1291,6 +1328,14 @@ function odoSave() {
   var _why = odoWhyBlocked();
   if (_why) { showToast(_why); var _v = document.getElementById('odoVans'); if (_v) { _v.classList.add('need'); setTimeout(function () { _v.classList.remove('need'); }, 2500); } return; }
   if (!(km >= 0)) { showToast('Километры вписаны неверно'); return; }
+  var _van = (odoMode === 'swap_out') ? odoVan : (odoVanSel || odoVan);
+  var _chk = odoKmCheck(km, odoMode, _van);
+  var _suspect = false;
+  if (_chk && _chk.block) { showToast(_chk.block); return; }
+  if (_chk && _chk.ask) {
+    if (!confirm(_chk.ask)) return;
+    _suspect = true;   // человек подтвердил — пишем, но помечаем для диспетчера
+  }
   var mode = odoMode, date = wtDate(), ts = Date.now();
   if (mode === 'start' && valMode !== 'driver') valSetRole('driver'); // роль выбрана на этом же экране
   if (mode === 'start' && wtState(wtToday()) === 'idle') wtStartSeg(); // взял руль в начале дня = ещё и клок-ин; «сдать руль» день НЕ завершает
@@ -1302,7 +1347,7 @@ function odoSave() {
   // взял машину = ты и есть водитель дня.
   if (mode === 'start' || mode === 'swap_in') nordPtr('driver');
   var vanEv = (mode === 'swap_out') ? odoVan : (odoVanSel || odoVan);
-  odoWriteKm(date, mode, km, ts, vanEv);
+  odoWriteKm(date, mode, km, ts, vanEv, _suspect);
   odoUploadPhoto(odoPhotoFile, date, mode, ts);
   if (mode === 'swap_out') {
     // сдал старую — сразу ведём на шаг 2, чтобы человек не остался «ни на какой машине»
@@ -1364,14 +1409,14 @@ setInterval(function () { if (odoQ.length && navigator.onLine) odoProcessQ(); },
 // число «км» — своя надёжная очередь (localStorage), чтобы не потерять при слабой сети / закрытии приложения
 var odoKmQ = JSON.parse(localStorage.getItem('odoKmQ_' + DRV) || '[]');
 function saveOdoKmQ() { localStorage.setItem('odoKmQ_' + DRV, JSON.stringify(odoKmQ)); }
-function odoWriteKm(date, mode, km, ts, van) { odoKmQ.push({ date: date, mode: mode, km: km, ts: ts, van: van || null }); saveOdoKmQ(); odoFlushKm(); }
+function odoWriteKm(date, mode, km, ts, van, suspect) { odoKmQ.push({ date: date, mode: mode, km: km, ts: ts, van: van || null, suspect: suspect ? true : null }); saveOdoKmQ(); odoFlushKm(); }
 function odoFlushKm() {
   odoKmQ.slice().forEach(function (it) {
     var p = odoPaths(DRV, it);
     var first = p.legacy ? db.ref(p.legacy).update({ km: it.km, ts: it.ts, van: it.van || null }) : Promise.resolve();
     first.then(function () {
       // журнал событий: из него строятся отрезки «водитель × машина» за день
-      return db.ref(p.ev).update({ kind: it.mode, van: it.van || null, km: it.km, ts: it.ts });
+      return db.ref(p.ev).update({ kind: it.mode, van: it.van || null, km: it.km, ts: it.ts, suspect: it.suspect || null });
     }).then(function () {
       var i = odoKmQ.indexOf(it); if (i > -1) { odoKmQ.splice(i, 1); saveOdoKmQ(); }
     }).catch(function () {});
@@ -2203,7 +2248,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-7';
+var APP_V = '2026-08-11-8';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
