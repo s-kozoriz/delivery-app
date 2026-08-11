@@ -674,6 +674,18 @@ function wtYestAsk() {
   }
   wtCloseOther(y.day, at);
 }
+// Напоминание «вы ещё за рулём»: пауза дольше 90 минут или день не закрыт после 20:00.
+function odoRemindBar() {
+  var ban = document.getElementById('odoBanner'); if (!ban) return;
+  if (!odoDriving()) return;                       // машину не брали или уже сдали
+  var rec = wtToday(), st = wtState(rec);
+  var late = (new Date()).getHours() >= 20;
+  var need = (st === 'pause' && wtPauseDur(rec) >= 90) || (late && st !== 'done');
+  if (!need) return;
+  ban.innerHTML = '<span>&#9888; Вы ещё за рулём — закройте день и запишите пробег</span>'
+    + '<button onclick="wtFinishDay()">Закончить день</button>';
+  ban.classList.add('on');
+}
 function renderWtBtn() {
   var box = document.getElementById('wt3'); var line = document.getElementById('wtLine');
   if (!box) return;
@@ -694,6 +706,10 @@ function renderWtBtn() {
   // день закрыт: ⛔ни одна кнопка не открывает смену одним касанием — иначе в табеле
   //   появляются обрывки вида 17:41–17:41 (за 14 дней их набралось шесть у четверых)
   else { b1 = '<button class="wt3 dim">&#10003; День закрыт</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
+  // ⛔Требование пробега висело ТОЛЬКО на кнопке «Конец» — её можно просто не нажимать:
+  //   поставил «Перерыв» и ушёл, день остался открытым и без километров. Теперь, если машину
+  //   взяли и не сдали, а пауза затянулась, это видно прямо на экране, а не спрятано в кнопке.
+  odoRemindBar();
   var html = '<div class="wt-3">' + b1 + b2 + b3 + '</div>';
   var _y = wtYesterdayOpen();
   if (_y) html += '<button class="wt3 end" style="width:100%;margin-top:6px" onclick="wtYestAsk()">&#9888; Смена за ' + _y.day.slice(8) + '.' + _y.day.slice(5, 7) + ' не закрыта — закрыть</button>';
@@ -2251,7 +2267,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-9';
+var APP_V = '2026-08-11-10';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
