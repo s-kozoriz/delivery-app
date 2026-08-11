@@ -1284,13 +1284,15 @@ function odoKmCheck(km, mode, van) {
   if (mode === 'end' && rec && rec.start && rec.start.km != null) {
     var st = Number(rec.start.km);
     if (km < st) return { block: 'Меньше утреннего (' + st + ' км). Проверьте цифры на одометре' };
-    if (km - st > ODO_MAX_DAY) return { ask: 'За день ' + (km - st) + ' км — это точно так?' };
+    if (km - st > ODO_MAX_DAY) return { flag: 1 };   // тихо метим: сверит фото, а не человек
     return null;
   }
   var prev = odoPrevKm(van);
   if (prev == null) return null;
-  if (km < prev) return { ask: 'Прошлый раз на этой машине было ' + prev + ' км — сейчас меньше. Точно так?' };
-  if (km - prev > ODO_MAX_DAY * 3) return { ask: 'С прошлого раза ' + (km - prev) + ' км — это точно так?' };
+  // ⛔Единственное, чего НЕ видно на фото одометра, — на какой ты машине. Только про это и
+  //   спрашиваем: цифры сверит снимок, а пересадку в другую машину знает лишь сам водитель.
+  if (km < prev) return { ask: 'Прошлый раз на этой машине было ' + prev + ' км, сейчас меньше.\n\nВы точно на этой машине?' };
+  if (km - prev > ODO_MAX_DAY * 3) return { flag: 1 };
   return null;
 }
 function odoValidate() {
@@ -1332,9 +1334,10 @@ function odoSave() {
   var _chk = odoKmCheck(km, odoMode, _van);
   var _suspect = false;
   if (_chk && _chk.block) { showToast(_chk.block); return; }
+  if (_chk && _chk.flag) _suspect = true;   // расхождение — метим день, водителя не дёргаем
   if (_chk && _chk.ask) {
-    if (!confirm(_chk.ask)) return;
-    _suspect = true;   // человек подтвердил — пишем, но помечаем для диспетчера
+    if (!confirm(_chk.ask)) return;   // спрашиваем ТОЛЬКО про машину
+    _suspect = true;
   }
   var mode = odoMode, date = wtDate(), ts = Date.now();
   if (mode === 'start' && valMode !== 'driver') valSetRole('driver'); // роль выбрана на этом же экране
@@ -2248,7 +2251,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-8';
+var APP_V = '2026-08-11-9';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
