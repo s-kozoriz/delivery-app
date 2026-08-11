@@ -677,11 +677,21 @@ function wtYestAsk() {
 // Напоминание «вы ещё за рулём»: пауза дольше 90 минут или день не закрыт после 20:00.
 function odoRemindBar() {
   var ban = document.getElementById('odoBanner'); if (!ban) return;
-  if (!odoDriving()) return;                       // машину не брали или уже сдали
+  // ⛔Баннер надо не только показывать, но и УБИРАТЬ: сдал пробег — напоминание должно
+  //   исчезнуть само, а не висеть до перезагрузки.
+  if (!odoDriving()) { ban.classList.remove('on'); return; }
   var rec = wtToday(), st = wtState(rec);
-  var late = (new Date()).getHours() >= 20;
-  var need = (st === 'pause' && wtPauseDur(rec) >= 90) || (late && st !== 'done');
-  if (!need) return;
+  // ⛔НЕ по часам: бывают дальние рейсы с возвратом за полночь — «после 20:00» врало бы им
+  //   весь вечер. Считаем по делу: человек уже должен был доехать до склада (последняя
+  //   работа + дорога с запасом на пробки) — вот тогда и напоминаем.
+  var lim = wtCloseLimit(wtDate()), over = false;
+  if (lim) {
+    var pl = lim.limit.split(':'), lm = (+pl[0]) * 60 + (+pl[1]);
+    var nn = new Date();
+    over = (nn.getHours() * 60 + nn.getMinutes()) > lm;
+  }
+  var need = (st === 'pause' && wtPauseDur(rec) >= 90) || (over && st !== 'done');
+  if (!need) { ban.classList.remove('on'); return; }
   ban.innerHTML = '<span>&#9888; Вы ещё за рулём — закройте день и запишите пробег</span>'
     + '<button onclick="wtFinishDay()">Закончить день</button>';
   ban.classList.add('on');
@@ -2267,7 +2277,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-10';
+var APP_V = '2026-08-11-12';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
