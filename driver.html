@@ -903,6 +903,16 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '#odoGate .orole-b{flex:1;border:1px solid #3a4a60;background:#131c28;color:#c9d6e8;border-radius:12px;padding:15px 8px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
     + '#odoGate .orole-b.on{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
     + '#odoGate .ovans{display:flex;gap:8px;flex-wrap:wrap}'
+    + '.rv{padding:26px 18px;text-align:center;color:#cfe0f5}'
+    + '.rv-ic{font-size:44px;margin-bottom:6px}'
+    + '.rv-hd{font-size:17px;font-weight:800;color:#eaf0f8}'
+    + '.rv-n{font-size:52px;font-weight:800;line-height:1.05;margin-top:10px;color:#8ef0b0}'
+    + '.rv-w{font-size:14px;color:#9fb0c8;margin-bottom:14px}'
+    + '.rv-list{max-width:320px;margin:0 auto}'
+    + '.rv-c{display:flex;justify-content:space-between;gap:12px;padding:9px 13px;background:#131c28;border:1px solid #263346;border-radius:10px;margin-bottom:6px;font-size:14.5px}'
+    + '.rv-c b{color:#8ef0b0}'
+    + '.rv-sub{font-size:13px;color:#9fb0c8;line-height:1.5;margin-top:14px}'
+    + '.rv-empty{font-size:15px;color:#9fb0c8;margin:16px 0}'
     + '#odoGate .ovans-hd{width:100%;font-size:12.5px;color:#9fb0c8;margin:-2px 0 2px}'
     + '#odoGate .ovans.need{outline:2px solid #d98324;outline-offset:4px;border-radius:12px}'
     + '#odoGate .ogo.wait{opacity:.62}'
@@ -1617,17 +1627,45 @@ function routeAllowed() {
   if (!odoLoaded) return true;   // данные ещё едут — не пугаем требованием раньше времени
   return odoFixedToday();
 }
-// Заглушка вместо маршрута — не тупик: из неё видно, что именно сделать.
+// Ограниченный просмотр вместо маршрута.
+// ⛔Решение Сергея 11.08: посмотреть, СКОЛЬКО работы, можно и без пробега — но так, чтобы
+//   через этот экран нельзя было обойти регистрацию. Поэтому показываем только объём дня
+//   (сколько точек и в каких городах) и НИ ОДНОЙ адреса, накладной или комментария:
+//   поехать работать «по списку» невозможно, а понять, есть ли сегодня работа, — можно.
+function routeVolume() {
+  var mine = rows.filter(function (r) {
+    return r && r.date === curD && r.drv === routeDrv() && r.inRoute !== false && ((r.addr && r.addr.trim()) || r.fromDriver);
+  });
+  var by = {}, order = [];
+  mine.forEach(function (r) {
+    var c = (r.city && String(r.city).trim()) || 'Без города';
+    if (by[c] == null) { by[c] = 0; order.push(c); }
+    by[c]++;
+  });
+  order.sort(function (a, b) { return by[b] - by[a]; });
+  return { total: mine.length, cities: order.map(function (c) { return { name: c, n: by[c] }; }) };
+}
+function routeVolumeHtml() {
+  var v = routeVolume();
+  if (!v.total) return '<div class="rv-empty">На этот день заданий нет</div>';
+  var li = v.cities.map(function (c) { return '<div class="rv-c"><span>' + xe(c.name) + '</span><b>' + c.n + '</b></div>'; }).join('');
+  return '<div class="rv-n">' + v.total + '</div><div class="rv-w">' + plural(v.total) + '</div><div class="rv-list">' + li + '</div>';
+}
+function plural(n) { var t = n % 100, o = n % 10; if (t > 10 && t < 20) return 'адресов'; if (o === 1) return 'адрес'; if (o > 1 && o < 5) return 'адреса'; return 'адресов'; }
+// Заглушка вместо маршрута — не тупик: из неё видно объём дня и что именно сделать.
 function routeLockHtml() {
   var loader = (typeof valMode !== 'undefined' && valMode === 'loader');
   if (loader) {
-    return '<div class="empty"><div style="font-size:44px;margin-bottom:10px">&#128230;</div>'
-      + '<p><b>Вы сегодня грузчик</b><br>Маршрут доступен водителю за рулём.</p>'
-      + '<button class="wt-main start" style="max-width:320px;margin:14px auto 0" onclick="valSwitch()">Я сегодня за рулём</button></div>';
+    return '<div class="rv"><div class="rv-ic">&#128230;</div>'
+      + '<div class="rv-hd">Вы сегодня грузчик</div>'
+      + '<div class="rv-sub">Маршрут открыт водителю за рулём.</div>'
+      + '<button class="wt-main start" style="max-width:320px;margin:16px auto 0" onclick="valSwitch()">Я сегодня за рулём</button></div>';
   }
-  return '<div class="empty"><div style="font-size:44px;margin-bottom:10px">&#128663;</div>'
-    + '<p><b>Сначала зафиксируйте пробег</b><br>Фото одометра, километры и машина — потом маршрут.</p>'
-    + '<button class="wt-main start" style="max-width:320px;margin:14px auto 0" onclick="dayStart()">&#9654; Начать день</button></div>';
+  return '<div class="rv"><div class="rv-ic">&#128666;</div>'
+    + '<div class="rv-hd">Сегодня у вас</div>'
+    + routeVolumeHtml()
+    + '<div class="rv-sub">Адреса откроются после фиксации пробега:<br>фото одометра, километры и машина.</div>'
+    + '<button class="wt-main start" style="max-width:320px;margin:16px auto 0" onclick="dayStart()">&#9654; Начать день</button></div>';
 }
 function render() {
   document.getElementById('dl').textContent = fmt(curD);
@@ -2007,7 +2045,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-2';
+var APP_V = '2026-08-11-3';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
