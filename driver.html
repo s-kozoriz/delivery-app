@@ -1082,6 +1082,12 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '#odoGate .orole{display:flex;gap:9px;padding:0 16px 4px}'
     + '#odoGate .orole-b{flex:1;border:1px solid #3a4a60;background:#131c28;color:#c9d6e8;border-radius:12px;padding:15px 8px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
     + '#odoGate .orole-b.on{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
+    + '#odoGate .oshot-note{margin:0 16px 8px;padding:9px 12px;border-radius:9px;font-size:13px;line-height:1.4;background:#131c28;border:1px solid #263346;color:#c9d6e8}'
+    + '#odoGate .oshot-note.ok{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
+    + '#odoGate .oshot-use{display:block;width:100%;margin-top:8px;background:#1a7a40;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}'
+    + '#odoGate .oshot-note.bad{border-color:#b23b2e;background:#2a1512;color:#ffb3a7}'
+    + '#odoGate .oshot-note.warn{border-color:#a35a06;background:#2a1e0d;color:#ffd9a0}'
+    + '#odoGate .oshot-note.wait{color:#9fb0c8}'
     + '#odoGate .ovans{display:flex;gap:8px;flex-wrap:wrap}'
     + '.rv{padding:26px 18px;text-align:center;color:#cfe0f5}'
     + '.rv-ic{font-size:44px;margin-bottom:6px}'
@@ -1205,6 +1211,7 @@ function odoOpen(mode) {
   // ⛔Конец дня НИКОГДА не блокируем меткой руля: 10.08 именно она (пустая) весь день не давала
   //   Виталию записать конечный пробег. Право закрыть свой день даёт собственный одометр.
   odoMode = mode; odoPhotoFile = null;
+  try { odoShotNote(''); } catch (e) {}
   var end = mode === 'end', so = mode === 'swap_out', si = mode === 'swap_in';
   var _hd = document.getElementById('odoHd'), _sub = document.getElementById('odoSub');
   if (so) { _hd.textContent = 'Смена машины · шаг 1 из 2'; _sub.textContent = 'Сдаёте ' + odoVanLabel(odoVan) + ': сфотографируйте одометр и впишите КОНЕЧНЫЙ пробег.'; }
@@ -1234,9 +1241,76 @@ function odoOpen(mode) {
 // пользователя», и камера молча не открывается. Сброс делает обработчик change.
 function odoShoot() { document.getElementById('odoInput').click(); }
 function odoShootGal() { document.getElementById('odoInputGal').click(); }
+// ⛔Приложение принимало ЛЮБОЙ файл: 3 августа Рома снял потолок — серую поверхность без
+//   единого прибора, и день так и записался. Проверять снимок через неделю бессмысленно:
+//   человек уже уехал. Смотрим сразу, пока он стоит у машины.
+// ⛔Мягко: нет сети или сервис молчит — снимок принимаем как раньше. Запрет по причине
+//   «не смогли проверить» оставил бы водителя без работы на пустом месте.
+var odoShotSeq = 0;
+function odoShotNote(html, kind) {
+  var el = document.getElementById('odoShotNote');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'odoShotNote';
+    var cam = document.getElementById('odoCam');
+    if (cam && cam.parentNode) cam.parentNode.insertBefore(el, cam.nextSibling);
+  }
+  el.className = 'oshot-note' + (kind ? ' ' + kind : '');
+  el.innerHTML = html || '';
+  el.style.display = html ? '' : 'none';
+}
+// Підставити прочитане число в поле пробігу — один дотик замість ручного вводу.
+function odoUseKm(km) {
+  var el = document.getElementById('odoKm'); if (!el) return;
+  el.value = String(km);
+  odoShotNote('Пробег <b>' + String(km) + '</b> км взят с фото', 'ok');
+  odoValidate();
+  if (navigator.vibrate) navigator.vibrate(40);
+}
+function odoCheckShot(file) {
+  var my = ++odoShotSeq;
+  if (!navigator.onLine) { odoShotNote(''); return; }
+  odoShotNote('⏳ Проверяю снимок…', 'wait');
+  var rd = new FileReader();
+  rd.onload = function () {
+    var b64 = String(rd.result || '').split(',')[1];
+    if (!b64) { odoShotNote(''); return; }
+    var q = 'Это фото приборной панели фургона? Найди одометр — табло или окошко с общим пробегом. '
+      + 'Верхнее число на табло — общий пробег (целое, 5-7 цифр), нижнее — суточный счётчик. '
+      + 'Ответь строго JSON: {"panel":true|false,"km":число или null}. '
+      + 'panel=false если на фото нет приборной панели. km=null если цифры неразличимы.';
+    fetch('https://lk-proxy.s-kozorizz.workers.dev/', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 200, messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+        { type: 'text', text: q }] }] })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (my !== odoShotSeq) return;   // пока ждали, человек переснял
+      var t = (j && j.content && j.content[0] && j.content[0].text) || '';
+      var m = t.match(/\{[\s\S]*\}/);
+      if (!m) { odoShotNote(''); return; }
+      var res = null; try { res = JSON.parse(m[0]); } catch (e) {}
+      if (!res) { odoShotNote(''); return; }
+      if (res.panel === false) {
+        odoShotNote('⚠ На фото не видно приборной панели. Переснимите так, чтобы одометр попал в кадр.', 'bad');
+        return;
+      }
+      if (res.km != null && Number(res.km) > 0) {
+        // ⛔Прочиталось — водію лишається ОДИН дотик замість шести цифр. Це і швидше,
+        //   і дисциплінує знімати так, щоб цифри було видно: зняв погано — вводь руками.
+        odoShotNote('На фото <b>' + String(res.km) + '</b> км'
+          + '<button type="button" class="oshot-use" onclick="odoUseKm(' + Number(res.km) + ')">Подтвердить</button>', 'ok');
+      } else {
+        odoShotNote('⚠ Цифры на одометре не разобрать. Если так же плохо видно глазом — переснимите ближе.', 'warn');
+      }
+    }).catch(function () { odoShotNote(''); });
+  };
+  rd.onerror = function () { odoShotNote(''); };
+  rd.readAsDataURL(file);
+}
 function odoOnFile(e) {
   var f = e.target.files[0]; if (!f) return;
   odoPhotoFile = f;
+  compressPhoto(f, function (small) { odoCheckShot(small || f); }, { side: 1600, q: 0.82 });
   document.getElementById('odoCam').innerHTML = '<img src="' + URL.createObjectURL(f) + '">';
   var sh = document.getElementById('odoShot'); sh.className = 'oshot done'; sh.textContent = '✓ Фото есть · переснять';
   e.target.value = ''; odoValidate();
@@ -2288,7 +2362,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-13';
+var APP_V = '2026-08-11-14';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
