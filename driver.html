@@ -493,16 +493,58 @@ function dayStart() {
 function wtStartSeg() { wtMutate(function (rec) { var L = wtSegs(rec); L.push({ s: nowTime() }); rec.seg = L; rec.done = null; }); if (navigator.vibrate) navigator.vibrate(60); }
 function wtPauseSeg() { wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; }); if (navigator.vibrate) navigator.vibrate(40); }
 // Закрыть день физически: время в табеле. Никаких проверок — их делает wtFinishDay.
-function wtCloseDay() {
-  wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; rec.done = true; });
+// Когда человек в последний раз РАБОТАЛ (а не просто держал приложение открытым):
+// отметка «Выполнено», фото доставки, событие одометра. Возвращает "ЧЧ:ММ" или null.
+// ⛔За 30 дней шесть смен по 13–19 часов: работа кончилась вечером, «Конец» нажали ночью.
+function wtLastWork() {
+  var day = wtDate(), best = 0;
+  function take(ts) {
+    ts = Number(ts); if (!ts) return;
+    var d = new Date(ts), s = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    if (s === day && ts > best) best = ts;
+  }
+  try {
+    rows.forEach(function (r) {
+      if (!r || r.date !== day) return;
+      take(r.doneTs);
+      [].concat(r.photoTs || []).forEach(take);
+    });
+  } catch (e) {}
+  try {
+    var rec = odoRec();
+    if (rec) {
+      if (rec.start) take(rec.start.ts);
+      if (rec.end) take(rec.end.ts);
+      Object.keys(rec.ev || {}).forEach(take);
+    }
+    odoKmQ.forEach(function (q) { if (q && q.date === day) take(q.ts); });
+  } catch (e) {}
+  if (!best) return null;
+  var b = new Date(best);
+  return String(b.getHours()).padStart(2, '0') + ':' + String(b.getMinutes()).padStart(2, '0');
+}
+// Пора ли предлагать закрыть день временем последней работы: только если она кончилась
+// заметно раньше, чем человек нажал «Конец». Иначе вопрос лишний.
+function wtCloseSuggest() {
+  var lw = wtLastWork(); if (!lw) return null;
+  var p = String(lw).split(':'), lm = (+p[0]) * 60 + (+p[1]);
+  var n = new Date(), nm = n.getHours() * 60 + n.getMinutes();
+  var gap = nm - lm; if (gap < 0) gap += 1440;
+  return gap >= 45 ? { at: lw, gapMin: gap } : null;
+}
+function wtCloseDay(at) {
+  var _at = at || nowTime();
+  wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = _at; rec.seg = L; rec.done = true; });
   if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
   closeWtPanel(); showMonthSummary();
 }
 // ⛔День НЕ закрывается, пока водитель не записал конечный пробег. Раньше «Конец» и одометр
 //   жили отдельными кнопками, и день закрывался без километров — 10.08 так у Виталия и Ромы.
-function wtFinishDay() {
+var _wtCloseAt = null;   // время, которым человек решил закрыть день (если выбрал не «сейчас»)
+function wtFinishDay(at) {
+  _wtCloseAt = at || null;
   if (odoDriving()) { closeWtPanel(); odoOpen('end'); return; }   // запишет км и закроет день сам
-  wtCloseDay();
+  wtCloseDay(_wtCloseAt); _wtCloseAt = null;
 }
 // итог за текущий месяц (из уже загруженного wtData, без новых запросов)
 var wtSummaryTimer = null;
@@ -532,6 +574,38 @@ function closeMonthSummary() { if (wtSummaryTimer) { clearTimeout(wtSummaryTimer
 
 function wtPauseDur(rec) { var L = wtSegs(rec); if (!L.length) return 0; var last = L[L.length - 1]; if (!last || !last.e) return 0; var p = (''+last.e).split(':'); var em = (+p[0]) * 60 + (+p[1]); if (isNaN(em)) return 0; var n = new Date(); var m = (n.getHours() * 60 + n.getMinutes()) - em; if (m < 0) m += 1440; return m; }
 function goToday() { curD = isoD(0); render(); }
+// ⛔Смена, забытая с прошлого дня, не должна тянуться дальше: спрашиваем один раз при
+//   открытии приложения и закрываем ВЧЕРАШНИМ временем последней работы, а не текущим.
+var _wtYestAsked = false;
+function wtYesterdayOpen() {
+  if (_wtYestAsked || !wtLoaded) return null;
+  var today = wtDate();
+  var days = Object.keys(wtData || {}).filter(function (d) { return d < today; }).sort();
+  for (var i = days.length - 1; i >= 0; i--) {
+    var rec = wtData[days[i]];
+    if (rec && !rec.done && wtOpenIdx(rec) >= 0) return { day: days[i], rec: rec };
+  }
+  return null;
+}
+// Закрыть чужой (не сегодняшний) день указанным временем.
+function wtCloseOther(day, at) {
+  var rec = JSON.parse(JSON.stringify(wtData[day] || {}));
+  var L = wtSegs(rec); var i = wtOpenIdx(rec);
+  if (i >= 0) L[i].e = at; rec.seg = L; rec.done = true;
+  wtData[day] = rec;
+  db.ref('worktime/' + DRV + '/' + day).update(rec).catch(function () {});
+  _wtYestAsked = true;
+  renderWtBtn(); wtRepanel();
+  showToast('Вчерашняя смена закрыта в ' + at);
+}
+function wtYestAsk() {
+  var y = wtYesterdayOpen(); if (!y) return;
+  var L = wtSegs(y.rec), open = L[wtOpenIdx(y.rec)];
+  var at = prompt('Смена за ' + y.day + ' осталась открытой с ' + open.s + '.\nВо сколько вы закончили? (ЧЧ:ММ)', '17:00');
+  if (!at) { _wtYestAsked = true; return; }
+  if (!/^\d{1,2}:\d{2}$/.test(at)) { showToast('Время в виде 17:30'); return; }
+  wtCloseOther(y.day, at);
+}
 function renderWtBtn() {
   var box = document.getElementById('wt3'); var line = document.getElementById('wtLine');
   if (!box) return;
@@ -553,6 +627,8 @@ function renderWtBtn() {
   //   появляются обрывки вида 17:41–17:41 (за 14 дней их набралось шесть у четверых)
   else { b1 = '<button class="wt3 dim">&#10003; День закрыт</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
   var html = '<div class="wt-3">' + b1 + b2 + b3 + '</div>';
+  var _y = wtYesterdayOpen();
+  if (_y) html += '<button class="wt3 end" style="width:100%;margin-top:6px" onclick="wtYestAsk()">&#9888; Смена за ' + _y.day.slice(8) + '.' + _y.day.slice(5, 7) + ' не закрыта — закрыть</button>';
   box.innerHTML = html;
 }
 function wtBtnTap() {
@@ -569,6 +645,7 @@ function wtAsk(m) { wtPanelMode = m; renderWtPanel(); }
 function wtBack() { wtPanelMode = 'view'; renderWtPanel(); }
 function wtDoStart() { wtPanelMode = 'view'; wtStartSeg(); }
 function wtDoFinish() { wtPanelMode = 'view'; wtFinishDay(); }
+function wtDoFinishAt(at) { wtPanelMode = 'view'; wtFinishDay(at); }
 function wtSegLine(rec) {
   var L = wtSegs(rec); if (!L.length) return '';
   var parts = L.map(function (g) { return (g.s || '?') + '&#8211;' + (g.e || '…'); });
@@ -586,8 +663,17 @@ function renderWtPanel() {
   }
   if (wtPanelMode === 'confirmFinish') {
     var _finWarn = odoDriving() ? '<div class="wt-qs" style="color:#b06a12">Вы за рулём — дальше попросим фото одометра и километры, ими день и закроется.</div>' : '';
-    box.innerHTML = '<div class="wt-q">Завершить день?</div><div class="wt-qs">Отработано <b>' + (Math.round(wtWorkedMin(rec, true) / 6) / 10) + ' ч</b></div>' + _finWarn +
-      '<div class="wt-qbtns"><button class="wt-cancel" onclick="wtBack()">Отмена</button><button class="wt-yes" onclick="wtDoFinish()">Да</button></div>';
+    // ⛔Если работа кончилась давно, а «Конец» нажали сейчас — предлагаем закрыть временем
+    //   последней работы. Решает человек: бывает, что он и правда работал до ночи.
+    var _sg = wtCloseSuggest();
+    var _btns = _sg
+      ? '<div class="wt-qs" style="color:#8ef0b0;margin-top:8px">Последняя работа — <b>' + _sg.at + '</b>, сейчас <b>' + nowTime() + '</b></div>'
+        + '<div class="wt-qbtns" style="flex-direction:column;gap:8px">'
+        + '<button class="wt-yes" onclick="wtDoFinishAt(\'' + _sg.at + '\')">Закрыть в ' + _sg.at + '</button>'
+        + '<button class="wt-cancel" onclick="wtDoFinish()">Закрыть сейчас (' + nowTime() + ')</button>'
+        + '<button class="wt-cancel" onclick="wtBack()">Отмена</button></div>'
+      : '<div class="wt-qbtns"><button class="wt-cancel" onclick="wtBack()">Отмена</button><button class="wt-yes" onclick="wtDoFinish()">Да</button></div>';
+    box.innerHTML = '<div class="wt-q">Завершить день?</div><div class="wt-qs">Отработано <b>' + (Math.round(wtWorkedMin(rec, true) / 6) / 10) + ' ч</b></div>' + _finWarn + _btns;
     return;
   }
   var worked = wtWorkedMin(rec, true);
@@ -1166,7 +1252,7 @@ function odoSave() {
     return;
   }
   if (mode === 'start' || mode === 'swap_in') odoSetVan(odoVanSel || odoVan); else if (mode === 'end') odoSetVan(null);
-  if (mode === 'end') wtCloseDay();   // конец дня = пробег и закрытие одной кнопкой
+  if (mode === 'end') { wtCloseDay(_wtCloseAt); _wtCloseAt = null; }   // конец дня = пробег и закрытие одной кнопкой
   try { render(); } catch (e) {}   // пробег снят → кнопки оживают сразу, без ожидания базы
   document.getElementById('odoGate').classList.remove('on');
   document.getElementById('odoBanner').classList.remove('on');
@@ -2045,7 +2131,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-3';
+var APP_V = '2026-08-11-4';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
