@@ -220,6 +220,11 @@ firebase.auth().onAuthStateChanged(function(user){
     if(c.role !== 'loader' || !c.lagerId){ showWrongRole(c, 'Эта страница — для грузчика.'); return; }
     if(_authOk){ var _w0=document.getElementById('wrongRole'); if(_w0)_w0.style.display='none'; return; }
     _authOk=true;
+    // ⛔Один застосунок на всіх: грузчик работает в том же driver.html, что и водители,
+    //   только без пробега, машины и маршрута. Эта страница осталась точкой входа ради
+    //   ярлыка на телефоне (свой manifest) и как запасной путь: убрать одну строку ниже —
+    //   и она снова работает сама по себе.
+    location.replace('driver.html?drv=' + encodeURIComponent(c.lagerId) + location.hash); return;
     DRV = c.lagerId; NAME = c.name || '';
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = '';
