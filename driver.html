@@ -1412,6 +1412,7 @@ function valModeKey() { return 'valMode_' + DRV + '_' + wtDate(); }
 // Признак берём из настроек (его ставит диспетчер галочками в экране «Люди»),
 // а не зашиваем в код: состав людей меняется, код — нет.
 function valCanLoad() {
+  if (PURE_LOADER) return false;   // ему не между чем выбирать
   try { return !!(cfg && cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].canLoader); }
   catch (e) { return false; }
 }
@@ -1426,6 +1427,7 @@ function valBadge() {
   el.innerHTML = (valMode === 'loader') ? '&#128230; Грузчик' : '&#128666; Водитель';
 }
 function valEnsureRole(cb) {
+  if (PURE_LOADER) { valMode = 'loader'; valBadge(); renderWtBtn(); if (cb) cb(); return; }
   // роль уже выбрана (вкладка живёт с прошлого дня) — диалога не будет, но «водитель дня»
   // за СЕГОДНЯ всё равно надо отметить, иначе в диспетчере останется безымянный «Норд»
   if (valMode) { if (valMode === 'driver') nordPtr('driver'); if (cb) cb(); return; }
@@ -1743,9 +1745,9 @@ function routeLockHtml() {
   var loader = (typeof valMode !== 'undefined' && valMode === 'loader');
   if (loader) {
     return '<div class="rv"><div class="rv-ic">&#128230;</div>'
-      + '<div class="rv-hd">Вы сегодня грузчик</div>'
-      + '<div class="rv-sub">Маршрут открыт водителю за рулём.</div>'
-      + '<button class="wt-main start" style="max-width:320px;margin:16px auto 0" onclick="valSwitch()">Я сегодня за рулём</button></div>';
+      + '<div class="rv-hd">' + (PURE_LOADER ? 'Вы грузчик' : 'Вы сегодня грузчик') + '</div>'
+      + '<div class="rv-sub">Отмечайте начало, перерыв и конец смены.<br>Маршрут открыт водителю за рулём.</div>'
+      + (PURE_LOADER ? '' : '<button class="wt-main start" style="max-width:320px;margin:16px auto 0" onclick="valSwitch()">Я сегодня за рулём</button>') + '</div>';
   }
   return '<div class="rv"><div class="rv-ic">&#128666;</div>'
     + '<div class="rv-hd">Сегодня у вас</div>'
@@ -1898,15 +1900,24 @@ function showWrongRole(c, needTxt){
 // ⛔Токен обновляется не только при входе: при каждом возврате в приложение, при появлении
 // сети и раз в 25 минут. Раньше КАЖДОЕ обновление заново запускало вход — __startDB() с нуля
 // (+19 подписок на базу) и полная перерисовка. На телефоне это давало постоянное мерцание.
+// ⛔Чистий вантажник (Iurcovschi, Toporet, Санду) — не «водій, що обрав вантажника»:
+//   у нього немає машини взагалі, тому ні вибору ролі, ні пробігу, ні маршруту.
+var PURE_LOADER = false;
 var _authOk=false;
 firebase.auth().onAuthStateChanged(function(user){
   if(!user){ location.replace('login.html'); return; }
   user.getIdTokenResult().then(function(res){
     var _wr=document.getElementById('wrongRole'); if(_wr){ _wr.style.display='none'; }
     var c=res.claims||{};
-    if(!(c.role==='driver'&&c.drv===DRV)){ showWrongRole(c, 'Эта страница — для водителя.'); return; }
+    // Один застосунок на всіх: сюди заходить і водій (claim drv), і вантажник (claim lagerId).
+    // ⛔У чистого вантажника машини немає ніколи — роль ставимо тут і більше не питаємо.
+    var _isDrv = (c.role === 'driver' && c.drv === DRV);
+    var _isLoad = (c.role === 'loader' && c.lagerId === DRV);
+    if(!(_isDrv || _isLoad)){ showWrongRole(c, 'Эта страница — для водителя или грузчика.'); return; }
+    if (_isLoad) { PURE_LOADER = true; valMode = 'loader'; try { localStorage.setItem(valModeKey(), 'loader'); } catch (e) {} }
     if(_authOk){ var _w0=document.getElementById('wrongRole'); if(_w0)_w0.style.display='none'; return; }
     _authOk=true;
+    try { if (c.name) document.title = c.name; } catch (e) {}
     sessionStorage.removeItem('login_from');
     var __pw=document.getElementById('pinWrap'); if(__pw) __pw.style.display='none';
     document.getElementById('driverApp').style.display='';
@@ -2131,7 +2142,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-4';
+var APP_V = '2026-08-11-5';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
