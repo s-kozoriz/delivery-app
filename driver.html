@@ -1399,7 +1399,18 @@ function odoSave() {
 }
 var odoQ = JSON.parse(localStorage.getItem('odoQ_' + DRV) || '[]');
 function saveOdoQ() { return _lsSet('odoQ_' + DRV, _qJSON(odoQ)); }
-function odoUploadPhoto(file, date, mode, ts) {
+// ⛔Сжатие стояло ТОЛЬКО в офлайн-очереди: при живой сети снимок уезжал оригиналом с камеры —
+//   2,4 МБ за кадр. Это и трафик водителя, и вес любой будущей сверки цифр по фото.
+//   Жмём ВСЕГДА, до отправки, обеими дорогами.
+// ⛔Качество выше, чем у фото доставки (0.82 против 0.7): на одометре надо различать мелкие
+//   цифры барабана, при 0.7 они замыливаются. На 1600px цифры читаются, вес падает
+//   с ~2400 КБ до ~200-300 КБ.
+// Побочно решается ещё одно: браузер рисует снимок с учётом поворота из EXIF, поэтому
+// в хранилище он ложится уже не лежащим на боку.
+function odoUploadPhoto(rawFile, date, mode, ts) {
+  compressPhoto(rawFile, function (f) { odoUploadPhotoNow(f || rawFile, date, mode, ts); }, { side: 1600, q: 0.82 });
+}
+function odoUploadPhotoNow(file, date, mode, ts) {
   var path = 'odometer/' + DRV + '/' + date + '/' + mode + '_' + ts + '.jpg';
   if (navigator.onLine) {
     storage.ref(path).put(file).then(function (sn) { return sn.ref.getDownloadURL(); })
@@ -2277,7 +2288,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-12';
+var APP_V = '2026-08-11-13';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
