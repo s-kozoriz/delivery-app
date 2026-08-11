@@ -856,7 +856,12 @@ function uploadPhotoWithQueue(file, rowId) {
 // ===================== ОДОМЕТР (пробег) — гейт старта/конца дня =====================
 // Хранение: odometer/{DRV}/{date} = { start:{km,photo,ts}, end:{km,photo,ts} }
 var odoData = {}, _odoGateChecked = false, odoMode = null, odoPhotoFile = null, nordWheel = null;
-db.ref('odometer/' + DRV).on('value', function (s) { odoData = s.val() || {}; });
+db.ref('odometer/' + DRV).on('value', function (s) { odoData = s.val() || {}; odoLoaded = true; try { render(); } catch (e) {} });
+// ⛔Пока пробег за сегодня не пришёл из базы, НЕ показываем заглушку «зафиксируйте пробег»:
+//   иначе водитель, который всё уже сделал, на секунду видит требование и решает, что
+//   приложение сломалось. Через 8 секунд считаем, что база ответила (или связи нет).
+var odoLoaded = false;
+setTimeout(function () { odoLoaded = true; try { render(); } catch (e) {} }, 8000);
 function odoRec() { return odoData[wtDate()] || {}; }
 // ⛔Пробег за сегодня зафиксирован? Считаем и ОФЛАЙН-очередь: иначе водитель без сети
 // не смог бы работать вообще, хотя пробег он честно снял.
@@ -919,7 +924,7 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '<div class="okm"><label>Пробег, км</label><input id="odoKm" type="number" inputmode="numeric" placeholder="напр. 123456" oninput="odoValidate()"></div>'
     + '<button class="ogo" id="odoGo" disabled onclick="odoSave()"></button>'
     + '<button class="ogo" id="odoGoL" style="display:none" onclick="odoStartLoader()">Начать смену</button>'
-    + '<button class="opeek" id="odoPeek" onclick="odoPeek()">Только посмотреть маршрут</button></div>';
+    + '</div>';
   document.body.appendChild(g);
   var inp = document.createElement('input'); inp.id = 'odoInput'; inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment'); inp.style.display = 'none';
   inp.addEventListener('change', odoOnFile); document.body.appendChild(inp);
@@ -1025,7 +1030,6 @@ function odoOpen(mode) {
   else if (si) { _hd.textContent = 'Смена машины · шаг 2 из 2'; _sub.textContent = 'Выберите машину, которую берёте, и впишите её пробег сейчас.'; }
   else { _hd.textContent = end ? 'Конец дня — пробег' : 'Начало дня — пробег'; _sub.textContent = 'Сфотографируйте одометр и впишите км' + (end ? ', чтобы завершить день.' : ', чтобы начать день.'); }
   document.getElementById('odoGo').textContent = so ? 'Дальше →' : si ? 'Готово ✓' : end ? 'Завершить день' : 'Начать рабочий день';
-  document.getElementById('odoPeek').style.display = (end || so || si) ? 'none' : '';
   // Вибір ролі — лише на старті дня і лише тим, хто працює у двох ролях.
   // Хто тільки водій — бачить одразу поля пробігу, як і раніше.
   var _role = document.getElementById('odoRole');
@@ -1034,7 +1038,6 @@ function odoOpen(mode) {
   odoFields(!askRole);   // пока роль не выбрана — полей пробега на экране нет
   document.getElementById('odoGo').style.display = askRole ? 'none' : '';
   document.getElementById('odoGoL').style.display = 'none';
-  if (askRole) document.getElementById('odoPeek').style.display = 'none';
   odoVanSel = si ? null : (odoVan || odoLastVan());
   odoRenderVans(mode === 'start' || si, si ? odoVan : null);
   var sh = document.getElementById('odoShot'); sh.className = 'oshot'; sh.innerHTML = '&#128247; Сфотографировать пробег';
@@ -1078,7 +1081,6 @@ function odoPickRole(r) {
   odoFields(drv);
   var go = document.getElementById('odoGo'); if (go) go.style.display = drv ? '' : 'none';
   var gl = document.getElementById('odoGoL'); if (gl) gl.style.display = drv ? 'none' : '';
-  var pk = document.getElementById('odoPeek'); if (pk) pk.style.display = drv ? '' : 'none';
   if (drv) odoValidate();
 }
 // Грузчик за руль не садится — ни машины, ни фото, ни километров: одна кнопка.
@@ -1109,10 +1111,8 @@ function odoValidate() {
   _go.disabled = false;
   _go.classList.toggle('wait', !(odoPhotoFile && km.length > 0 && (!needVan || odoVanSel)));
 }
-function odoPeek() {
-  document.getElementById('odoGate').classList.remove('on');
-  if (wtState(wtToday()) === 'idle') document.getElementById('odoBanner').classList.add('on');
-}
+// ⛔Функция «только посмотреть маршрут» удалена намеренно: это и была дыра в требовании.
+//   Хочешь видеть маршрут — зафиксируй пробег и машину. Других путей нет.
 // «Я сегодня за рулём» — это НЕ отдельная метка, а ВЫВОД из одометра: есть начало дня и нет
 // конца. ⛔Раньше правды было три — метка nord_wheel в базе, флажок odoDrv_* в телефоне и сам
 //   одометр, — и они расходились. 10.08 Виталий весь день не мог записать конечный пробег:
@@ -1358,8 +1358,11 @@ function valSwitch() {
   valMode = null; _valAsked = false; _odoGateChecked = false;
   try { localStorage.removeItem(valModeKey()); } catch (e) {}
   // Смена роли СРЕДИ дня — отдельный выбор: экран начала дня к этому моменту уже
-  // закрыт, а спрашивать роль больше негде.
-  _valAsked = true; _valPendingCb = odoMaybeGate; valOpenPicker();
+  // закрыт, а спрашивать роль больше негде. Выбрал «водитель» — сразу ведём на пробег,
+  // иначе человек окажется перед закрытым маршрутом без подсказки, что делать.
+  _valAsked = true;
+  _valPendingCb = function () { if (valMode === 'driver' && !odoFixedToday()) odoOpen('start'); try { render(); } catch (e) {} };
+  valOpenPicker();
 }
 // ===================== /РОЛЬ =====================
 
@@ -1605,6 +1608,27 @@ function nordPtr(m){
     else db.ref('nord_driver/' + wtDate()).once('value', function(s){ var v = s.val(); if (v && v.drv === DRV) db.ref('nord_driver/' + wtDate()).remove(); });
   } catch (e) {}
 }
+// ⛔ЕДИНОЕ место, где решается, показывать ли маршрут. Не «блокируем кнопки» — не показываем
+//   вообще: люди не сообщают о сбое, а ищут обход, лишь бы увидеть адреса.
+//   · грузчик маршрут не видит НИКОГДА — ему там нечего делать, и подмена роли теряет смысл;
+//   · водитель видит маршрут только после фото одометра, километров и выбора машины.
+function routeAllowed() {
+  if (typeof valMode !== 'undefined' && valMode === 'loader') return false;
+  if (!odoLoaded) return true;   // данные ещё едут — не пугаем требованием раньше времени
+  return odoFixedToday();
+}
+// Заглушка вместо маршрута — не тупик: из неё видно, что именно сделать.
+function routeLockHtml() {
+  var loader = (typeof valMode !== 'undefined' && valMode === 'loader');
+  if (loader) {
+    return '<div class="empty"><div style="font-size:44px;margin-bottom:10px">&#128230;</div>'
+      + '<p><b>Вы сегодня грузчик</b><br>Маршрут доступен водителю за рулём.</p>'
+      + '<button class="wt-main start" style="max-width:320px;margin:14px auto 0" onclick="valSwitch()">Я сегодня за рулём</button></div>';
+  }
+  return '<div class="empty"><div style="font-size:44px;margin-bottom:10px">&#128663;</div>'
+    + '<p><b>Сначала зафиксируйте пробег</b><br>Фото одометра, километры и машина — потом маршрут.</p>'
+    + '<button class="wt-main start" style="max-width:320px;margin:14px auto 0" onclick="dayStart()">&#9654; Начать день</button></div>';
+}
 function render() {
   document.getElementById('dl').textContent = fmt(curD);
   var dr = rows.filter(function(r) {
@@ -1619,6 +1643,11 @@ function render() {
   } else prg.style.display = 'none';
 
   var wrap = document.getElementById('wrap');
+  if (!routeAllowed()) {
+    wrap.innerHTML = routeLockHtml();
+    var _p = document.getElementById('prg'); if (_p) _p.style.display = 'none';
+    return;
+  }
   if (!tot) {
     wrap.innerHTML = '<div class="empty"><div style="font-size:48px;margin-bottom:12px">&#128666;</div><p>Нет доставок на этот день</p></div>';
     return;
@@ -1978,7 +2007,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-1';
+var APP_V = '2026-08-11-2';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
