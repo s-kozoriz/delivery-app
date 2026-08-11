@@ -496,6 +496,50 @@ function wtPauseSeg() { wtMutate(function (rec) { var L = wtSegs(rec); var i = w
 // Когда человек в последний раз РАБОТАЛ (а не просто держал приложение открытым):
 // отметка «Выполнено», фото доставки, событие одометра. Возвращает "ЧЧ:ММ" или null.
 // ⛔За 30 дней шесть смен по 13–19 часов: работа кончилась вечером, «Конец» нажали ночью.
+// Скільки треба на дорогу від останньої точки до складу. Джерела за спаданням точності:
+//   1) число, пораховане для КОНКРЕТНОЇ адреси (кладе нічний робот у саму заявку);
+//   2) запас по місту з налаштувань — коли адресу ще не порахували;
+//   3) запас регіону — коли й міста немає в таблиці.
+// ⛔Середнє по місту — не норматив, а страховка: райони Ганновера різняться на 40 хвилин.
+function wtReturnMin(day) {
+  var reg = null;
+  try { reg = isNordDrv() ? 'nord' : 'main'; } catch (e) { reg = 'main'; }
+  var tbl = (cfg && cfg.return_min && cfg.return_min[reg]) || {};
+  var best = null, city = null;
+  try {
+    rows.forEach(function (r) {
+      if (!r || r.date !== day || r.drv !== DRV || !r.doneTs) return;
+      if (best == null || Number(r.doneTs) > best) { best = Number(r.doneTs); city = r.city || null; if (r.returnMin != null) city = { exact: Number(r.returnMin) }; }
+    });
+  } catch (e) {}
+  if (city && city.exact != null) return city.exact;          // порахували саме цю адресу
+  if (city && tbl.city && tbl.city[city] != null) return tbl.city[city];
+  return tbl.def != null ? tbl.def : (reg === 'nord' ? 60 : 120);
+}
+// Остання реальна робота за вказаний день у вигляді "ЧЧ:ММ" (або null).
+function wtLastWorkOn(day) {
+  var best = 0;
+  function take(ts) {
+    ts = Number(ts); if (!ts) return;
+    var d = new Date(ts), s = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    if (s === day && ts > best) best = ts;
+  }
+  try { rows.forEach(function (r) { if (r && r.date === day) { take(r.doneTs); [].concat(r.photoTs || []).forEach(take); } }); } catch (e) {}
+  try {
+    var rec = (odoData || {})[day];
+    if (rec) { if (rec.start) take(rec.start.ts); if (rec.end) take(rec.end.ts); Object.keys(rec.ev || {}).forEach(take); }
+  } catch (e) {}
+  if (!best) return null;
+  var b = new Date(best);
+  return String(b.getHours()).padStart(2, '0') + ':' + String(b.getMinutes()).padStart(2, '0');
+}
+// Пізніше цього часу закрити день не можна: остання робота + дорога до складу.
+function wtCloseLimit(day) {
+  var lw = wtLastWorkOn(day); if (!lw) return null;
+  var p = lw.split(':'), m = (+p[0]) * 60 + (+p[1]) + wtReturnMin(day);
+  if (m >= 1440) m = 1439;
+  return { last: lw, limit: String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0') };
+}
 function wtLastWork() {
   var day = wtDate(), best = 0;
   function take(ts) {
@@ -598,12 +642,36 @@ function wtCloseOther(day, at) {
   renderWtBtn(); wtRepanel();
   showToast('Вчерашняя смена закрыта в ' + at);
 }
+// ⛔Раньше здесь принималось ЛЮБОЕ время и не спрашивался пробег: день уходил в табель
+//   без километров, а часы можно было приписать. Теперь позже расчётного возврата на
+//   склад закрыть нельзя, а если машину в тот день брали и не сдали — просят километры.
 function wtYestAsk() {
   var y = wtYesterdayOpen(); if (!y) return;
   var L = wtSegs(y.rec), open = L[wtOpenIdx(y.rec)];
-  var at = prompt('Смена за ' + y.day + ' осталась открытой с ' + open.s + '.\nВо сколько вы закончили? (ЧЧ:ММ)', '17:00');
+  var lim = wtCloseLimit(y.day);
+  var hint = lim ? ('\nПоследняя работа — ' + lim.last + ', с дорогой на склад — не позже ' + lim.limit + '.') : '';
+  var at = prompt('Смена за ' + y.day + ' осталась открытой с ' + open.s + '.' + hint + '\nВо сколько вы закончили? (ЧЧ:ММ)', lim ? lim.limit : '17:00');
   if (!at) { _wtYestAsked = true; return; }
+  at = String(at).trim();
   if (!/^\d{1,2}:\d{2}$/.test(at)) { showToast('Время в виде 17:30'); return; }
+  var pa = at.split(':'), am = (+pa[0]) * 60 + (+pa[1]);
+  var po = String(open.s).split(':'), om = (+po[0]) * 60 + (+po[1]);
+  if (am <= om) { showToast('Раньше начала смены (' + open.s + ') — так не бывает'); return; }
+  if (lim) {
+    var pl = lim.limit.split(':'), lm = (+pl[0]) * 60 + (+pl[1]);
+    if (am > lm) { showToast('Позже ' + lim.limit + ' нельзя: работа кончилась в ' + lim.last); return; }
+  }
+  // машину брали и не сдали — конечный пробег обязателен и задним числом
+  var rec = (odoData || {})[y.day];
+  if (rec && rec.start != null && rec.end == null) {
+    var km = prompt('В тот день вы брали машину и не сдали её.\nКакой был пробег в конце дня? (км)', '');
+    if (km == null) { showToast('Без километров день не закрыть'); return; }
+    km = String(km).replace(/[^0-9]/g, '');
+    if (!km.length) { showToast('Впишите километры цифрами'); return; }
+    if (Number(km) < Number(rec.start.km)) { showToast('Меньше утреннего (' + rec.start.km + ') — проверьте'); return; }
+    odoKmQ.push({ date: y.day, mode: 'end', km: Number(km), ts: Date.now(), van: (rec.start.van || null), late: true });
+    saveOdoKmQ(); odoFlushKm();
+  }
   wtCloseOther(y.day, at);
 }
 function renderWtBtn() {
@@ -2135,7 +2203,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-6';
+var APP_V = '2026-08-11-7';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
