@@ -3328,10 +3328,14 @@ function whShipDone(drv){
     db.ref('rows/'+r.id+'/invs').set(keep[r.id].length?keep[r.id]:null);
     r.invs=keep[r.id];
   });
+  // ⛔Адресу з маршруту НЕ прибираємо: там може бути забір сміття, інструмент чи майстри —
+  //   накладні до цього не мають стосунку, а тип роботи в рядках не заповнюється взагалі
+  //   (613 рядків за місяць, поле порожнє). Прибрати означало б залишити сміття не забраним.
+  //   Тому лишаємо адресу і ставимо явну мітку: водій бачить, що вантажу туди не поїхало.
   emptyRows.forEach(function(r){
-    db.ref('rows/'+r.id+'/inRoute').set(false);
-    r.inRoute=false;
-    try{ auditLog('снял с маршрута (склад не отгрузил)', r.id, {addr:r.addr, city:r.city}); }catch(e){}
+    db.ref('rows/'+r.id+'/noShip').set(true);
+    r.noShip=true;
+    try{ auditLog('склад не отгрузил ничего', r.id, {addr:r.addr, city:r.city}); }catch(e){}
   });
   try{ auditLog('отгрузка завершена', null, {drv:drv, date:day, shipped:keepCnt, returned:back.length}); }catch(e){}
   toast('Отгрузка закрыта: '+keepCnt+' поехало, '+back.length+' вернулось');
