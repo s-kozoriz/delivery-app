@@ -609,6 +609,7 @@ function wtCloseDay(at) {
 //   жили отдельными кнопками, и день закрывался без километров — 10.08 так у Виталия и Ромы.
 var _wtCloseAt = null;   // время, которым человек решил закрыть день (если выбрал не «сейчас»)
 function wtFinishDay(at) {
+  if (wtState(wtToday()) === 'idle') return;   // день не почато — закривати нічого
   _wtCloseAt = at || null;
   if (odoDriving()) { closeWtPanel(); odoOpen('end'); return; }   // запишет км и закроет день сам
   wtCloseDay(_wtCloseAt); _wtCloseAt = null;
@@ -2621,7 +2622,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-33';
+var APP_V = '2026-08-12-34';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
