@@ -2044,7 +2044,11 @@ function render() {
     var _h = document.querySelector('.hdr'); if (_h) _h.style.display = 'none';
     return;
   }
-  var _h2 = document.querySelector('.hdr'); if (_h2) _h2.style.display = '';
+  // ⛔Поки дані одометра ще не прийшли, routeAllowed() навмисно каже «так» (щоб не лякати
+  //   вимогою того, хто все зробив) — і саме через це шапка встигала блимнути на секунду
+  //   після вводу коду. Показуємо її лише коли день СПРАВДІ почато і дані на місці.
+  var _h2 = document.querySelector('.hdr');
+  if (_h2) _h2.style.display = (odoLoaded && wtLoaded) ? '' : 'none';
   if (!tot) {
     wrap.innerHTML = '<div class="empty"><div style="font-size:48px;margin-bottom:12px">&#128666;</div><p>Нет доставок на этот день</p></div>';
     return;
@@ -2413,7 +2417,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-6';
+var APP_V = '2026-08-12-7';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
