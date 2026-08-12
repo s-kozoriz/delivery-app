@@ -1365,6 +1365,7 @@ function odoCheckShot(file) {
 function odoOnFile(e) {
   var f = e.target.files[0]; if (!f) return;
   odoPhotoFile = f;
+  var _c = document.getElementById('odoCam'); if (_c) _c.style.display = '';   // знімок є — показуємо його
   compressPhoto(f, function (small) { odoCheckShot(small || f); }, { side: 1600, q: 0.82 });
   document.getElementById('odoCam').innerHTML = '<img src="' + URL.createObjectURL(f) + '">';
   var sh = document.getElementById('odoShot'); sh.className = 'oshot done'; sh.textContent = '✓ Фото есть · переснять';
@@ -1404,7 +1405,13 @@ function odoPickRole(r) {
     //   з яким він працював. Фото одометра й кілометри йому не потрібні — він не за кермом.
     odoRenderVans(true, null);
   }
+  // ⛔Роль обрано — питання зникає: далі це вже сторінка водія (або вантажника), а не вибір.
+  var _rl = document.getElementById('odoRole'); if (_rl) _rl.style.display = 'none';
   odoFields(drv);
+  // ⛔Порожня рамка «Нажмите Сфотографировать пробег» займала пів екрана і нічого не робила.
+  //   Показуємо місце під знімок лише тоді, коли знімок справді є.
+  var _cam = document.getElementById('odoCam');
+  if (_cam) _cam.style.display = (drv && odoPhotoFile) ? '' : 'none';
   var go = document.getElementById('odoGo'); if (go) go.style.display = drv ? '' : 'none';
   var gl = document.getElementById('odoGoL'); if (gl) gl.style.display = drv ? 'none' : '';
   if (drv) odoValidate();
@@ -2469,7 +2476,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-10';
+var APP_V = '2026-08-12-11';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
