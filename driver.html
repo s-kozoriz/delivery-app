@@ -1692,7 +1692,8 @@ db.ref('pairs').on('value',function(s){pairsMine=s.val()||{};},function(){});
     +'#pairGate .psub{font-size:13px;color:#9fb0c8;text-align:center;line-height:1.5;margin-bottom:16px}'
     +'#pairGate .plist{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px}'
     +'#pairGate .prow{display:flex;align-items:center;gap:12px;background:#131c28;border:1px solid #2a3a50;border-radius:12px;padding:15px 16px;font-size:17px;font-weight:700;cursor:pointer}'
-    +'#pairGate .prow.on{background:#0f2417;border-color:#1a7a40;color:#8ef0b0}'
+    +'#pairGate .prow.palone{justify-content:center;color:#9fb0c8;border-style:dashed;font-weight:600}'
++'#pairGate .prow.on{background:#0f2417;border-color:#1a7a40;color:#8ef0b0}'
     +'#pairGate .pck{width:26px;height:26px;border-radius:7px;border:2px solid #3a4a60;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px}'
     +'#pairGate .prow.on .pck{background:#1a7a40;border-color:#1a7a40;color:#fff}'
     +'#pairGate .pgo{border:none;border-radius:12px;padding:16px;font-size:17px;font-weight:800;color:#fff;background:#1a7a40;cursor:pointer;margin-top:12px;font-family:inherit}'
@@ -1703,7 +1704,7 @@ db.ref('pairs').on('value',function(s){pairsMine=s.val()||{};},function(){});
     +'<div class="psub">Отметь грузчиков, которые работали с тобой. Это нужно для честного учёта их рабочего времени.</div>'
     +'<div class="plist" id="pairList"></div>'
     +'<button class="pgo" onclick="pairSave()">Сохранить</button>'
-    +'<button class="pskip" onclick="pairSkip()">Никого / пропустить</button>';
+    +'';
   document.body.appendChild(g);
 })();
 var _pairDate=null,_pairSel={};
@@ -1745,7 +1746,7 @@ function pairRender(ids){
   document.getElementById('pairList').innerHTML=ids.map(function(id){
     var nm=(loadersPub[id]&&loadersPub[id].name)||'грузчик'; var on=!!_pairSel[id];
     return '<div class="prow'+(on?' on':'')+'" onclick="pairTog(\''+id+'\')"><div class="pck">'+(on?'&#10003;':'')+'</div>'+xe(nm)+'</div>';
-  }).join('');
+  }).join('') + '<div class="prow palone" onclick="pairSkip()">Работал один</div>';
 }
 function pairTog(id){ _pairSel[id]=!_pairSel[id]; pairRender(pairRegionIds()); }
 function pairSave(){
@@ -2584,7 +2585,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-26';
+var APP_V = '2026-08-12-27';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
