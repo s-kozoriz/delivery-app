@@ -1291,7 +1291,17 @@ function odoOpen(mode) {
     _hd.textContent = 'Начать день';
     _sub.textContent = 'Кто вы сегодня?';
   }
-  odoVanSel = null;
+  // ⛔Порожня рамка «Нажмите Сфотографировать пробег» показувалась і в кінці дня. Прибираємо
+  //   скрізь: місце під знімок з'являється лише коли знімок є.
+  var _cm = document.getElementById('odoCam');
+  if (_cm) { _cm.style.display = 'none'; _cm.innerHTML = ''; }
+  // ⛔Тестові входи мають пройти і кінець дня — кнопка потрібна й тут, не лише на старті.
+  var _tb = document.getElementById('odoTestBtn'); if (_tb && _tb.parentNode) _tb.parentNode.removeChild(_tb);
+  if (typeof isTestUser === 'function' && isTestUser()) {
+    var _sg2 = document.getElementById('odoShotG');
+    if (_sg2) _sg2.insertAdjacentHTML('afterend',
+      '<button type="button" class="oshotg" id="odoTestBtn" onclick="odoTestSkip()" style="border-color:#a35a06;color:#ffd9a0">&#9889; Тест: подставить фото и км</button>');
+  }  odoVanSel = null;
   odoRenderVans(!askRole && (mode === 'start' || si), si ? odoVan : null);   // ⛔машини — лише після вибору ролі
   var sh = document.getElementById('odoShot'); sh.className = 'oshot'; sh.innerHTML = '&#128247; Сфотографировать пробег';
   document.getElementById('odoCam').innerHTML = '<div class="ohint">Нажмите «Сфотографировать пробег»</div>';
@@ -2501,7 +2511,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-12';
+var APP_V = '2026-08-12-13';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
