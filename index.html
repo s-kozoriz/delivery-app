@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -1618,7 +1618,7 @@ function _cfOpts(sel,list,cur){ if(!sel)return;
   sel.style.background=cur?'#dce8fb':'#fff';
 }
 function fillColFilters(){
-  var dl=[]; DRV_KEYS.forEach(function(k){ if(cfg.drivers&&cfg.drivers[k]&&cfg.drivers[k].dyn===true&&cfg.drivers[k].nord===true)return; dl.push({v:k,t:(k==='C'?'Норд':dname(k))}); });
+  var dl=[]; DRV_KEYS.forEach(function(k){  dl.push({v:k,t:(k==='C'?'Норд':dname(k))}); });
   _cfOpts(document.getElementById('cf-drv'), dl, colFilter.drv);
   var cl=(disp2Mode?CITIESC:CITIES).map(function(c){return {v:c,t:c};});
   _cfOpts(document.getElementById('cf-city'), cl, colFilter.city);
@@ -1724,7 +1724,7 @@ function _rtblNow(){
     if(isEditing){
       var sel='<td style="width:80px"><select onchange="ur(\''+r.id+'\',\'drv\',this.value)" style="'+dc+'">';
       sel+='<option value=""'+((!r.drv||r.drv==='')?' selected':'')+'>— назначить —</option>';
-      DRV_KEYS.forEach(function(k){if(cfg.drivers[k]&&cfg.drivers[k].dyn===true&&cfg.drivers[k].nord===true)return;var n=k==='C'?'Норд':dname(k);if(n||k!=='C')sel+='<option value="'+k+'"'+(r.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
+      DRV_KEYS.forEach(function(k){var n=k==='C'?'Норд':dname(k);if(n||k!=='C')sel+='<option value="'+k+'"'+(r.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
       sel+='</select></td>';
       h+=sel;
     } else {
@@ -1804,7 +1804,7 @@ function _rtblNow(){
   if(newRowDraft){
     var nd=newRowDraft;
     var drvOpts='',cityOpts='',statOpts='';
-    DRV_KEYS.forEach(function(k){if(cfg.drivers[k]&&cfg.drivers[k].dyn===true&&cfg.drivers[k].nord===true)return;var n=k==='C'?'Норд':dname(k);if(n||k!=='C')drvOpts+='<option value="'+k+'"'+(nd.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
+    DRV_KEYS.forEach(function(k){var n=k==='C'?'Норд':dname(k);if(n||k!=='C')drvOpts+='<option value="'+k+'"'+(nd.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
     var cl=disp2Mode?CITIESC:CITIES;
     cl.forEach(function(city){cityOpts+='<option value="'+xe(city)+'"'+(nd.city===city?' selected':'')+'>'+xe(city)+'</option>';});
     STATS.forEach(function(s){statOpts+='<option value="'+xe(s)+'"'+(nd.status===s?' selected':'')+'>'+xe(s)+'</option>';});
@@ -1850,6 +1850,9 @@ function _rtblNow(){
 function clearColFilters(){ colFilter={drv:'',city:'',status:'',doneF:''}; ['cf-drv','cf-city','cf-status','cf-done'].forEach(function(id){var e=document.getElementById(id);if(e){e.value='';e.style.background='#fff';}}); rtbl(); }
 
 // Водители региона Nord: фиксированный C (Виталик) + динамические с nord:true
+// ⛔Раніше додаткові норд-водії ховались з усіх списків: вважалось, що Норд — це ОДИН пункт
+//   і всі заявки йдуть на спільний маршрут машини C. 12.08 у Норді вже троє (Виталик, Микола,
+//   Вася) і в кожного свої адреси — Вася зникав зі списку, щойно йому ставили Норд.
 function nordDrvKeys(){ var b=['C']; Object.keys(cfg.drivers||{}).forEach(function(k){ if(b.indexOf(k)===-1 && cfg.drivers[k] && cfg.drivers[k].dyn===true && cfg.drivers[k].nord===true) b.push(k); }); return b; }
 // Строка относится к региону Nord: Nord-водитель ИЛИ заказ в Nord-городе; НО ад-хок задача (fromDriver) чужого водителя -> в главный диспетчер
 function isNordRow(r){ var nd=nordDrvKeys().indexOf(r.drv||'')!==-1; if(r.fromDriver && !nd) return false; return nd || r.nord===true || CITIESC.indexOf(r.city||'')!==-1; }
@@ -1872,7 +1875,15 @@ function activeDrvs(){
   if(disp2Mode)return ['C'].concat([secondNordDrv()||'2nd']); // слот Норд + всегда «второе поле» (2-я/партнёрская машина)
   var dr=(cfg&&cfg.drivers)||{};
   // основной регион слева (L/R/V + не-Норд динамические), Норд-машина (C) — крайней справа для быстрой визуальной идентификации
-  var main=DRV_KEYS.filter(function(k){ return k!=='C' && !(dr[k]&&dr[k].dyn===true&&dr[k].nord===true); });
+  // ⛔Норд-водії окремої панелі не мали: у Норду одна машина, все йде на спільний пункт «Норд».
+  //   Але 12.08 Васі поставили шість персональних адрес — і його вікна внизу не було взагалі.
+  //   Тепер норд-водій з'являється рівно тоді, коли на нього заплановано щось СВОЄ.
+  var main=DRV_KEYS.filter(function(k){
+    if(k==='C')return false;
+    var nordExtra=(dr[k]&&dr[k].dyn===true&&dr[k].nord===true);
+    if(!nordExtra)return true;
+    return rows.some(function(r){return r.date===curD&&r.drv===k&&r.addr&&r.addr.trim()&&r.inRoute!==false;});
+  });
   return main.concat(['C']);
 }
 function drows(d){
