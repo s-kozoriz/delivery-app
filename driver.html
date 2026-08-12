@@ -1837,6 +1837,12 @@ function renderRow(r, num) {
   h += '<a class="adr" href="' + mapsUrl + '" target="_blank">' + xe(r.addr) + '</a>';
   h += '<div style="font-size:11px;color:#888;margin-bottom:2px">&#128205; ' + xe(r.city) + '</div>';
   if (r.timeSlot) h += '<div class="ttag">&#9201; до ' + xe(r.timeSlot) + '</div>';
+  // ⛔Склад не відвантажив нічого на цю адресу: накладних немає, але адреса лишилась —
+  //   там може бути сміття, інструмент чи майстри. Водій має бачити, що ВАНТАЖУ немає,
+  //   інакше він шукатиме в машині те, чого туди не поклали.
+  if (r.noShip) {
+    h += '<div class="invs" style="color:#b23b2e;font-weight:700">&#9888; Груз не отгружен складом — едете без накладных</div>';
+  }
   if (invs.length) {
     h += '<div class="invs">';
     invs.forEach(function(i) { h += '<span class="inv">' + xe(i) + '</span>'; });
@@ -2367,7 +2373,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-1';
+var APP_V = '2026-08-12-2';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
