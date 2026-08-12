@@ -3496,7 +3496,7 @@ function renderInc(){
     var w=(typeof r.weight_kg==='number')?wkg(r.weight_kg):'—';
     h+='<tr class="'+incColor(r)+'">'+
       '<td>'+cb+'</td>'+
-      '<td>'+xe(r.ready_status||'')+(r._returned?' <span class="inc-ret" title="Снята с плана; из 1С сейчас не приходит — проверьте актуальность в 1С">&#8617;'+(r._reason==='not_shipped'?'не отгружено':'проверить')+'</span><button class="inc-forget" data-inv="'+xe(r.invoice||'')+'" onclick="incForget(this)" title="Проверено в 1С — убрать из списка">&#10005;</button>':'')+'</td>'+
+      '<td>'+xe(r.ready_status||'')+(r._returned?' <span class="inc-ret" title="Снята с плана; из 1С сейчас не приходит — проверьте актуальность в 1С">&#8617;'+(r._reason==='not_shipped'?'не отгружено складом':'проверить')+'</span><button class="inc-forget" data-inv="'+xe(r.invoice||'')+'" onclick="incForget(this)" title="Проверено в 1С — убрать из списка">&#10005;</button>':'')+'</td>'+
       '<td><span class="inc-invlink" onclick="incShowPos(\''+r.invoice+'\')" title="Показать состав накладной">'+xe(r.invoice)+'</span></td>'+
       '<td>'+xe(r.warehouse||'—')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
