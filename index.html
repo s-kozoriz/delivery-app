@@ -1781,7 +1781,9 @@ function _rtblNow(){
         photoHtml+='<img class="photo-thumb-sm" src="'+xe(url)+'" data-url="'+xe(url)+'" data-addr="'+xe(r.addr)+'">';
       });
       if(photos.length>3)photoHtml+='<span class="photo-count-badge" data-rowid="'+r.id+'">+'+(photos.length-3)+'</span>';
-      if(!viewOnly&&!disp2Mode&&photoTs.length>0){
+      // ⛔Час і дата фото показувались ТІЛЬКИ в основному диспетчері: норд-вкладка і режим
+      //   «Просмотр» їх не бачили. А саме норд-технікам треба знати, коли водій зняв фото.
+      if(photoTs.length>0){
         photoHtml+='<div style="margin-top:3px">';
         var shownTs=[];
         photoTs.forEach(function(ts,i){
