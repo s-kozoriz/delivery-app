@@ -1597,7 +1597,7 @@ function odoSave() {
   showToast(mode === 'swap_in' ? ('Вы на: ' + odoVanLabel(odoVan) + ' ✓') : mode === 'end' ? 'Руль сдан · пробег записан ✓' : 'За рулём · пробег записан ✓');
   if (navigator.vibrate) navigator.vibrate(60);
   // ⛔Интерфейс Норда и центра одинаковый (решение 12.08): пару спрашиваем у всех водителей.
-  if (mode === 'end') setTimeout(function () { pairAsk(date); }, 350);
+  if (mode === 'end') pairAsk(date);
   wtRepanel();
 }
 var odoQ = JSON.parse(localStorage.getItem('odoQ_' + DRV) || '[]');
@@ -2541,7 +2541,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-21';
+var APP_V = '2026-08-12-22';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
