@@ -243,10 +243,7 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
     </div>
   </div>
   <div class="nav">
-    <button id="prev">&#8249;</button>
     <div class="lbl" id="dl">загрузка...</div>
-    <button id="next">&#8250;</button>
-    <button class="today-b" id="todayB" onclick="goToday()">Сегодня</button>
   </div>
   <div class="wt-line" id="wtLine">&nbsp;</div>
   <div id="wt3"></div>
@@ -2232,8 +2229,6 @@ function showToast(msg) {
   setTimeout(function() { t.classList.remove('on'); }, 2500);
 }
 
-document.getElementById('prev').addEventListener('click', function() { sh(-1); });
-document.getElementById('next').addEventListener('click', function() { sh(1); });
 
 function __startDB(){
 db.ref('rows').on('value', function(snap) {
@@ -2546,7 +2541,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-19';
+var APP_V = '2026-08-12-20';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
