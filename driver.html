@@ -599,6 +599,14 @@ function wtCloseDay(at) {
   closeWtPanel();
   _summaryAfterPair = true;
   if (!pairPending()) { _summaryAfterPair = false; showMonthSummary(); }
+  // ⛔Страховка: питання ставить лише odoSave. Закрили день без нього (без фото, кнопкою
+  //   «Конец» не за кермом, забутий день) — підсумок мусить з’явитися сам, а не зникнути назавжди.
+  setTimeout(function () {
+    if (!_summaryAfterPair) return;
+    var g = document.getElementById('pairGate');
+    if (g && g.classList.contains('on')) return;   // питання на екрані — чекаємо відповідь
+    _summaryAfterPair = false; showMonthSummary();
+  }, 900);
 }
 // ⛔День НЕ закрывается, пока водитель не записал конечный пробег. Раньше «Конец» и одометр
 //   жили отдельными кнопками, и день закрывался без километров — 10.08 так у Виталия и Ромы.
@@ -1699,7 +1707,10 @@ function pairRegionIds(){ var mine=!!(cfg.drivers&&cfg.drivers[DRV]&&cfg.drivers
 var _summaryAfterPair = false;
 // Чи буде взагалі питання про напарника: якщо в регіоні нікого — не буде, і підсумок
 // показуємо одразу, не чекаючи закриття вікна, якого не відкриють.
-function pairPending(){ try { return pairRegionIds().length > 0; } catch(e) { return false; } }
+function pairPending(){ try {
+  if (cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].nord) return false;   // ⛔Норду пари не питають
+  return pairRegionIds().length > 0;
+} catch(e) { return false; } }
 function pairAsk(date){
   _pairDate=date; _pairSel={};
   var ids=pairRegionIds(); if(!ids.length)return;
@@ -2523,7 +2534,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-14';
+var APP_V = '2026-08-12-15';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
