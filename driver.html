@@ -594,7 +594,11 @@ function wtCloseDay(at) {
   var _at = at || nowTime();
   wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = _at; rec.seg = L; rec.done = true; });
   if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
-  closeWtPanel(); showMonthSummary();
+  // ⛔Порядок після закриття дня: спершу «з ким працював», потім підсумок годин.
+  //   Раніше підсумок блимав на пів секунди і його одразу накривало питання про напарника.
+  closeWtPanel();
+  _summaryAfterPair = true;
+  if (!pairPending()) { _summaryAfterPair = false; showMonthSummary(); }
 }
 // ⛔День НЕ закрывается, пока водитель не записал конечный пробег. Раньше «Конец» и одометр
 //   жили отдельными кнопками, и день закрывался без километров — 10.08 так у Виталия и Ромы.
@@ -1692,6 +1696,10 @@ db.ref('pairs').on('value',function(s){pairsMine=s.val()||{};},function(){});
 })();
 var _pairDate=null,_pairSel={};
 function pairRegionIds(){ var mine=!!(cfg.drivers&&cfg.drivers[DRV]&&cfg.drivers[DRV].nord); return Object.keys(loadersPub).filter(function(id){var n=!!(loadersPub[id]&&loadersPub[id].nord);return n===mine;}); }
+var _summaryAfterPair = false;
+// Чи буде взагалі питання про напарника: якщо в регіоні нікого — не буде, і підсумок
+// показуємо одразу, не чекаючи закриття вікна, якого не відкриють.
+function pairPending(){ try { return pairRegionIds().length > 0; } catch(e) { return false; } }
 function pairAsk(date){
   _pairDate=date; _pairSel={};
   var ids=pairRegionIds(); if(!ids.length)return;
@@ -1722,7 +1730,11 @@ function pairSave(){
   pairClose(); showToast('Записано ✓');
 }
 function pairSkip(){ pairClose(); }
-function pairClose(){ var g=document.getElementById('pairGate'); if(g)g.classList.remove('on'); _pairDate=null; _pairSel={}; }
+function pairClose(){
+  var g=document.getElementById('pairGate'); if(g)g.classList.remove('on'); _pairDate=null; _pairSel={};
+  // підсумок годин показуємо ПІСЛЯ того, як людина відповіла про напарника
+  if (_summaryAfterPair) { _summaryAfterPair = false; setTimeout(showMonthSummary, 250); }
+}
 // ===================== /ПАРА =====================
 
 // ── РОЛЬ НА ДЕНЬ (только Валентин): водитель / грузчик — авторизация НЕ трогается ──
@@ -2511,7 +2523,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-13';
+var APP_V = '2026-08-12-14';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
