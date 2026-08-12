@@ -737,7 +737,7 @@ function renderWtBtn() {
   //   «взять/сдать руль» больше нет: именно они и расходились с табелем.
   var b1, b2, b3;
   if (st === 'idle') { b1 = '<button class="wt3 go" onclick="dayStart()">&#9654; Начать день</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
-  else if (st === 'run') { b1 = '<button class="wt3 dim">&#9654; Начать</button>'; b2 = '<button class="wt3 pause" onclick="wtPauseSeg()">&#9208; Перерыв</button>'; b3 = '<button class="wt3 end" ' + END + '>&#9209; Конец</button>'; }
+  else if (st === 'run') { b1 = ''; b2 = '<button class="wt3 pause" onclick="wtPauseSeg()">&#9208; Перерыв</button>'; b3 = '<button class="wt3 end" ' + END + '>&#9209; Конец</button>'; }
   else if (st === 'pause') { b1 = '<button class="wt3 go" onclick="wtStartSeg()">&#9654; Продолжить</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 end" ' + END + '>&#9209; Конец</button>'; }
   // день закрыт: ⛔ни одна кнопка не открывает смену одним касанием — иначе в табеле
   //   появляются обрывки вида 17:41–17:41 (за 14 дней их набралось шесть у четверых)
@@ -2546,7 +2546,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-18';
+var APP_V = '2026-08-12-19';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
