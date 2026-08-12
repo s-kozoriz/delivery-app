@@ -2330,6 +2330,7 @@ function renderWarehouse(){
     html+='<div style="display:flex;align-items:center;gap:10px">';
     html+='<div style="font-size:14px;font-weight:700;color:'+drvColor+'">&#128666; '+xe(dname(d))+'</div>';
     html+='<button class="btn btn-sm wh-print-btn" data-drv="'+d+'" style="background:#f0f4fc;color:#1856a0;border-color:#aec6ef;padding:3px 10px;font-size:12px">&#128438; Печать</button>';
+    html+='<button class="btn btn-sm" onclick="whShipDone(\''+d+'\')" style="background:#e8f5ec;color:#1a7a40;border-color:#9fd6b4;padding:3px 10px;font-size:12px">&#10004; Отгрузка завершена</button>';
     html+='</div>';
     html+='<span style="font-size:12px;color:var(--mu)">&#128230; '+loadedInvs+'/'+totalInvs+' накл. загружено</span>';
     html+='</div>';
@@ -3287,6 +3288,54 @@ function incUnplace(inv){
 }
 // когда рапер снова присылает накладную — наш оверлей-копия больше не нужен
 function incCleanReturned(){ Object.keys(incReturned).forEach(function(k){ if(incAll[k]) db.ref('1c/delivery/returned/'+k).remove(); }); }
+// ⛔План складається за потребами техніків, але склад не завжди може відвантажити все:
+//   на адресу заплановано три накладні, а фактично їде дві, одна або жодної. Раніше різницю
+//   ніде не було видно — водій їхав за списком, якого в машині немає.
+// Комірник ставить галочки на те, що РЕАЛЬНО поїхало, і тисне «Отгрузка завершена»:
+//   відмічене лишається у водія, невідмічене повертається у «Входящие 1С» з причиною.
+// ⛔Нічого не спрацьовує саме: поки кнопку не натиснуто, план не рухається.
+function whShipDone(drv){
+  if(IS_VIEWER)return;
+  var day=curD;
+  var list=rows.filter(function(r){return r.date===day&&r.drv===drv&&r.addr&&r.addr.trim()&&r.inRoute!==false;});
+  if(!list.length){ toast('На этот день у водителя ничего нет'); return; }
+  var back=[], keepCnt=0, emptyRows=[], keep={};
+  list.forEach(function(r){
+    var invs=(r.invs||[]).map(function(x){return (''+(x||'')).trim();}).filter(Boolean);
+    if(!invs.length){ keepCnt++; return; }
+    var kept=[];
+    invs.forEach(function(inv,ii){
+      if(warehouseStatus[day+'_'+r.id+'_'+ii]) kept.push(inv); else back.push({inv:inv,row:r});
+    });
+    keepCnt+=kept.length;
+    keep[r.id]=kept;
+    if(!kept.length) emptyRows.push(r);
+  });
+  if(!back.length){ toast('Всё запланированное отгружено'); return; }
+  var msg='Отгрузка завершена?\n\nОтгружено: '+keepCnt+' накл.\nНЕ отгружено: '+back.length+' накл. — вернутся во «Входящие 1С».';
+  if(emptyRows.length) msg+='\n\nАдресов, по которым не едет НИЧЕГО: '+emptyRows.length+' — они уйдут из маршрута водителя.';
+  if(!confirm(msg))return;
+  back.forEach(function(x){
+    var p=incPlaced[x.inv], cp;
+    if(p&&p.snap){ cp={}; for(var kk in p.snap){cp[kk]=p.snap[kk];} }
+    else { cp={invoice:x.inv,address:(x.row.addr||''),city:(x.row.city||''),ship_date:(x.row.date||''),ready_status:''}; }
+    cp._returned=true; cp.returned_at=Date.now(); cp._reason='not_shipped';
+    db.ref('1c/delivery/returned/'+x.inv).set(cp);
+    db.ref('1c/delivery/placed/'+x.inv).remove();
+  });
+  list.forEach(function(r){
+    if(!keep[r.id])return;
+    db.ref('rows/'+r.id+'/invs').set(keep[r.id].length?keep[r.id]:null);
+    r.invs=keep[r.id];
+  });
+  emptyRows.forEach(function(r){
+    db.ref('rows/'+r.id+'/inRoute').set(false);
+    r.inRoute=false;
+    try{ auditLog('снял с маршрута (склад не отгрузил)', r.id, {addr:r.addr, city:r.city}); }catch(e){}
+  });
+  try{ auditLog('отгрузка завершена', null, {drv:drv, date:day, shipped:keepCnt, returned:back.length}); }catch(e){}
+  toast('Отгрузка закрыта: '+keepCnt+' поехало, '+back.length+' вернулось');
+}
 // Автоочистка выше срабатывает, только если накладная СНОВА придёт из 1С. Если её там уже
 // доставили/отменили — она не придёт никогда, и метка «проверить» висит вечно. Поэтому нужна
 // явная кнопка: человек посмотрел в 1С, убедился — убрал.
@@ -3447,7 +3496,7 @@ function renderInc(){
     var w=(typeof r.weight_kg==='number')?wkg(r.weight_kg):'—';
     h+='<tr class="'+incColor(r)+'">'+
       '<td>'+cb+'</td>'+
-      '<td>'+xe(r.ready_status||'')+(r._returned?' <span class="inc-ret" title="Снята с плана; из 1С сейчас не приходит — проверьте актуальность в 1С">&#8617;проверить</span><button class="inc-forget" data-inv="'+xe(r.invoice||'')+'" onclick="incForget(this)" title="Проверено в 1С — убрать из списка">&#10005;</button>':'')+'</td>'+
+      '<td>'+xe(r.ready_status||'')+(r._returned?' <span class="inc-ret" title="Снята с плана; из 1С сейчас не приходит — проверьте актуальность в 1С">&#8617;'+(r._reason==='not_shipped'?'не отгружено':'проверить')+'</span><button class="inc-forget" data-inv="'+xe(r.invoice||'')+'" onclick="incForget(this)" title="Проверено в 1С — убрать из списка">&#10005;</button>':'')+'</td>'+
       '<td><span class="inc-invlink" onclick="incShowPos(\''+r.invoice+'\')" title="Показать состав накладной">'+xe(r.invoice)+'</span></td>'+
       '<td>'+xe(r.warehouse||'—')+'</td>'+
       '<td>'+xe(r.city||'')+'</td>'+
