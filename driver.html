@@ -1207,6 +1207,14 @@ function odoRenderVans(show, exclude) {
     return '<button type="button" class="ovan' + (v.id === odoVanSel ? ' on' : '') + '" data-van="' + v.id + '" onclick="odoPickVan(this)">' + v.label + '</button>';
   }).join('');
   odoVansExtraBtn();
+  // тестовим входам — швидкий спосіб пройти крок без камери
+  if (typeof isTestUser === 'function' && isTestUser()) {
+    var _sg = document.getElementById('odoShotG');
+    if (_sg && !document.getElementById('odoTestBtn')) {
+      _sg.insertAdjacentHTML('afterend',
+        '<button type="button" class="oshotg" id="odoTestBtn" onclick="odoTestSkip()" style="border-color:#a35a06;color:#ffd9a0">&#9889; Тест: подставить фото и км</button>');
+    }
+  }
 }
 // ⛔Нова машина вже на дорозі, а номера в списку ще немає: без цього водій не може почати
 //   день узагалі. Вписаний номер іде в дані як є — диспетчер потім заведе машину нормально.
@@ -1433,6 +1441,23 @@ function odoStartLoader() {
 }
 // ⛔Сірая кнопка, которая молчит, — это «приложение не работает» с точки зрения водителя.
 //   11.08 Лёша так простоял: фото сделал, километры вписал, а машину не выбрал.
+// ⛔ТІЛЬКИ для тестових входів (ТЕСТ Водитель / ТЕСТ Грузчик): на комп'ютері немає камери,
+//   і без цього неможливо пройти далі й перевірити наступні кроки. Для живих водіїв кнопки
+//   немає взагалі — фото одометра лишається обов'язковим.
+function isTestUser() { return /^TEST/i.test(String(DRV || '')) || /^p_test/i.test(String(DRV || '')); }
+function odoTestSkip() {
+  if (!isTestUser()) return;
+  odoPhotoFile = new Blob(['test'], { type: 'image/jpeg' });
+  odoPhotoFile.name = 'test.jpg';
+  var cam = document.getElementById('odoCam');
+  if (cam) { cam.style.display = ''; cam.innerHTML = '<div style="padding:22px;text-align:center;color:#9fb0c8;font-size:13px">тестовый снимок</div>'; }
+  var sh = document.getElementById('odoShot');
+  if (sh) { sh.className = 'oshot done'; sh.textContent = '✓ Тестовое фото'; }
+  var km = document.getElementById('odoKm');
+  if (km && !km.value) km.value = String(100000 + Math.floor((Date.now() / 60000) % 900000));
+  odoValidate();
+  showToast('Тестовый режим: фото и км подставлены');
+}
 function odoWhyBlocked() {
   var km = (document.getElementById('odoKm').value || '').trim();
   var needVan = (odoMode === 'start' || odoMode === 'swap_in') && odoVans().length > 0;
@@ -2476,7 +2501,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-11';
+var APP_V = '2026-08-12-12';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
