@@ -1193,7 +1193,8 @@ function odoVans() {
 function odoVanLabel(id) {
   if (!id) return '';
   var f = odoVans().filter(function (v) { return v.id === id; })[0];
-  return f ? f.label : ('Машина ' + id);
+  // ⛔Номер, вписаний водієм вручну, у списку машин не значиться — показуємо як є.
+  return f ? f.label : String(id);
 }
 function odoRenderVans(show, exclude) {
   odoVanEx = exclude || null;
@@ -1205,6 +1206,27 @@ function odoRenderVans(show, exclude) {
   el.innerHTML = '<div class="ovans-hd">Нажмите машину, на которой поедете</div>' + list.map(function (v) {
     return '<button type="button" class="ovan' + (v.id === odoVanSel ? ' on' : '') + '" data-van="' + v.id + '" onclick="odoPickVan(this)">' + v.label + '</button>';
   }).join('');
+  odoVansExtraBtn();
+}
+// ⛔Нова машина вже на дорозі, а номера в списку ще немає: без цього водій не може почати
+//   день узагалі. Вписаний номер іде в дані як є — диспетчер потім заведе машину нормально.
+function odoVansExtraBtn() {
+  var el = document.getElementById('odoVans'); if (!el) return;
+  var known = odoVans().some(function (v) { return v.id === odoVanSel; });
+  var manual = odoVanSel && !known;
+  el.insertAdjacentHTML('beforeend',
+    '<button type="button" class="ovan' + (manual ? ' on' : '') + '" onclick="odoVanOther()">'
+    + (manual ? xe(odoVanSel) : '&#10133; Другая машина') + '</button>');
+}
+function odoVanOther() {
+  var known = odoVans().some(function (v) { return v.id === odoVanSel; });
+  var v = prompt('Номер машины, как написано на борту:', (!known && odoVanSel) ? odoVanSel : '');
+  if (v == null) return;
+  v = String(v).trim();
+  if (v.length < 2) { showToast('Впишите номер машины'); return; }
+  odoVanSel = v;
+  odoRenderVans(true, odoVanEx);
+  odoValidate();
 }
 function odoPickVan(btn) { odoVanSel = btn.getAttribute('data-van'); odoRenderVans(true, odoVanEx); odoValidate(); }
 function odoSetVan(id) {
@@ -2417,7 +2439,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-7';
+var APP_V = '2026-08-12-8';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
