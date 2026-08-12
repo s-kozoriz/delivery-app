@@ -1276,8 +1276,15 @@ function odoOpen(mode) {
   document.getElementById('odoGoL').style.display = 'none';
   // ⛔Машину выбирают КАЖДЫЙ раз руками: подставленная кнопка провоцирует
   //   «сфотографировал и поехал», а потом нестыковки в данных. Даже если машина одна.
+  // ⛔Крок 1 і крок 2 — РІЗНІ екрани. Поки роль не обрана, показуємо тільки питання «хто ви
+  //   сьогодні»: ні машин, ні фото, ні кілометрів. Інакше людина бачить усе одразу і не
+  //   розуміє, з чого починати.
+  if (askRole) {
+    _hd.textContent = 'Начать день';
+    _sub.textContent = 'Кто вы сегодня?';
+  }
   odoVanSel = null;
-  odoRenderVans(mode === 'start' || si, si ? odoVan : null);
+  odoRenderVans(!askRole && (mode === 'start' || si), si ? odoVan : null);   // ⛔машини — лише після вибору ролі
   var sh = document.getElementById('odoShot'); sh.className = 'oshot'; sh.innerHTML = '&#128247; Сфотографировать пробег';
   document.getElementById('odoCam').innerHTML = '<div class="ohint">Нажмите «Сфотографировать пробег»</div>';
   document.getElementById('odoKm').value = '';
@@ -1365,7 +1372,8 @@ function odoOnFile(e) {
 }
 // Поля пробега (машина, фото, км) — только для того, кто за рулём.
 function odoFields(show) {
-  var ids = ['odoCam', 'odoVans', 'odoShot', 'odoShotG', 'odoKm'];
+  // ⛔Машини сюди більше не входять: їх бачать обидві ролі, і показом керує odoRenderVans.
+  var ids = ['odoCam', 'odoShot', 'odoShotG', 'odoKm'];
   for (var i = 0; i < ids.length; i++) {
     var el = document.getElementById(ids[i]); if (!el) continue;
     var box = (ids[i] === 'odoKm') ? el.parentNode : el;   // у поля км прячем всю строку с подписью
@@ -1383,6 +1391,19 @@ function odoPickRole(r) {
   if (bl) bl.className = 'orole-b' + (drv ? '' : ' on');
   // ⛔Тап по роли смену НЕ начинает: промах по кнопке иначе закрепил бы грузчика на
   //   весь день, а грузчику одометр уже не открыть — пробег было бы не ввести.
+  // крок 2: обрав «за кермом» — тільки тепер з’являються машина, фото і кілометри
+  var _h2 = document.getElementById('odoHd'), _s2 = document.getElementById('odoSub');
+  if (drv) {
+    if (_h2) _h2.textContent = 'Начало дня — пробег';
+    if (_s2) _s2.textContent = 'Сфотографируйте одометр и впишите км.';
+    odoRenderVans(true, null);
+  } else {
+    if (_h2) _h2.textContent = 'Начать смену';
+    if (_s2) _s2.textContent = 'На какой машине работаете?';
+    // ⛔Вантажник теж обирає машину: так його години прив'язуються до авто і до водія,
+    //   з яким він працював. Фото одометра й кілометри йому не потрібні — він не за кермом.
+    odoRenderVans(true, null);
+  }
   odoFields(drv);
   var go = document.getElementById('odoGo'); if (go) go.style.display = drv ? '' : 'none';
   var gl = document.getElementById('odoGoL'); if (gl) gl.style.display = drv ? 'none' : '';
@@ -1390,6 +1411,15 @@ function odoPickRole(r) {
 }
 // Грузчик за руль не садится — ни машины, ни фото, ни километров: одна кнопка.
 function odoStartLoader() {
+  // ⛔Без машини прив'язка «вантажник × авто × час» не складеться — а саме заради неї
+  //   ми його й питаємо. Якщо машина в списку одна, вибирати нема з чого.
+  if (odoVans().length > 1 && !odoVanSel) {
+    showToast('Выберите машину, на которой работаете');
+    var _v = document.getElementById('odoVans');
+    if (_v) { _v.classList.add('need'); setTimeout(function () { _v.classList.remove('need'); }, 2500); }
+    return;
+  }
+  if (odoVanSel) { try { db.ref('worktime/' + DRV + '/' + wtDate() + '/van').set(odoVanSel); } catch (e) {} }
   valSetRole('loader');   // закрывает экран и баннер «пробег не зафиксирован»
   if (wtState(wtToday()) === 'idle') wtStartSeg();
   showToast('Смена начата · грузчик');
@@ -2439,7 +2469,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-8';
+var APP_V = '2026-08-12-10';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
