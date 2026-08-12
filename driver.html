@@ -595,14 +595,14 @@ function wtCloseDay(at) {
   //   Раніше підсумок блимав на пів секунди і його одразу накривало питання про напарника.
   closeWtPanel();
   _summaryAfterPair = true;
-  if (!pairPending()) { _summaryAfterPair = false; showMonthSummary(); }
+  if (!pairPending()) { _summaryAfterPair = false; daySummaryOrHint(); }
   // ⛔Страховка: питання ставить лише odoSave. Закрили день без нього (без фото, кнопкою
   //   «Конец» не за кермом, забутий день) — підсумок мусить з’явитися сам, а не зникнути назавжди.
   setTimeout(function () {
     if (!_summaryAfterPair) return;
     var g = document.getElementById('pairGate');
     if (g && g.classList.contains('on')) return;   // питання на екрані — чекаємо відповідь
-    _summaryAfterPair = false; showMonthSummary();
+    _summaryAfterPair = false; daySummaryOrHint();
   }, 900);
 }
 // ⛔День НЕ закрывается, пока водитель не записал конечный пробег. Раньше «Конец» и одометр
@@ -1573,6 +1573,7 @@ function odoSave() {
     _suspect = true;
   }
   var mode = odoMode, date = wtDate(), ts = Date.now();
+  if (mode === 'end') _odoEndLocal = date;   // база ще не відповіла, але ми вже знаємо
   if (mode === 'start' && valMode !== 'driver') valSetRole('driver'); // роль выбрана на этом же экране
   if (mode === 'start' && wtState(wtToday()) === 'idle') wtStartSeg(); // взял руль в начале дня = ещё и клок-ин; «сдать руль» день НЕ завершает
   // ⛔флажок «за рулём» в телефоне убран: правда одна — сам одометр (см. odoDriving)
@@ -1710,6 +1711,40 @@ db.ref('pairs').on('value',function(s){pairsMine=s.val()||{};},function(){});
 var _pairDate=null,_pairSel={};
 function pairRegionIds(){ var mine=!!(cfg.drivers&&cfg.drivers[DRV]&&cfg.drivers[DRV].nord); return Object.keys(loadersPub).filter(function(id){var n=!!(loadersPub[id]&&loadersPub[id].nord);return n===mine;}); }
 var _summaryAfterPair = false;
+var _odoEndLocal = null;   // дата, за яку водій щойно здав кермо (база ще може не встигнути)
+function dayMissing() {
+  try {
+    var rec = wtToday();
+    if (!rec || !rec.done) return null;                  // день ще йде — нічого не винен
+    var od = odoData[wtDate()] || {};
+    if (!od.end && _odoEndLocal !== wtDate())
+      return { why: 'Не сдан конечный пробег', go: function(){ odoOpen('end'); } };
+    if (!rec.pairAsked && pairRegionIds().length)
+      return { why: 'Не отмечено, с кем работал', go: function(){ pairAsk(wtDate()); } };
+    if (!od.start)
+      return { why: 'Пробег в начале дня не был записан', go: null };   // вже не виправити
+    return null;
+  } catch (e) { return null; }
+}
+// Підсумок або підказка — але ніколи не тиша.
+function daySummaryOrHint() {
+  if (dayFullyDone()) { showMonthSummary(); return; }
+  var m = dayMissing();
+  if (!m) return;
+  showToast('⚠ ' + m.why);
+  if (m.go) setTimeout(m.go, 900);
+}
+function dayFullyDone() {
+  try {
+    var rec = wtToday();
+    if (!rec || !rec.done) return false;                 // день не закрито
+    var od = odoData[wtDate()] || {};
+    if (!od.start) return false;                         // пробіг на старті
+    if (!od.end && _odoEndLocal !== wtDate()) return false;   // і в кінці
+    if (!rec.pairAsked && pairRegionIds().length) return false;   // не сказав, з ким працював
+    return true;
+  } catch (e) { return false; }
+}
 // Чи буде взагалі питання про напарника: якщо в регіоні нікого — не буде, і підсумок
 // показуємо одразу, не чекаючи закриття вікна, якого не відкриють.
 function pairPending(){ try { return pairRegionIds().length > 0; } catch(e) { return false; } }
@@ -1782,7 +1817,8 @@ function pairRecheck(){
 function pairClose(){
   var g=document.getElementById('pairGate'); if(g)g.classList.remove('on'); _pairDate=null; _pairSel={};
   // підсумок годин показуємо ПІСЛЯ того, як людина відповіла про напарника
-  if (_summaryAfterPair) { _summaryAfterPair = false; setTimeout(showMonthSummary, 250); }
+  _summaryAfterPair = false;
+  setTimeout(daySummaryOrHint, 250);
 }
 // ===================== /ПАРА =====================
 
@@ -2585,7 +2621,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-29';
+var APP_V = '2026-08-12-33';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
