@@ -743,6 +743,10 @@ function renderWtBtn() {
   //   поставил «Перерыв» и ушёл, день остался открытым и без километров. Теперь, если машину
   //   взяли и не сдали, а пауза затянулась, это видно прямо на экране, а не спрятано в кнопке.
   odoRemindBar();
+  // ⛔«+» лише в роботі: після закриття дня й на паузі завдання не додають.
+  var _fab = document.getElementById('fabAddTask');
+  if (_fab) _fab.style.display = (st === 'run') ? '' : 'none';
+  pairRecheck();
   // ⛔Затверджений вигляд початку дня: на екрані ОДНА дія. Поки день не почато, велика кнопка
   //   «Начать день» уже стоїть у блоці з обсягом дня — три кнопки над нею лише плутають
   //   (дві з них сірі й нічого не роблять). 12.08 водій дивився на цей екран і не розумів,
@@ -1066,7 +1070,7 @@ function uploadPhotoWithQueue(file, rowId) {
 // ===================== ОДОМЕТР (пробег) — гейт старта/конца дня =====================
 // Хранение: odometer/{DRV}/{date} = { start:{km,photo,ts}, end:{km,photo,ts} }
 var odoData = {}, _odoGateChecked = false, odoMode = null, odoPhotoFile = null, nordWheel = null;
-db.ref('odometer/' + DRV).on('value', function (s) { odoData = s.val() || {}; odoLoaded = true; try { render(); } catch (e) {} });
+db.ref('odometer/' + DRV).on('value', function (s) { odoData = s.val() || {}; odoLoaded = true; try { render(); renderWtBtn(); } catch (e) {} });
 // ⛔Пока пробег за сегодня не пришёл из базы, НЕ показываем заглушку «зафиксируйте пробег»:
 //   иначе водитель, который всё уже сделал, на секунду видит требование и решает, что
 //   приложение сломалось. Через 8 секунд считаем, что база ответила (или связи нет).
@@ -1594,10 +1598,10 @@ function odoSave() {
   try { render(); } catch (e) {}   // пробег снят → кнопки оживают сразу, без ожидания базы
   document.getElementById('odoGate').classList.remove('on');
   document.getElementById('odoBanner').classList.remove('on');
-  showToast(mode === 'swap_in' ? ('Вы на: ' + odoVanLabel(odoVan) + ' ✓') : mode === 'end' ? 'Руль сдан · пробег записан ✓' : 'За рулём · пробег записан ✓');
+  if (mode !== 'end') showToast(mode === 'swap_in' ? ('Вы на: ' + odoVanLabel(odoVan) + ' ✓') : mode === 'end' ? 'Руль сдан · пробег записан ✓' : 'За рулём · пробег записан ✓');
   if (navigator.vibrate) navigator.vibrate(60);
   // ⛔Интерфейс Норда и центра одинаковый (решение 12.08): пару спрашиваем у всех водителей.
-  if (mode === 'end') pairAsk(date);
+  if (mode === 'end') pairAsk(date, { km: km, van: _van });
   wtRepanel();
 }
 var odoQ = JSON.parse(localStorage.getItem('odoQ_' + DRV) || '[]');
@@ -1681,7 +1685,10 @@ db.ref('pairs').on('value',function(s){pairsMine=s.val()||{};},function(){});
 (function(){
   var css='#pairGate{position:fixed;inset:0;z-index:9200;background:#0d1520;display:none;flex-direction:column;color:#eaf0f8;font-family:inherit;padding:22px}'
     +'#pairGate.on{display:flex}'
-    +'#pairGate .phd{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}'
+    +'#pairGate .pdone{background:#0f2417;border:1px solid #1a7a40;border-radius:12px;padding:12px 14px;margin-bottom:18px;text-align:center}'
++'#pairGate .pdone b{display:block;font-size:16px;font-weight:800;color:#8ef0b0;margin-bottom:3px}'
++'#pairGate .pdone span{font-size:13px;color:#9fb0c8}'
++'#pairGate .phd{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}'
     +'#pairGate .psub{font-size:13px;color:#9fb0c8;text-align:center;line-height:1.5;margin-bottom:16px}'
     +'#pairGate .plist{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px}'
     +'#pairGate .prow{display:flex;align-items:center;gap:12px;background:#131c28;border:1px solid #2a3a50;border-radius:12px;padding:15px 16px;font-size:17px;font-weight:700;cursor:pointer}'
@@ -1692,7 +1699,7 @@ db.ref('pairs').on('value',function(s){pairsMine=s.val()||{};},function(){});
     +'#pairGate .pskip{background:none;border:none;color:#8ea3c4;font-size:13px;font-weight:700;cursor:pointer;padding:10px;text-decoration:underline;font-family:inherit}';
   var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
   var g=document.createElement('div');g.id='pairGate';
-  g.innerHTML='<div class="phd">Кто ездил с тобой сегодня?</div>'
+  g.innerHTML='<div id="pairDone"></div>'+'<div class="phd">Кто ездил с тобой сегодня?</div>'
     +'<div class="psub">Отметь грузчиков, которые работали с тобой. Это нужно для честного учёта их рабочего времени.</div>'
     +'<div class="plist" id="pairList"></div>'
     +'<button class="pgo" onclick="pairSave()">Сохранить</button>'
@@ -1705,7 +1712,23 @@ var _summaryAfterPair = false;
 // Чи буде взагалі питання про напарника: якщо в регіоні нікого — не буде, і підсумок
 // показуємо одразу, не чекаючи закриття вікна, якого не відкриють.
 function pairPending(){ try { return pairRegionIds().length > 0; } catch(e) { return false; } }
-function pairAsk(date){
+// ⛔Підтвердження про зданий кермо було спливаючою смужкою на 2,5 с і його ніхто не читав —
+//   вона висіла поверх питання про напарника. Тепер це шапка самого екрана.
+function pairDoneHtml(done){
+  try {
+    var d = odoData[wtDate()] || {};
+    var km = done ? done.km : (d.end ? d.end.km : null);
+    if (typeof km !== 'number') return '';
+    var van = odoVanLabel((done ? done.van : (d.end && d.end.van)) || '');
+    var diff = (d.start && typeof d.start.km === 'number') ? (km - d.start.km) : null;
+    var sub = [];
+    if (van) sub.push(xe(van));
+    sub.push(String(km) + ' км');
+    if (diff !== null && diff >= 0) sub.push('за день +' + diff);
+    return '<div class="pdone"><b>&#10003; Руль сдан</b><span>' + sub.join(' &middot; ') + '</span></div>';
+  } catch (e) { return ''; }
+}
+function pairAsk(date, done){
   _pairDate=date; _pairSel={};
   var ids=pairRegionIds(); if(!ids.length)return;
   var last=[]; try{ last=JSON.parse(localStorage.getItem('pairLast_'+DRV)||'[]'); }catch(e){}
@@ -1714,6 +1737,7 @@ function pairAsk(date){
     if(todays[id]&&todays[id].drv===DRV)_pairSel[id]=true;
     else if(!hasToday && last.indexOf(id)!==-1)_pairSel[id]=true;
   });
+  var _dn = document.getElementById('pairDone'); if (_dn) _dn.innerHTML = pairDoneHtml(done);
   pairRender(ids);
   document.getElementById('pairGate').classList.add('on');
 }
@@ -1725,6 +1749,7 @@ function pairRender(ids){
 }
 function pairTog(id){ _pairSel[id]=!_pairSel[id]; pairRender(pairRegionIds()); }
 function pairSave(){
+  pairMarkAnswered();
   var date=_pairDate; if(!date){pairClose();return;}
   var todays=(pairsMine[date])||{}; var sel=[];
   pairRegionIds().forEach(function(id){
@@ -1734,7 +1759,25 @@ function pairSave(){
   try{ localStorage.setItem('pairLast_'+DRV, JSON.stringify(sel)); }catch(e){}
   pairClose(); showToast('Записано ✓');
 }
-function pairSkip(){ pairClose(); }
+function pairSkip(){ pairMarkAnswered(); pairClose(); }
+// ⛔Відмітка «на питання відповіли» — пишеться й при «Никого», інакше питання буде лізти вічно.
+function pairMarkAnswered(){ try { wtMutate(function (rec) { rec.pairAsked = Date.now(); }); } catch (e) {} }
+// Питання висить боргом: день закрито, пробіг здано, а відповіді немає.
+var _pairRecheckDone = false;
+function pairRecheck(){
+  try {
+    if (_pairRecheckDone) return;
+    if (!wtLoaded || !odoLoaded) return;                 // дані ще йдуть
+    if (PURE_LOADER) return;                             // вантажнику не ставлять цього питання
+    var rec = wtToday();
+    if (!rec || !rec.done || rec.pairAsked) return;       // день відкритий або вже відповіли
+    var od = odoData[wtDate()];
+    if (!od || !od.end) return;                          // день закривався не через пробіг
+    if (!pairRegionIds().length) return;                 // відмічати нікого
+    _pairRecheckDone = true;
+    pairAsk(wtDate(), { km: od.end.km, van: od.end.van });
+  } catch (e) {}
+}
 function pairClose(){
   var g=document.getElementById('pairGate'); if(g)g.classList.remove('on'); _pairDate=null; _pairSel={};
   // підсумок годин показуємо ПІСЛЯ того, як людина відповіла про напарника
@@ -2541,7 +2584,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-22';
+var APP_V = '2026-08-12-26';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
