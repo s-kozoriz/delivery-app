@@ -1918,6 +1918,11 @@ function renderRow(r, num) {
 // Смена/пробег/пары остаются под своим ключом (зарплата). Кто вошёл водителем — пишем в nord_driver для колонки «Норд».
 function isNordDrv(){ return DRV === 'C' || (cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].nord === true); }
 function routeDrv(){ return isNordDrv() ? 'C' : DRV; }
+// ⛔Норд-водій бачив ТІЛЬКИ спільний маршрут машини Норду, а адреси, поставлені особисто на
+//   нього, не показувались нікому: 12.08 у Васі так «зникли» шість адрес по Aurich і Wiesmoor.
+//   Тепер його список = спільний маршрут Норду + те, що поставили особисто йому.
+//   У центрових водіїв нічого не змінюється: у них свій слот і є маршрутом.
+function myRow(r){ return r && (r.drv === routeDrv() || r.drv === DRV); }
 function myName(){ return (cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].name) || DRV; }
 function nordPtr(m){
   if (!isNordDrv()) return;
@@ -1942,7 +1947,7 @@ function routeAllowed() {
 //   поехать работать «по списку» невозможно, а понять, есть ли сегодня работа, — можно.
 function routeVolume() {
   var mine = rows.filter(function (r) {
-    return r && r.date === curD && r.drv === routeDrv() && r.inRoute !== false && ((r.addr && r.addr.trim()) || r.fromDriver);
+    return r && r.date === curD && myRow(r) && r.inRoute !== false && ((r.addr && r.addr.trim()) || r.fromDriver);
   });
   var by = {}, order = [];
   mine.forEach(function (r) {
@@ -1978,7 +1983,7 @@ function routeLockHtml() {
 function render() {
   document.getElementById('dl').textContent = fmt(curD);
   var dr = rows.filter(function(r) {
-    return r.date === curD && r.drv === routeDrv() && r.inRoute !== false && ((r.addr && r.addr.trim()) || r.fromDriver);
+    return r.date === curD && myRow(r) && r.inRoute !== false && ((r.addr && r.addr.trim()) || r.fromDriver);
   });
   var tot = dr.length, dn = dr.filter(function(r) { return r.done; }).length;
   var prg = document.getElementById('prg');
@@ -2315,7 +2320,7 @@ function submitAddTask(){
   var now = Date.now();
   var maxOrder = 0;
   rows.forEach(function(r){
-    if(r.date === curD && r.drv === routeDrv() && r.order != null && r.order > maxOrder) maxOrder = r.order;
+    if(r.date === curD && myRow(r) && r.order != null && r.order > maxOrder) maxOrder = r.order;
   });
   var row = {
     id: rowId, date: curD, drv: routeDrv(),
@@ -2362,7 +2367,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-11-14';
+var APP_V = '2026-08-12-1';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
