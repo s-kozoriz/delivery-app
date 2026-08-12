@@ -1599,8 +1599,8 @@ function odoSave() {
   document.getElementById('odoBanner').classList.remove('on');
   showToast(mode === 'swap_in' ? ('Вы на: ' + odoVanLabel(odoVan) + ' ✓') : mode === 'end' ? 'Руль сдан · пробег записан ✓' : 'За рулём · пробег записан ✓');
   if (navigator.vibrate) navigator.vibrate(60);
-  // пары «водитель+грузчик» нужны только в основном регионе (много машин). Норд = 1 машина → якорь по одометру, пары не спрашиваем.
-  if (mode === 'end' && !(cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].nord)) setTimeout(function () { pairAsk(date); }, 350);
+  // ⛔Интерфейс Норда и центра одинаковый (решение 12.08): пару спрашиваем у всех водителей.
+  if (mode === 'end') setTimeout(function () { pairAsk(date); }, 350);
   wtRepanel();
 }
 var odoQ = JSON.parse(localStorage.getItem('odoQ_' + DRV) || '[]');
@@ -1707,10 +1707,7 @@ function pairRegionIds(){ var mine=!!(cfg.drivers&&cfg.drivers[DRV]&&cfg.drivers
 var _summaryAfterPair = false;
 // Чи буде взагалі питання про напарника: якщо в регіоні нікого — не буде, і підсумок
 // показуємо одразу, не чекаючи закриття вікна, якого не відкриють.
-function pairPending(){ try {
-  if (cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].nord) return false;   // ⛔Норду пари не питають
-  return pairRegionIds().length > 0;
-} catch(e) { return false; } }
+function pairPending(){ try { return pairRegionIds().length > 0; } catch(e) { return false; } }
 function pairAsk(date){
   _pairDate=date; _pairSel={};
   var ids=pairRegionIds(); if(!ids.length)return;
@@ -2534,7 +2531,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-15';
+var APP_V = '2026-08-12-16';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
