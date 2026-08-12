@@ -1786,12 +1786,27 @@ function valBadge() {
   }
   el.innerHTML = (valMode === 'loader') ? '&#128230; Грузчик' : '&#128666; Водитель';
 }
+function valDayStarted() {
+  try {
+    if (typeof wtLoaded !== 'undefined' && !wtLoaded) return true;    // данные ещё едут — не трогаем
+    if (typeof odoLoaded !== 'undefined' && !odoLoaded) return true;
+    var rec = (typeof wtToday === 'function') ? wtToday() : null;
+    if (rec && (wtSegs(rec).length > 0 || rec.done)) return true;
+    var od = (typeof odoData !== 'undefined' && odoData) ? odoData[wtDate()] : null;
+    if (od && (od.start || od.end)) return true;
+    return false;
+  } catch (e) { return true; }
+}
 function valEnsureRole(cb) {
   if (PURE_LOADER) { valMode = 'loader'; valBadge(); renderWtBtn(); if (cb) cb(); return; }
   // роль уже выбрана (вкладка живёт с прошлого дня) — диалога не будет, но «водитель дня»
   // за СЕГОДНЯ всё равно надо отметить, иначе в диспетчере останется безымянный «Норд»
   if (valMode) { if (valMode === 'driver') nordPtr('driver'); if (cb) cb(); return; }
   var saved = localStorage.getItem(valModeKey());
+  // ⛔Роль из памяти берём, только если день уже реально начат (есть смена или пробег).
+  //   Пустой день = человек ещё ничего не делал: спрашиваем заново, даже если вкладка помнит
+  //   вчерашний выбор или день был сброшен. Иначе ошибочное «Грузчик» не исправить.
+  if (saved && !valDayStarted()) { try { localStorage.removeItem(valModeKey()); } catch (e) {} saved = null; }
   if (saved === 'driver' || saved === 'loader') { valMode = saved; valBadge(); renderWtBtn(); if (saved === 'driver') nordPtr('driver'); if (cb) cb(); return; }
   // Человек работает только водителем — вопроса нет вообще, сразу за руль.
   if (!valCanLoad()) { valMode = 'driver'; nordPtr('driver'); valBadge(); renderWtBtn(); if (cb) cb(); return; }
@@ -2531,7 +2546,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-16';
+var APP_V = '2026-08-12-17';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
