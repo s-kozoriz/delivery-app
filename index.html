@@ -1414,12 +1414,45 @@ function acInit(){
 
 // Норд-планировщик правит/удаляет только СВОИ строки (по plannerId-автору). Диспетчер (zentrum) — всё. Перемещение (order) разрешено всем.
 function canEditRow(r){ return !IS_PLANNER || (r && r.plannerId===PLANNER_ID); }
+// ⛔12.08 у Виталика зникли 4 завдання, і довести, хто їх прибрав, було НІЧИМ: рядок
+//   стирається без сліду. Тому пишемо журнал дій — хто, коли, що саме зробив.
+//   У записі про видалення лежить САМ рядок цілком, тому видалене можна повернути.
+// ⛔Журнал не заважає роботі: пишеться окремо, помилка запису нічого не ламає.
+function whoAmI(){
+  if (typeof IS_PLANNER !== 'undefined' && IS_PLANNER) return (PLANNER_NAME || 'Планировщик') + ' (норд)';
+  if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER) return 'Просмотр';
+  return 'Диспетчер';
+}
+function auditLog(action, rowId, data){
+  try {
+    var d = new Date(), day = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    var rec = { ts: Date.now(), who: whoAmI(), action: action, rowId: rowId || null };
+    if (data) rec.data = data;
+    db.ref('audit/'+day).push(rec).catch(function(){});
+  } catch(e) {}
+}
 function dr(id){
   if(IS_VIEWER)return;
   var r=rows.find(function(x){return x.id===id;});
   if(r&&!canEditRow(r)){ toast('Это адрес другого техника — удалять нельзя'); return; }
   if(r){ (r.invs||[]).forEach(function(inv){ inv=(''+(inv||'')).trim(); if(inv&&incPlaced[inv]&&incPlaced[inv].rowId===id) incUnplace(inv); }); }
+  auditLog('удалил', id, r ? JSON.parse(JSON.stringify(r)) : null);   // копія рядка — щоб можна було повернути
   db.ref('rows/'+id).remove();
+}
+// Повернути видалений рядок: беремо копію з журналу і кладемо назад тим самим ключем.
+function auditRestore(day, key){
+  if(IS_VIEWER)return;
+  db.ref('audit/'+day+'/'+key).once('value', function(s){
+    var rec = s.val();
+    if(!rec || !rec.data || !rec.rowId){ toast('Нечего возвращать'); return; }
+    db.ref('rows/'+rec.rowId).once('value', function(s2){
+      if(s2.exists()){ toast('Строка уже на месте'); return; }
+      db.ref('rows/'+rec.rowId).set(rec.data).then(function(){
+        auditLog('вернул', rec.rowId, { from: day+'/'+key });
+        toast('Возвращено ✓');
+      }).catch(function(){ toast('Нет прав'); });
+    });
+  });
 }
 function toggleDone(id,val){
   if(IS_VIEWER)return;
@@ -1522,6 +1555,7 @@ function ur(id,f,v){
   if(_re&&!canEditRow(_re))return; // Норд-планировщик не правит чужие строки
   _lastEdit=Date.now();
   _pending[id+'/'+f]={v:v,ts:Date.now()};
+  if(f==='drv'||f==='date'||f==='addr'||f==='city'){ auditLog('изменил '+f, id, { was: (_re?_re[f]:null), now: v, addr: (_re?_re.addr:null) }); }
   db.ref('rows/'+id+'/'+f).set(v);
   var r=rows.find(function(x){return x.id===id;});if(r)r[f]=v;
   if(f==='date'&&v){ db.ref('rows/'+id+'/date_pending').remove(); if(r)r.date_pending=null; }
@@ -2569,16 +2603,22 @@ function peopleAdd(){
   var roles=peopleAskRoles({});
   if(!roles)return;
   if(!Object.keys(roles).length){ toast('Выберите хотя бы одну роль'); return; }
-  var slot=null;
-  if(roles.driver){ slot=(prompt('Слот водителя (L, R, C, V — или оставьте пустым для нового):','')||'').trim()||('d'+Date.now().toString(36)); }
+  var slot=null, nord=false;
+  if(roles.driver){
+    slot=(prompt('Слот водителя (L, R, C, V — или оставьте пустым для нового):','')||'').trim()||('d'+Date.now().toString(36));
+    nord=confirm('Работает в регионе Nord?\n\nОК — да, Отмена — нет (центр)');
+  }
+  else if(roles.loader){ nord=confirm('Грузчик региона Nord?\n\nОК — да, Отмена — нет (центр)'); }
   var pin=prompt('Код для входа (4 цифры):'); if(pin===null)return; pin=String(pin).trim();
   if(!/^\d{4}$/.test(pin)){ toast('Код — 4 цифры'); return; }
   var id='p_'+Date.now().toString(36);
-  var rec={firstName:fn,lastName:ln,shortName:(fn||ln),roles:roles,active:true};
+  var rec={firstName:fn,lastName:ln,shortName:(fn||ln),roles:roles,active:true,nord:!!nord};
   if(slot)rec.slot=slot;
   db.ref('people/'+id).set(rec).then(function(){
-    peopleSyncCanLoad(slot,roles);
-    peoplePinWrite(id,pin,function(okk){ toast(okk?'Человек добавлен ✓':'Добавлен, но код не занят — задайте другой'); });
+    // ⛔одне збереження розкладає людину в усі списки — окремих екранів більше не треба
+    peopleSync(id, rec, function(){
+      peoplePinWrite(id,pin,function(okk){ toast(okk?('Добавлен ✓ '+(slot?'и в списке водителей':'')):'Добавлен, но код занят — задайте другой'); });
+    });
   }).catch(function(){ toast('Нет прав. Войдите главным диспетчером.'); });
 }
 // Роли спрашиваем по одной: в проекте нет своей формы с галочками, а confirm понятен всем.
@@ -2591,6 +2631,16 @@ function peopleAskRoles(cur){
     if(ans)out[k]=true;
   }
   return out;
+}
+// Зміна ролей або регіону — і всі списки перебудовуються самі.
+function peopleSetNord(id){
+  if(IS_VIEWER)return;
+  var p=peopleAll[id]||{};
+  var nord=confirm('«'+peopleName(p)+'» работает в регионе Nord?\n\nОК — да, Отмена — нет (центр).\nСейчас: '+(p.nord?'Nord':'центр'));
+  db.ref('people/'+id+'/nord').set(nord).then(function(){
+    var rec=JSON.parse(JSON.stringify(p)); rec.nord=nord;
+    peopleSync(id, rec, function(){ toast(nord?'Nord ✓':'Центр ✓'); });
+  }).catch(function(){ toast('Нет прав'); });
 }
 function peopleEditRoles(id){
   if(IS_VIEWER)return;
@@ -2607,6 +2657,48 @@ function peopleEditRoles(id){
 // в настройки водителя — их читают все. Ставится сам, по галочкам в этом экране.
 // ⛔Без этого 08.08 Рома впервые увидел вопрос о роли после переезда на общее приложение
 //   и запутался: три попытки начать день за пять минут и три разных пробега.
+// ⛔Людина жила в п’яти місцях одразу: реєстр, коди, список водіїв, вантажники, планувальники.
+//   Через це 12.08 Вася був заведений, мав код — і НЕ з’являвся у випадаючому списку, бо
+//   «Люди» не чіпали cfg/drivers. Тепер джерело правди одне — картка людини, а всі похідні
+//   списки розкладає ця функція. Додав/змінив/вимкнув в одному місці — працює скрізь.
+function peopleSync(id, rec, cb){
+  var p = rec || peopleAll[id] || {};
+  var roles = p.roles || {};
+  var nm = (p.shortName || p.firstName || p.lastName || '').trim();
+  var on = (p.active !== false);
+  var jobs = [];
+  // ── водій: місце у випадаючому списку маршруту ──
+  if (p.slot) {
+    var base = (['L','R','C','V'].indexOf(p.slot) !== -1);
+    if (roles.driver && on) {
+      var d = { name: nm, nord: !!p.nord, canLoader: !!roles.loader };
+      if (!base) d.dyn = true;
+      jobs.push(db.ref('cfg/drivers/' + p.slot).update(d));
+    } else if (!base) {
+      jobs.push(db.ref('cfg/drivers/' + p.slot).remove());   // пішов або більше не водій — зникає зі списку
+    } else {
+      jobs.push(db.ref('cfg/drivers/' + p.slot + '/canLoader').set(roles.loader ? true : null));
+    }
+  }
+  // ── вантажник без керма: свій список і таблиця «Сейчас на смене» ──
+  var pureLoader = (roles.loader && !roles.driver);
+  if (pureLoader && on) {
+    var lid = String(id).replace(/^p_/, '');
+    jobs.push(db.ref('lager_staff/' + lid + '/name').set(nm));
+    jobs.push(db.ref('loaders_pub/' + lid + '/name').set(nm));
+    jobs.push(db.ref('loaders_pub/' + lid + '/nord').set(!!p.nord));
+  } else {
+    var lid2 = String(id).replace(/^p_/, '');
+    jobs.push(db.ref('lager_staff/' + lid2).remove());
+    jobs.push(db.ref('loaders_pub/' + lid2).remove());
+  }
+  // ── планувальник Норду ──
+  var pid = String(id).replace(/^p_/, '');
+  if (roles.norden && on) {
+    jobs.push(db.ref('nord_planners/' + pid + '/name').set(nm));
+  } else { jobs.push(db.ref('nord_planners/' + pid).remove()); }
+  Promise.all(jobs.map(function(x){ return x.catch(function(){}); })).then(function(){ if(cb)cb(); });
+}
 function peopleSyncCanLoad(slot,roles){
   if(!slot)return;
   var dual=!!(roles&&roles.driver&&roles.loader);
@@ -2629,7 +2721,10 @@ function peopleToggleActive(id){
   if(IS_VIEWER)return;
   var p=peopleAll[id]||{}, off=(p.active===false);
   if(!confirm(off?('Вернуть «'+peopleName(p)+'» в работу?'):('«'+peopleName(p)+'» больше не работает?\n\nЗаписи и часы сохранятся, вход перестанет действовать.')))return;
-  db.ref('people/'+id+'/active').set(off).then(function(){ toast(off?'Возвращён ✓':'Отключён ✓'); }).catch(function(){ toast('Нет прав'); });
+  db.ref('people/'+id+'/active').set(off).then(function(){
+    var rec=JSON.parse(JSON.stringify(p)); rec.active=off;
+    peopleSync(id, rec, function(){ toast(off?'Возвращён ✓':'Отключён ✓ — убран из списков'); });
+  }).catch(function(){ toast('Нет прав'); });
 }
 
 function renderDynDrivers(){
