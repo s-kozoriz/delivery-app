@@ -1691,8 +1691,8 @@ db.ref('pairs').on('value',function(s){pairsMine=s.val()||{};},function(){});
 +'#pairGate .phd{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}'
     +'#pairGate .psub{font-size:13px;color:#9fb0c8;text-align:center;line-height:1.5;margin-bottom:16px}'
     +'#pairGate .plist{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px}'
-    +'#pairGate .prow{width:100%;display:flex;align-items:center;justify-content:center;text-align:center;gap:8px;font-weight:700;cursor:pointer;font-family:inherit;background:#131c28;border:1px solid #2a3a50;border-radius:12px;padding:15px 16px;font-size:17px;font-weight:700;cursor:pointer}'
-    +'#pairGate .prow.palone{justify-content:center;color:#9fb0c8;border-style:dashed;font-weight:600}'
+    +'#pairGate .prow{color:#eaf0f8;width:100%;display:flex;align-items:center;justify-content:center;text-align:center;gap:8px;font-weight:700;cursor:pointer;font-family:inherit;background:#131c28;border:1px solid #2a3a50;border-radius:12px;padding:15px 16px;font-size:17px;font-weight:700;cursor:pointer}'
+    +'#pairGate .prow.palone{border-style:dashed}'
 +'#pairGate .prow.on{background:#0f2417;border-color:#1a7a40;color:#8ef0b0}'
     +'#pairGate .pck{width:26px;height:26px;border-radius:7px;border:2px solid #3a4a60;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px}'
     +'#pairGate .prow.on .pck{background:#1a7a40;border-color:#1a7a40;color:#fff}'
@@ -2585,7 +2585,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-28';
+var APP_V = '2026-08-12-29';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
