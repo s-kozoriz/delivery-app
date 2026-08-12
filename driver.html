@@ -490,7 +490,18 @@ function dayStart() {
   if (valMode === 'loader') { wtStartSeg(); return; }
   odoOpen('start');   // там же выбирается роль, и оттуда же откроется смена
 }
-function wtStartSeg() { wtMutate(function (rec) { var L = wtSegs(rec); L.push({ s: nowTime() }); rec.seg = L; rec.done = null; }); if (navigator.vibrate) navigator.vibrate(60); }
+// ⛔Кнопка додавала новий відрізок ЩОРАЗУ, не дивлячись, чи вже є відкритий. Досить було
+//   тапнути двічі — і в табелі росла каша. 12.08 у Роми так набралось 15 відрізків за день
+//   (включно з «11:29–10:30», де кінець раніше початку), бо в нього не працювала кнопка
+//   ролі й він тиснув усе підряд. Тепер повторний тап нічого не додає.
+function wtStartSeg() {
+  wtMutate(function (rec) {
+    var L = wtSegs(rec);
+    if (wtOpenIdx(rec) >= 0) { rec.seg = L; rec.done = null; return; }   // зміна вже йде
+    L.push({ s: nowTime() }); rec.seg = L; rec.done = null;
+  });
+  if (navigator.vibrate) navigator.vibrate(60);
+}
 function wtPauseSeg() { wtMutate(function (rec) { var L = wtSegs(rec); var i = wtOpenIdx(rec); if (i >= 0) L[i].e = nowTime(); rec.seg = L; }); if (navigator.vibrate) navigator.vibrate(40); }
 // Закрыть день физически: время в табеле. Никаких проверок — их делает wtFinishDay.
 // Когда человек в последний раз РАБОТАЛ (а не просто держал приложение открытым):
@@ -2373,7 +2384,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-2';
+var APP_V = '2026-08-12-3';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
