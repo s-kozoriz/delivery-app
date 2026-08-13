@@ -610,6 +610,45 @@ function wtCloseDay(at) {
 // ⛔День НЕ закрывается, пока водитель не записал конечный пробег. Раньше «Конец» и одометр
 //   жили отдельными кнопками, и день закрывался без километров — 10.08 так у Виталия и Ромы.
 var _wtCloseAt = null;   // время, которым человек решил закрыть день (если выбрал не «сейчас»)
+// ⛔ГІЛКА ВАНТАЖНИКА: де він сьогодні працював — на машині чи на складі.
+//   Це друга половина зв'язку: водій каже «з ким працював», вантажник — «де працював».
+var LOADER_WH = 'warehouse';   // склад
+function loaderEndAsk() {
+  odoMode = null; odoVanSel = null; odoPhotoFile = null;
+  var hd = document.getElementById('odoHd'), sub = document.getElementById('odoSub');
+  if (hd) hd.textContent = 'Конец смены';
+  if (sub) sub.textContent = 'Где вы сегодня работали?';
+  var rl = document.getElementById('odoRole'); if (rl) rl.style.display = 'none';
+  odoFields(false);                                   // жодного фото й кілометрів
+  var tb = document.getElementById('odoTestBtn'); if (tb) tb.style.display = 'none';
+  odoRenderVans(true, null);
+  var box = document.getElementById('odoVans');
+  if (box && !document.getElementById('odoWh'))
+    box.insertAdjacentHTML('beforeend', '<button type="button" class="ovan" id="odoWh" onclick="loaderPickWh()">&#127978; Склад</button>');
+  var go = document.getElementById('odoGo'); if (go) go.style.display = 'none';
+  var gl = document.getElementById('odoGoL');
+  if (gl) { gl.style.display = ''; gl.textContent = 'Завершить день'; gl.setAttribute('onclick', 'loaderEndSave()'); }
+  document.getElementById('odoGate').classList.add('on');
+}
+// Склад — такий самий варіант вибору, як і машина.
+function loaderPickWh() {
+  odoVanSel = LOADER_WH;
+  Array.prototype.forEach.call(document.querySelectorAll('#odoVans .ovan'), function (b) { b.classList.remove('on'); });
+  var e = document.getElementById('odoWh'); if (e) e.classList.add('on');
+}
+function loaderEndSave() {
+  if (!odoVanSel) {
+    showToast('Отметьте машину или склад');
+    var v = document.getElementById('odoVans');
+    if (v) { v.classList.add('need'); setTimeout(function () { v.classList.remove('need'); }, 2500); }
+    return;
+  }
+  var _where = odoVanSel;
+  wtMutate(function (rec) { rec.van = _where; });
+  document.getElementById('odoGate').classList.remove('on');
+  wtCloseDay(_wtCloseAt); _wtCloseAt = null;
+  showToast(odoVanSel === LOADER_WH ? 'Смена закрыта · склад' : 'Смена закрыта · ' + odoVanLabel(odoVanSel));
+}
 // Друга зміна того ж дня: вантажника викликали повторно.
 function wtReopenDay() {
   if (!isLoaderToday()) return;                 // гілка водія тут не ходить — там ще пробіг
@@ -626,7 +665,8 @@ function wtReopenDay() {
 function wtFinishDay(at) {
   if (wtState(wtToday()) === 'idle') return;   // день не почато — закривати нічого
   _wtCloseAt = at || null;
-  if (!isLoaderToday() && odoDriving()) { closeWtPanel(); odoOpen('end'); return; }   // гілка водія   // запишет км и закроет день сам
+  if (!isLoaderToday() && odoDriving()) { closeWtPanel(); odoOpen('end'); return; }   // гілка водія
+  if (isLoaderToday()) { closeWtPanel(); loaderEndAsk(); return; }                   // гілка вантажника   // запишет км и закроет день сам
   wtCloseDay(_wtCloseAt); _wtCloseAt = null;
 }
 // итог за текущий месяц (из уже загруженного wtData, без новых запросов)
@@ -1471,12 +1511,8 @@ function odoPickRole(r) {
 function odoStartLoader() {
   // ⛔Без машини прив'язка «вантажник × авто × час» не складеться — а саме заради неї
   //   ми його й питаємо. Якщо машина в списку одна, вибирати нема з чого.
-  if (odoVans().length > 1 && !odoVanSel) {
-    showToast('Выберите машину, на которой работаете');
-    var _v = document.getElementById('odoVans');
-    if (_v) { _v.classList.add('need'); setTimeout(function () { _v.classList.remove('need'); }, 2500); }
-    return;
-  }
+  // ⛔Де він працював — питаємо НАПРИКІНЦІ дня (рішення Сергія 13.08): зранку він ще не
+  //   знає ні машини, ні чи не лишиться на складі. Тикати навмання = псувати дані.
   if (odoVanSel) { try { db.ref('worktime/' + DRV + '/' + wtDate() + '/van').set(odoVanSel); } catch (e) {} }
   valSetRole('loader');   // закрывает экран и баннер «пробег не зафиксирован»
   if (wtState(wtToday()) === 'idle') wtStartSeg();
@@ -2649,7 +2685,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-06';
+var APP_V = '2026-08-13-08';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
