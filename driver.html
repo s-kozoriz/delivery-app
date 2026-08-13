@@ -263,6 +263,18 @@ body{background:#0d1520;color:#eaf0f8}
 
 .empty .ldr{width:34px;height:34px;margin:0 auto 14px;border:3px solid #2a3a50;border-top-color:#8ea3c4;border-radius:50%;animation:ldrspin .8s linear infinite}
 @keyframes ldrspin{to{transform:rotate(360deg)}}
+
+/* Панель додавання завдання — темна гама */
+.add-sheet-title{color:#eaf0f8;border-bottom-color:#2a3a50}
+.add-sheet-handle{background:#3a4a60}
+.add-type-btn{background:#131c28;border-bottom-color:#2a3a50}
+.add-type-btn:active{background:#1c2836}
+.add-type-text-main{color:#eaf0f8}
+.add-type-text-sub{color:#9fb0c8}
+.add-type-icon.delivery{background:#16263d;color:#7fb0ee}
+.add-type-icon.trash{background:#3a2a10;color:#e2b25f}
+.add-cancel{background:#1c2836;color:#eaf0f8}
+.add-form{background:#0d1520;color:#eaf0f8}
 </style>
 </head>
 <body>
@@ -2860,7 +2872,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-20';
+var APP_V = '2026-08-13-21';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
