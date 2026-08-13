@@ -2248,7 +2248,8 @@ function render() {
     var _p = document.getElementById('prg'); if (_p) _p.style.display = 'none';
     // ⛔Шапка з ім’ям, стрілками по днях і сірими кнопками зникає цілком: до початку
     //   зміни вона нічого не дає і лише збиває з пантелику.
-    var _h = document.querySelector('.hdr'); if (_h) _h.style.display = 'none';
+    var _h = document.querySelector('.hdr');
+    if (_h) _h.style.display = (valMode === 'loader') ? '' : 'none';   // вантажнику кнопки потрібні
     return;
   }
   // ⛔Поки дані одометра ще не прийшли, routeAllowed() навмисно каже «так» (щоб не лякати
@@ -2622,7 +2623,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-12-34';
+var APP_V = '2026-08-13-01';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
