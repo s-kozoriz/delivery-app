@@ -275,6 +275,21 @@ body{background:#0d1520;color:#eaf0f8}
 .add-type-icon.trash{background:#3a2a10;color:#e2b25f}
 .add-cancel{background:#1c2836;color:#eaf0f8}
 .add-form{background:#0d1520;color:#eaf0f8}
+
+/* Форма додавання завдання — темна гама */
+.add-form-hint{color:#9fb0c8}
+.add-form-label{color:#9fb0c8}
+.add-form-input{background:#131c28;color:#eaf0f8;border-color:#3a4a60}
+.add-form-input::placeholder{color:#6b7a90}
+.add-photo-zone{background:#131c28;border-color:#3a4a60}
+.add-photo-zone:active{background:#1c2836}
+.add-photo-zone-icon{color:#c88ae0}
+.add-photo-zone-text{color:#eaf0f8}
+.add-photo-zone-sub{color:#9fb0c8}
+.add-photo-preview-item{border-color:#3a4a60}
+.add-form-send:disabled{background:#2f3d4e;color:#7c8aa0}
+/* картка завдання, доданого водієм */
+.card.driver-added{background:linear-gradient(to right,#16263d 0,#16263d 4px,#131c28 4px);border-color:#2f6ab0}
 </style>
 </head>
 <body>
@@ -2872,7 +2887,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-21';
+var APP_V = '2026-08-13-22';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
