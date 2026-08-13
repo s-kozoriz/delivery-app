@@ -336,6 +336,8 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<!-- чтение QR коробок (LKBOX:) с фото; не загрузился → фото работают как раньше, скан выключен -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 var DRV = (new URLSearchParams(location.search).get('drv') || '').trim();
 var TODAY_KEY = '';
@@ -621,7 +623,9 @@ function loaderEndAsk() {
   var rl = document.getElementById('odoRole'); if (rl) rl.style.display = 'none';
   odoFields(false);                                   // жодного фото й кілометрів
   var tb = document.getElementById('odoTestBtn'); if (tb) tb.style.display = 'none';
+  _odoVansHint = 'Нажмите машину, на которой работали сегодня';
   odoRenderVans(true, null);
+  _odoVansHint = null;
   var tb2 = document.getElementById('odoTestBtn'); if (tb2) tb2.style.display = 'none';   // ⛔вантажнику фото не підставляють
   var box = document.getElementById('odoVans');
   if (box && !document.getElementById('odoWh'))
@@ -1089,10 +1093,81 @@ function photoLvl(chars) {
   return { side: 1600, q: 0.7 };
 }
 
+// ── КОРОБКИ (станция, docs/box-tracking-architecture-2026-08-13.md): авто-скан QR «LKBOX:<номер>»
+// с ПОЛНОГО кадра до сжатия. Водитель ничего не отмечает: нашли QR → окошко «📦 Коробка №N» +
+// запись rows/{id}/boxScans/{localId} (ключ = localId фото: повтор не дублирует, станция привяжет
+// скан к этому фото) + строка «Коробка распознана» в карточке (решение Сергея 2026-08-13: без номера).
+// jsQR не загрузился (CDN) → фото работают как раньше, скан просто выключен.
+var boxQ = [];
+try { boxQ = JSON.parse(localStorage.getItem('boxQ_' + DRV) || '[]'); } catch(e) { boxQ = []; }
+function saveBoxQ() { return _lsSet('boxQ_' + DRV, _qJSON(boxQ)); }
+function _parseBoxQr(s) {
+  var m = /^LKBOX:\s*([0-9]{1,10})$/.exec(String(s || '').trim());
+  if (!m) return null;
+  var n = parseInt(m[1], 10);
+  return n > 0 ? String(n) : null;
+}
+function boxScanCount(r) {
+  var seen = {};
+  var bs = (r && r.boxScans) || {};
+  Object.keys(bs).forEach(function(k) { if (bs[k]) seen[k] = 1; });
+  boxQ.forEach(function(q) { if (r && q.rowId === r.id) seen[q.localId] = 1; });
+  return Object.keys(seen).length;
+}
+function boxLineHtml(r) {
+  var n = boxScanCount(r);
+  if (!n) return '';
+  var txt = n === 1 ? '&#128230; Коробка распознана &#10003;' : '&#128230; Распознано коробок: ' + n;
+  return '<div style="font-size:11px;font-weight:700;color:#1856a0;margin-top:4px;padding:0 10px 6px">' + txt + '</div>';
+}
+function boxScanPhoto(file, rowId, localId) {
+  if (typeof jsQR === 'undefined') return;
+  var url = URL.createObjectURL(file), img = new Image();
+  img.onload = function() {
+    try {
+      var M = 1300, k = Math.min(1, M / Math.max(img.width, img.height));
+      var cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      var ctx = cv.getContext('2d');
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      var q = jsQR(ctx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height, { inversionAttempts: 'dontInvert' });
+      var num = q && _parseBoxQr(q.data);
+      if (num) {
+        boxQ.push({ rowId: rowId, localId: localId, code: 'LKBOX:' + num, ts: Date.now() });
+        saveBoxQ();
+        showToast('&#128230; Коробка №' + num);
+        render();
+        flushBoxQ();
+      }
+    } catch(e) {}
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = function() { URL.revokeObjectURL(url); };
+  img.src = url;
+}
+var _boxqBusy = false;
+function flushBoxQ() {
+  if (_boxqBusy || !boxQ.length || !navigator.onLine) return;
+  _boxqBusy = true;
+  var item = boxQ[0];
+  db.ref('rows/' + item.rowId + '/boxScans/' + item.localId)
+    .set({ code: item.code, ts: item.ts, localId: item.localId })
+    .then(function() {
+      _boxqBusy = false;
+      boxQ.shift(); saveBoxQ();
+      if (boxQ.length) setTimeout(flushBoxQ, 800);
+    })
+    .catch(function() { _boxqBusy = false; setTimeout(flushBoxQ, 15000); });
+}
+window.addEventListener('online', function() { setTimeout(flushBoxQ, 2500); });
+setTimeout(flushBoxQ, 3500);
+setInterval(function() { if (boxQ.length && navigator.onLine) flushBoxQ(); }, 30000);
+
 function uploadPhotoWithQueue(file, rowId) {
   var localId = _uid();
   var ts = Date.now();
   var path = 'photos/' + rowId + '/' + ts + '_' + localId + '.jpg';
+  try { boxScanPhoto(file, rowId, localId); } catch(e) {}   // авто-скан QR коробки (фото не блокирует)
   // 1) СРАЗУ показываем фото (⏳) и разблокируем «Выполнено» — водитель не ждёт сеть
   var r = rows.find(function(x) { return x.id === rowId; });
   var photos = (r && r.photos) ? [].concat(r.photos) : [];
@@ -1200,7 +1275,7 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '#odoGate .ovans-hd{width:100%;font-size:12.5px;color:#5a6b60;margin:-2px 0 2px}'
     + '#odoGate .ovans.need{outline:2px solid #d98324;outline-offset:4px;border-radius:12px}'
     + '#odoGate .ogo.wait{opacity:.62}'
-    + '#odoGate .ovan{flex:1;min-width:98px;border:1px solid #cfe0d6;background:#ffffff;color:#c9d6e8;border-radius:11px;padding:13px 10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
+    + '#odoGate .ovan{flex:1;min-width:98px;border:1px solid #cfe0d6;background:#ffffff;color:#1f2a24;border-radius:11px;padding:13px 10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
     + '#odoGate .ovan.on{border-color:#1a7a40;background:#dff3e6;color:#137a3d}'
     + '#odoVanBar{display:none;align-items:center;justify-content:space-between;gap:8px;background:#123a5c;color:#fff;padding:9px 12px;font-size:13px;font-weight:700}'
     + '#odoVanBar.on{display:flex}'
@@ -1268,6 +1343,7 @@ function odoVanLabel(id) {
   // ⛔Номер, вписаний водієм вручну, у списку машин не значиться — показуємо як є.
   return f ? f.label : String(id);
 }
+var _odoVansHint = null;   // чим підписати список машин у цьому випадку
 function odoRenderVans(show, exclude) {
   odoVanEx = exclude || null;
   var el = document.getElementById('odoVans'); if (!el) return;
@@ -1275,7 +1351,7 @@ function odoRenderVans(show, exclude) {
   var list = odoVans().filter(function (v) { return v.id !== odoVanEx; });
   if (!list.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = 'flex';
-  el.innerHTML = '<div class="ovans-hd">Нажмите машину, на которой поедете</div>' + list.map(function (v) {
+  el.innerHTML = '<div class="ovans-hd">' + (_odoVansHint || 'Нажмите машину, на которой поедете') + '</div>' + list.map(function (v) {
     return '<button type="button" class="ovan' + (v.id === odoVanSel ? ' on' : '') + '" data-van="' + v.id + '" onclick="odoPickVan(this)">' + v.label + '</button>';
   }).join('');
   odoVansExtraBtn();
@@ -2211,6 +2287,7 @@ function renderRow(r, num) {
       h += '<div class="photo-count">' + photos.length + ' фото</div>';
     }
   }
+  h += boxLineHtml(r);
   h += '</div>';
   h += '</div>';
   return h;
@@ -2686,7 +2763,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-11';
+var APP_V = '2026-08-13-12';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
