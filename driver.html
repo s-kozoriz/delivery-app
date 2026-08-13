@@ -631,7 +631,7 @@ function wtCloseDay(at) {
     var g = document.getElementById('pairGate');
     if (g && g.classList.contains('on')) return;   // питання на екрані — чекаємо відповідь
     _summaryAfterPair = false; daySummaryOrHint();
-  }, 900);
+  }, 400);
 }
 // ⛔День НЕ закрывается, пока водитель не записал конечный пробег. Раньше «Конец» и одометр
 //   жили отдельными кнопками, и день закрывался без километров — 10.08 так у Виталия и Ромы.
@@ -717,7 +717,7 @@ function showMonthSummary() {
     + '<div class="wts-mrow"><div class="wts-mlbl">За ' + wtMonthName() + '</div>'
     + '<div class="wts-mval">' + ms.hours + ' ч</div>'
     + '<div class="wts-msub">' + ms.days + ' ' + wtDaysWord(ms.days) + '</div></div>'
-    + '<button class="wts-done" onclick="closeMonthSummary()">Готово</button></div>';
+    + '<button class="wts-done" onclick="dayDoneExit()">Готово</button></div>';
   o.onclick = function (e) { if (e.target === o) closeMonthSummary(); };
   document.body.appendChild(o);
   wtSummaryTimer = setTimeout(closeMonthSummary, 6000);
@@ -909,6 +909,43 @@ function renderWtPanel() {
       '<button class="wt-main start" onclick="wtAsk(\'confirmStart\')">&#9654; Возобновить работу</button>' +
       '<div class="wt-done-note">Правки — у диспетчера.</div>';
   }
+}
+// Скільки записів ще не долетіло до бази.
+function pendingSaves() {
+  var n = 0;
+  try { n += Object.keys(wtQueue || {}).length; } catch (e) {}
+  try { n += (odoKmQ || []).length; } catch (e) {}
+  try { n += (offlineQueue || []).length; } catch (e) {}
+  return n;
+}
+// День закрито й показано — більше в застосунку робити нічого (рішення Сергія 13.08).
+//   ⛔Але спершу дочікуємося, щоб черга збереження спорожніла.
+var _exitTries = 0;
+function dayDoneExit() {
+  var box = document.getElementById('wtSummary');
+  if (pendingSaves() > 0 && _exitTries < 10) {
+    _exitTries++;
+    if (box) {
+      var b = box.querySelector('.wts-done');
+      if (b) { b.disabled = true; b.textContent = 'Сохраняем…'; }
+    }
+    setTimeout(dayDoneExit, 1000);
+    return;
+  }
+  if (pendingSaves() > 0) {
+    // зв’язку немає вже 10 секунд — людину не тримаємо, але й не викидаємо:
+    // черга лежить у сховищі й дойде при наступному вході.
+    if (!confirm('Данные ещё сохраняются — нет связи.\nВыйти всё равно? Они дойдут при следующем входе.')) {
+      var b2 = box && box.querySelector('.wts-done');
+      if (b2) { b2.disabled = false; b2.textContent = 'Готово'; }
+      _exitTries = 0;
+      return;
+    }
+  }
+  closeMonthSummary();
+  try { firebase.auth().signOut().then(function () { location.replace('login.html'); })
+    .catch(function () { location.replace('login.html'); }); }
+  catch (e) { location.replace('login.html'); }
 }
 function wtLogout() { if (confirm('Выйти и сменить вход?')) { firebase.auth().signOut().then(function () { location.replace('login.html'); }); } }
 function flushWtQueue() {
@@ -1982,7 +2019,7 @@ function pairClose(){
   var g=document.getElementById('pairGate'); if(g)g.classList.remove('on'); _pairDate=null; _pairSel={};
   // підсумок годин показуємо ПІСЛЯ того, як людина відповіла про напарника
   _summaryAfterPair = false;
-  setTimeout(daySummaryOrHint, 250);
+  daySummaryOrHint();
 }
 // ===================== /ПАРА =====================
 
@@ -2787,7 +2824,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-14';
+var APP_V = '2026-08-13-15';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
