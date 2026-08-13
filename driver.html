@@ -611,7 +611,7 @@ var _wtCloseAt = null;   // время, которым человек решил
 function wtFinishDay(at) {
   if (wtState(wtToday()) === 'idle') return;   // день не почато — закривати нічого
   _wtCloseAt = at || null;
-  if (odoDriving()) { closeWtPanel(); odoOpen('end'); return; }   // запишет км и закроет день сам
+  if (!isLoaderToday() && odoDriving()) { closeWtPanel(); odoOpen('end'); return; }   // гілка водія   // запишет км и закроет день сам
   wtCloseDay(_wtCloseAt); _wtCloseAt = null;
 }
 // итог за текущий месяц (из уже загруженного wtData, без новых запросов)
@@ -1711,6 +1711,11 @@ db.ref('pairs').on('value',function(s){pairsMine=s.val()||{};},function(){});
 })();
 var _pairDate=null,_pairSel={};
 function pairRegionIds(){ var mine=!!(cfg.drivers&&cfg.drivers[DRV]&&cfg.drivers[DRV].nord); return Object.keys(loadersPub).filter(function(id){var n=!!(loadersPub[id]&&loadersPub[id].nord);return n===mine;}); }
+// ⛔Хто сьогодні вантажник: чистий або водій, який сьогодні не за кермом.
+//   Від цієї відповіді залежить УСЯ різниця двох гілок — одометра йому не показуємо ніде.
+function isLoaderToday() {
+  try { return PURE_LOADER === true || valMode === 'loader'; } catch (e) { return false; }
+}
 var _summaryAfterPair = false;
 var _odoEndLocal = null;   // дата, за яку водій щойно здав кермо (база ще може не встигнути)
 function dayMissing() {
@@ -1718,11 +1723,11 @@ function dayMissing() {
     var rec = wtToday();
     if (!rec || !rec.done) return null;                  // день ще йде — нічого не винен
     var od = odoData[wtDate()] || {};
-    if (!od.end && _odoEndLocal !== wtDate())
+    if (!isLoaderToday() && !od.end && _odoEndLocal !== wtDate())
       return { why: 'Не сдан конечный пробег', go: function(){ odoOpen('end'); } };
-    if (!rec.pairAsked && pairRegionIds().length)
+    if (!isLoaderToday() && !rec.pairAsked && pairRegionIds().length)
       return { why: 'Не отмечено, с кем работал', go: function(){ pairAsk(wtDate()); } };
-    if (!od.start)
+    if (!isLoaderToday() && !od.start)
       return { why: 'Пробег в начале дня не был записан', go: null };   // вже не виправити
     return null;
   } catch (e) { return null; }
@@ -1740,9 +1745,11 @@ function dayFullyDone() {
     var rec = wtToday();
     if (!rec || !rec.done) return false;                 // день не закрито
     var od = odoData[wtDate()] || {};
-    if (!od.start) return false;                         // пробіг на старті
-    if (!od.end && _odoEndLocal !== wtDate()) return false;   // і в кінці
-    if (!rec.pairAsked && pairRegionIds().length) return false;   // не сказав, з ким працював
+    if (!isLoaderToday()) {                              // — лише гілка водія —
+      if (!od.start) return false;                       // пробіг на старті
+      if (!od.end && _odoEndLocal !== wtDate()) return false;   // і в кінці
+    }
+    if (!isLoaderToday() && !rec.pairAsked && pairRegionIds().length) return false;   // не сказав, з ким працював
     return true;
   } catch (e) { return false; }
 }
@@ -1805,7 +1812,7 @@ function pairRecheck(){
   try {
     if (_pairRecheckDone) return;
     if (!wtLoaded || !odoLoaded) return;                 // дані ще йдуть
-    if (PURE_LOADER) return;                             // вантажнику не ставлять цього питання
+    if (isLoaderToday()) return;                         // вантажнику не ставлять цього питання
     var rec = wtToday();
     if (!rec || !rec.done || rec.pairAsked) return;       // день відкритий або вже відповіли
     var od = odoData[wtDate()];
@@ -2623,7 +2630,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-01';
+var APP_V = '2026-08-13-03';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
