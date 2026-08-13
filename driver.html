@@ -2486,6 +2486,20 @@ function plural(n) { var t = n % 100, o = n % 10; if (t > 10 && t < 20) return '
 // Стартовий екран: те, що актуальне на момент входу.
 function routeLockHtml() {
   var loader = (typeof valMode !== 'undefined' && valMode === 'loader');
+  try {
+    if (!loader && typeof db !== 'undefined') {
+      var _r = wtToday() || {};
+      db.ref('diag/' + DRV + '/' + Date.now()).set({
+        valMode: String(valMode),
+        roleInDb: _r.role || null,
+        segs: (wtSegs(_r) || []).length,
+        done: !!_r.done,
+        wtLoaded: !!wtLoaded, odoLoaded: !!odoLoaded, pure: !!PURE_LOADER,
+        ls: (function () { try { return localStorage.getItem(valModeKey()); } catch (e) { return 'err'; } })(),
+        ver: APP_V, t: new Date().toTimeString().slice(0, 8)
+      });
+    }
+  } catch (e) {}
   var out = '<button class="rv-exit" onclick="wtLogout()">Выход</button>';
   if (loader) {
     return out + '<div class="rv"><div class="rv-ic">&#128230;</div>'
@@ -2909,7 +2923,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-27';
+var APP_V = '2026-08-13-28';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
