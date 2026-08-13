@@ -1409,7 +1409,7 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '<button class="oshotg" id="odoShotG" onclick="odoShootGal()">&#128444; Взять фото из галереи</button>'
     + '<div class="okm"><label>Пробег, км</label><input id="odoKm" type="number" inputmode="numeric" placeholder="напр. 123456" oninput="odoValidate()"></div>'
     + '<button class="ogo" id="odoGo" disabled onclick="odoSave()"></button>'
-    + '<button class="ogo" id="odoGoL" style="display:none" onclick="odoStartLoader()">Начать смену</button>'
+    + '<button class="ogo" id="odoGoL" style="display:none" onclick="odoStartLoader()">Начать смену грузчиком</button>'
     + '</div>';
   document.body.appendChild(g);
   var inp = document.createElement('input'); inp.id = 'odoInput'; inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment'); inp.style.display = 'none';
@@ -1698,7 +1698,14 @@ function odoPickRole(r) {
   var _tb2 = document.getElementById('odoTestBtn');
   if (_tb2) _tb2.style.display = drv ? '' : 'none';   // вантажнику фото не підставляють
   var go = document.getElementById('odoGo'); if (go) go.style.display = drv ? '' : 'none';
-  var gl = document.getElementById('odoGoL'); if (gl) gl.style.display = drv ? 'none' : '';
+  var gl = document.getElementById('odoGoL');
+  if (gl) {
+    gl.style.display = drv ? 'none' : '';
+    // ⛔кнопка могла лишитись від кінця дня — повертаємо їй рідну дію й напис
+    gl.textContent = 'Начать смену грузчиком';
+    gl.setAttribute('onclick', 'odoStartLoader()');
+    gl.onclick = null;
+  }
   if (drv) odoValidate();
 }
 // Грузчик за руль не садится — ни машины, ни фото, ни километров: одна кнопка.
@@ -2889,7 +2896,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-24';
+var APP_V = '2026-08-13-25';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
