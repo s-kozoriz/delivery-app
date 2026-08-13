@@ -1703,8 +1703,8 @@ function odoPickRole(r) {
     gl.style.display = drv ? 'none' : '';
     // ⛔кнопка могла лишитись від кінця дня — повертаємо їй рідну дію й напис
     gl.textContent = 'Начать смену грузчиком';
+    gl.onclick = null;                       // знімаємо старе — і вже потім ставимо своє
     gl.setAttribute('onclick', 'odoStartLoader()');
-    gl.onclick = null;
   }
   if (drv) odoValidate();
 }
@@ -2896,7 +2896,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-25';
+var APP_V = '2026-08-13-26';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
