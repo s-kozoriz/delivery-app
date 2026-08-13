@@ -260,6 +260,9 @@ body{background:#0d1520;color:#eaf0f8}
 .wt-q{color:#eaf0f8}
 .wt-qs{color:#9fb0c8}
 .wt-cancel{background:#1c2836;color:#eaf0f8;border-color:#2a3a50}
+
+.empty .ldr{width:34px;height:34px;margin:0 auto 14px;border:3px solid #2a3a50;border-top-color:#8ea3c4;border-radius:50%;animation:ldrspin .8s linear infinite}
+@keyframes ldrspin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -2464,6 +2467,13 @@ function render() {
   } else prg.style.display = 'none';
 
   var wrap = document.getElementById('wrap');
+  // Дані ще не прийшли — не вигадуємо стан, чесно кажемо, що вантажимо.
+  if (!odoLoaded || !wtLoaded) {
+    wrap.innerHTML = '<div class="empty"><div class="ldr"></div><p>Загрузка…</p></div>';
+    var _pl = document.getElementById('prg'); if (_pl) _pl.style.display = 'none';
+    var _hl = document.querySelector('.hdr'); if (_hl) _hl.style.display = 'none';
+    return;
+  }
   if (!routeAllowed()) {
     wrap.innerHTML = routeLockHtml();
     var _p = document.getElementById('prg'); if (_p) _p.style.display = 'none';
@@ -2844,7 +2854,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-18';
+var APP_V = '2026-08-13-19';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
