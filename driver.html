@@ -159,7 +159,7 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .wt3.dim{background:rgba(255,255,255,.12);color:rgba(255,255,255,.42);cursor:default}
 .exit-btn{border:none;background:rgba(255,255,255,.16);color:#fff;border-radius:10px;padding:0 12px;height:36px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0}
 .exit-btn:active{background:rgba(255,255,255,.3)}
-.wt-panel{position:fixed;inset:0;z-index:300;background:#0d1520;display:none;align-items:center;justify-content:center;padding:20px}
+.wt-panel{position:fixed;inset:0;z-index:300;background:#f0f8f4;display:none;align-items:center;justify-content:center;padding:20px}
 .wt-panel.on{display:flex}
 .wt-panel-inner{background:#fff;width:100%;max-width:340px;border-radius:18px;padding:22px 20px;text-align:center;animation:wtPop .2s ease}
 @keyframes wtPop{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
@@ -622,6 +622,7 @@ function loaderEndAsk() {
   odoFields(false);                                   // жодного фото й кілометрів
   var tb = document.getElementById('odoTestBtn'); if (tb) tb.style.display = 'none';
   odoRenderVans(true, null);
+  var tb2 = document.getElementById('odoTestBtn'); if (tb2) tb2.style.display = 'none';   // ⛔вантажнику фото не підставляють
   var box = document.getElementById('odoVans');
   if (box && !document.getElementById('odoWh'))
     box.insertAdjacentHTML('beforeend', '<button type="button" class="ovan" id="odoWh" onclick="loaderPickWh()">&#127978; Склад</button>');
@@ -1151,35 +1152,35 @@ function odoNeedFix() {
 }
 function odoBlockToast() { showToast('Сначала зафиксируйте пробег — фото и километры'); odoOpen('start'); }
 (function () {
-  var css = '#odoGate{position:fixed;inset:0;z-index:9000;background:#0d1520;display:none;flex-direction:column;color:#eaf0f8;font-family:inherit}'
+  var css = '#odoGate{position:fixed;inset:0;z-index:9000;background:#f0f8f4;display:none;flex-direction:column;color:#141a16;font-family:inherit}'
     + '#odoGate.on{display:flex}'
     + '#odoGate .ohd{padding:18px 18px 4px;font-size:18px;font-weight:800;text-align:center}'
-    + '#odoGate .osub{font-size:12.5px;color:#9fb0c8;text-align:center;padding:0 20px 10px}'
-    + '#odoGate .ocam{flex:1;display:flex;align-items:center;justify-content:center;background:#0a0e14;overflow:hidden}'
-    + '#odoGate .ocam img{max-width:88%;max-height:100%;border-radius:12px;border:2px solid #263346}'
-    + '#odoGate .ohint{color:#7c8aa0;font-size:14px;text-align:center;padding:24px;font-weight:600}'
+    + '#odoGate .osub{font-size:12.5px;color:#5a6b60;text-align:center;padding:0 20px 10px}'
+    + '#odoGate .ocam{flex:1;display:flex;align-items:center;justify-content:center;background:#e3ece7;overflow:hidden}'
+    + '#odoGate .ocam img{max-width:88%;max-height:100%;border-radius:12px;border:2px solid #cfe0d6}'
+    + '#odoGate .ohint{color:#6b7a70;font-size:14px;text-align:center;padding:24px;font-weight:600}'
     + '#odoGate .oform{padding:14px 16px 20px;display:flex;flex-direction:column;gap:11px}'
-    + '#odoGate .oshotg{width:100%;border:1px solid #33465e;background:none;color:#8ea3c4;border-radius:12px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:-4px}'
-    + '#odoGate .oshot{width:100%;border:2px dashed #3a5a86;background:none;color:#8fb4e6;border-radius:12px;padding:15px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
-    + '#odoGate .oshot.done{border-style:solid;border-color:#1a7a40;color:#8ef0b0;background:#0f2417}'
-    + '#odoGate .okm{display:flex;align-items:center;gap:10px;background:#131c28;border:1px solid #2a3a50;border-radius:12px;padding:9px 12px}'
-    + '#odoGate .okm label{font-size:13px;font-weight:700;color:#d0a94e;white-space:nowrap}'
-    + '#odoGate .okm input{flex:1;background:#0a0e14;border:1px solid #3a4a60;border-radius:8px;padding:12px;font-size:19px;font-weight:800;color:#ffd24a;text-align:center;letter-spacing:.05em;width:100%;font-family:inherit}'
+    + '#odoGate .oshotg{width:100%;border:1px solid #b9cfc2;background:none;color:#2f6b4a;border-radius:12px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:-4px}'
+    + '#odoGate .oshot{width:100%;border:2px dashed #1a7a40;background:none;color:#1a7a40;border-radius:12px;padding:15px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
+    + '#odoGate .oshot.done{border-style:solid;border-color:#1a7a40;color:#137a3d;background:#dff3e6}'
+    + '#odoGate .okm{display:flex;align-items:center;gap:10px;background:#ffffff;border:1px solid #cfe0d6;border-radius:12px;padding:9px 12px}'
+    + '#odoGate .okm label{font-size:13px;font-weight:700;color:#7a5a10;white-space:nowrap}'
+    + '#odoGate .okm input{flex:1;background:#e3ece7;border:1px solid #cfe0d6;border-radius:8px;padding:12px;font-size:19px;font-weight:800;color:#141a16;text-align:center;letter-spacing:.05em;width:100%;font-family:inherit}'
     + '#odoGate .ogo{width:100%;border:none;border-radius:12px;padding:16px;font-size:17px;font-weight:800;color:#fff;background:#1a7a40;cursor:pointer;font-family:inherit}'
-    + '#odoGate .ogo:disabled{background:#2f3d4e;color:#7c8aa0}'
-    + '#odoGate .opeek{background:none;border:none;color:#8ea3c4;font-size:13px;font-weight:700;cursor:pointer;padding:8px;text-decoration:underline;font-family:inherit}'
+    + '#odoGate .ogo:disabled{background:#cfd8d2;color:#6b7a70}'
+    + '#odoGate .opeek{background:none;border:none;color:#2f6b4a;font-size:13px;font-weight:700;cursor:pointer;padding:8px;text-decoration:underline;font-family:inherit}'
     + '#odoBanner{display:none;align-items:center;justify-content:space-between;gap:8px;background:#b23b2e;color:#fff;padding:10px 12px;font-size:13px;font-weight:800}'
     + '#odoBanner.on{display:flex}'
     + '#odoBanner button{background:#fff;color:#b23b2e;border:none;border-radius:8px;padding:7px 13px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}'
     + '#odoGate .orole{display:flex;gap:9px;padding:0 16px 4px}'
-    + '#odoGate .orole-b{flex:1;border:1px solid #3a4a60;background:#131c28;color:#c9d6e8;border-radius:12px;padding:15px 8px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
-    + '#odoGate .orole-b.on{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
-    + '#odoGate .oshot-note{margin:0 16px 8px;padding:9px 12px;border-radius:9px;font-size:13px;line-height:1.4;background:#131c28;border:1px solid #263346;color:#c9d6e8}'
-    + '#odoGate .oshot-note.ok{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
+    + '#odoGate .orole-b{flex:1;border:1px solid #cfe0d6;background:#ffffff;color:#c9d6e8;border-radius:12px;padding:15px 8px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
+    + '#odoGate .orole-b.on{border-color:#1a7a40;background:#dff3e6;color:#137a3d}'
+    + '#odoGate .oshot-note{margin:0 16px 8px;padding:9px 12px;border-radius:9px;font-size:13px;line-height:1.4;background:#ffffff;border:1px solid #cfe0d6;color:#c9d6e8}'
+    + '#odoGate .oshot-note.ok{border-color:#1a7a40;background:#dff3e6;color:#137a3d}'
     + '#odoGate .oshot-use{display:block;width:100%;margin-top:8px;background:#1a7a40;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}'
     + '#odoGate .oshot-note.bad{border-color:#b23b2e;background:#2a1512;color:#ffb3a7}'
     + '#odoGate .oshot-note.warn{border-color:#a35a06;background:#2a1e0d;color:#ffd9a0}'
-    + '#odoGate .oshot-note.wait{color:#9fb0c8}'
+    + '#odoGate .oshot-note.wait{color:#5a6b60}'
     + '#odoGate .ovans{display:flex;gap:8px;flex-wrap:wrap}'
     + '.rv{padding:30px 18px 24px;text-align:center;color:#2a3a2f}'
     + '.rv-exit{position:absolute;top:12px;right:12px;background:#e6eee9;color:#4a5a50;border:none;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}'
@@ -1196,11 +1197,11 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '.rv-c b{color:#1a7a40;font-variant-numeric:tabular-nums}'
     + '.rv-sub{font-size:13.5px;color:#5a6b60;line-height:1.5;margin-top:16px}'
     + '.rv-empty{font-size:15px;color:#5a6b60;margin:18px 0}'
-    + '#odoGate .ovans-hd{width:100%;font-size:12.5px;color:#9fb0c8;margin:-2px 0 2px}'
+    + '#odoGate .ovans-hd{width:100%;font-size:12.5px;color:#5a6b60;margin:-2px 0 2px}'
     + '#odoGate .ovans.need{outline:2px solid #d98324;outline-offset:4px;border-radius:12px}'
     + '#odoGate .ogo.wait{opacity:.62}'
-    + '#odoGate .ovan{flex:1;min-width:98px;border:1px solid #3a4a60;background:#131c28;color:#c9d6e8;border-radius:11px;padding:13px 10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
-    + '#odoGate .ovan.on{border-color:#1a7a40;background:#0f2417;color:#8ef0b0}'
+    + '#odoGate .ovan{flex:1;min-width:98px;border:1px solid #cfe0d6;background:#ffffff;color:#c9d6e8;border-radius:11px;padding:13px 10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}'
+    + '#odoGate .ovan.on{border-color:#1a7a40;background:#dff3e6;color:#137a3d}'
     + '#odoVanBar{display:none;align-items:center;justify-content:space-between;gap:8px;background:#123a5c;color:#fff;padding:9px 12px;font-size:13px;font-weight:700}'
     + '#odoVanBar.on{display:flex}'
     + '#odoVanBar button{background:#fff;color:#123a5c;border:none;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}';
@@ -1740,21 +1741,21 @@ var loadersPub={}, pairsMine={};
 db.ref('loaders_pub').on('value',function(s){loadersPub=s.val()||{};},function(){});
 db.ref('pairs').on('value',function(s){pairsMine=s.val()||{};},function(){});
 (function(){
-  var css='#pairGate{position:fixed;inset:0;z-index:9200;background:#0d1520;display:none;flex-direction:column;color:#eaf0f8;font-family:inherit;padding:22px}'
+  var css='#pairGate{position:fixed;inset:0;z-index:9200;background:#f0f8f4;display:none;flex-direction:column;color:#141a16;font-family:inherit;padding:22px}'
     +'#pairGate.on{display:flex}'
-    +'#pairGate .pdone{background:#0f2417;border:1px solid #1a7a40;border-radius:12px;padding:12px 14px;margin-bottom:18px;text-align:center}'
-+'#pairGate .pdone b{display:block;font-size:16px;font-weight:800;color:#8ef0b0;margin-bottom:3px}'
-+'#pairGate .pdone span{font-size:13px;color:#9fb0c8}'
+    +'#pairGate .pdone{background:#dff3e6;border:1px solid #1a7a40;border-radius:12px;padding:12px 14px;margin-bottom:18px;text-align:center}'
++'#pairGate .pdone b{display:block;font-size:16px;font-weight:800;color:#137a3d;margin-bottom:3px}'
++'#pairGate .pdone span{font-size:13px;color:#5a6b60}'
 +'#pairGate .phd{font-size:20px;font-weight:800;text-align:center;margin-bottom:4px}'
-    +'#pairGate .psub{font-size:13px;color:#9fb0c8;text-align:center;line-height:1.5;margin-bottom:16px}'
+    +'#pairGate .psub{font-size:13px;color:#5a6b60;text-align:center;line-height:1.5;margin-bottom:16px}'
     +'#pairGate .plist{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px}'
-    +'#pairGate .prow{color:#eaf0f8;width:100%;display:flex;align-items:center;justify-content:center;text-align:center;gap:8px;font-weight:700;cursor:pointer;font-family:inherit;background:#131c28;border:1px solid #2a3a50;border-radius:12px;padding:15px 16px;font-size:17px;font-weight:700;cursor:pointer}'
+    +'#pairGate .prow{color:#141a16;width:100%;display:flex;align-items:center;justify-content:center;text-align:center;gap:8px;font-weight:700;cursor:pointer;font-family:inherit;background:#ffffff;border:1px solid #cfe0d6;border-radius:12px;padding:15px 16px;font-size:17px;font-weight:700;cursor:pointer}'
     +'#pairGate .prow.palone{border-style:dashed}'
-+'#pairGate .prow.on{background:#0f2417;border-color:#1a7a40;color:#8ef0b0}'
-    +'#pairGate .pck{width:26px;height:26px;border-radius:7px;border:2px solid #3a4a60;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px}'
++'#pairGate .prow.on{background:#dff3e6;border-color:#1a7a40;color:#137a3d}'
+    +'#pairGate .pck{width:26px;height:26px;border-radius:7px;border:2px solid #cfe0d6;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px}'
     +'#pairGate .prow.on .pck{background:#1a7a40;border-color:#1a7a40;color:#fff}'
     +'#pairGate .pgo{border:none;border-radius:12px;padding:16px;font-size:17px;font-weight:800;color:#fff;background:#1a7a40;cursor:pointer;margin-top:12px;font-family:inherit}'
-    +'#pairGate .pskip{background:none;border:none;color:#8ea3c4;font-size:13px;font-weight:700;cursor:pointer;padding:10px;text-decoration:underline;font-family:inherit}';
+    +'#pairGate .pskip{background:none;border:none;color:#2f6b4a;font-size:13px;font-weight:700;cursor:pointer;padding:10px;text-decoration:underline;font-family:inherit}';
   var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
   var g=document.createElement('div');g.id='pairGate';
   g.innerHTML='<div id="pairDone"></div>'+'<div class="phd">Кто ездил с тобой сегодня?</div>'
@@ -1888,10 +1889,10 @@ function pairClose(){
 // ── РОЛЬ НА ДЕНЬ (только Валентин): водитель / грузчик — авторизация НЕ трогается ──
 var valMode = null, _valAsked = false, _valPendingCb = null;
 (function () {
-  var css = '#valPick{position:fixed;inset:0;z-index:9500;background:#0d1520;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#eaf0f8;font-family:inherit;padding:24px}'
+  var css = '#valPick{position:fixed;inset:0;z-index:9500;background:#f0f8f4;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#141a16;font-family:inherit;padding:24px}'
     + '#valPick.on{display:flex}'
     + '#valPick .vhd{font-size:22px;font-weight:800;text-align:center}'
-    + '#valPick .vsub{font-size:13.5px;color:#9fb0c8;text-align:center;line-height:1.5;margin-top:-6px}'
+    + '#valPick .vsub{font-size:13.5px;color:#5a6b60;text-align:center;line-height:1.5;margin-top:-6px}'
     + '#valPick .vbtn{width:100%;max-width:340px;border:none;border-radius:16px;padding:22px;font-size:20px;font-weight:800;color:#fff;cursor:pointer;font-family:inherit}'
     + '#valPick .vdrv{background:#1856a0}'
     + '#valPick .vloa{background:#b06a12}'
@@ -2685,7 +2686,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-09';
+var APP_V = '2026-08-13-11';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
