@@ -242,6 +242,16 @@ body{background:#0d1520;color:#eaf0f8}
 .wts-card{background:#131c28;color:#eaf0f8}
 .str{background:#3a2a10;color:#ffcf7a}
 .sur{background:#3a1520;color:#ff9aa8}
+
+/* Підсумок дня — темна гама, суцільна підкладка */
+.wt-summary{background:#0d1520}
+.wts-h{color:#eaf0f8}
+.wts-day{color:#9fb0c8}
+.wts-dayv{color:#c88ae0}
+.wts-mrow{background:#1c2836;border-color:#33465e}
+.wts-mlbl{color:#e2b25f}
+.wts-mval{color:#e2b25f}
+.wts-msub{color:#9fb0c8}
 </style>
 </head>
 <body>
@@ -2777,7 +2787,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-13';
+var APP_V = '2026-08-13-14';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
