@@ -610,6 +610,19 @@ function wtCloseDay(at) {
 // ⛔День НЕ закрывается, пока водитель не записал конечный пробег. Раньше «Конец» и одометр
 //   жили отдельными кнопками, и день закрывался без километров — 10.08 так у Виталия и Ромы.
 var _wtCloseAt = null;   // время, которым человек решил закрыть день (если выбрал не «сейчас»)
+// Друга зміна того ж дня: вантажника викликали повторно.
+function wtReopenDay() {
+  if (!isLoaderToday()) return;                 // гілка водія тут не ходить — там ще пробіг
+  if (wtState(wtToday()) !== 'done') return;
+  if (!confirm('Смена за сегодня уже закрыта.\nОткрыть вторую смену — вас вызвали снова?')) return;
+  wtMutate(function (rec) {
+    var L = wtSegs(rec);
+    L.push({ s: nowTime() });
+    rec.seg = L; rec.done = null;
+  });
+  showToast('Вторая смена начата');
+  if (navigator.vibrate) navigator.vibrate(60);
+}
 function wtFinishDay(at) {
   if (wtState(wtToday()) === 'idle') return;   // день не почато — закривати нічого
   _wtCloseAt = at || null;
@@ -741,6 +754,8 @@ function renderWtBtn() {
   else if (st === 'pause') { b1 = '<button class="wt3 go" onclick="wtStartSeg()">&#9654; Продолжить</button>'; b2 = ''; b3 = '<button class="wt3 end" ' + END + '>&#9209; Конец</button>'; }
   // день закрыт: ⛔ни одна кнопка не открывает смену одним касанием — иначе в табеле
   //   появляются обрывки вида 17:41–17:41 (за 14 дней их набралось шесть у четверых)
+  else if (isLoaderToday()) { b1 = '<button class="wt3 go" onclick="wtReopenDay()">&#9654; Начать снова</button>';
+    b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
   else { b1 = '<button class="wt3 dim">&#10003; День закрыт</button>'; b2 = '<button class="wt3 dim">&#9208; Перерыв</button>'; b3 = '<button class="wt3 dim">&#9209; Конец</button>'; }
   // ⛔Требование пробега висело ТОЛЬКО на кнопке «Конец» — её можно просто не нажимать:
   //   поставил «Перерыв» и ушёл, день остался открытым и без километров. Теперь, если машину
@@ -2632,7 +2647,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-04';
+var APP_V = '2026-08-13-05';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
