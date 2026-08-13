@@ -252,6 +252,9 @@ body{background:#0d1520;color:#eaf0f8}
 .wts-mlbl{color:#e2b25f}
 .wts-mval{color:#e2b25f}
 .wts-msub{color:#9fb0c8}
+
+#dayVeil{position:fixed;inset:0;z-index:399;background:#0d1520;display:none}
+#dayVeil.on{display:block}
 </style>
 </head>
 <body>
@@ -304,6 +307,7 @@ body{background:#0d1520;color:#eaf0f8}
   </div>
 </div>
 <!-- FAB Add Task -->
+<div id="dayVeil"></div>
 <button class="fab-add" id="fabAddTask" onclick="openAddSheet()" title="Добавить задание">+</button>
 
 <!-- Add task sheet (type selection) -->
@@ -691,11 +695,16 @@ function wtReopenDay() {
   showToast('Вторая смена начата');
   if (navigator.vibrate) navigator.vibrate(60);
 }
+function dayVeil(on) {
+  var v = document.getElementById('dayVeil');
+  if (v) v.classList[on ? 'add' : 'remove']('on');
+}
 function wtFinishDay(at) {
   if (wtState(wtToday()) === 'idle') return;   // день не почато — закривати нічого
   _wtCloseAt = at || null;
-  if (!isLoaderToday() && odoDriving()) { closeWtPanel(); odoOpen('end'); return; }   // гілка водія
-  if (isLoaderToday()) { closeWtPanel(); loaderEndAsk(); return; }                   // гілка вантажника   // запишет км и закроет день сам
+  if (!isLoaderToday() && odoDriving()) { closeWtPanel(); dayVeil(true); odoOpen('end'); return; }   // гілка водія
+  if (isLoaderToday()) { closeWtPanel(); dayVeil(true); loaderEndAsk(); return; }                   // гілка вантажника   // запишет км и закроет день сам
+  dayVeil(true);
   wtCloseDay(_wtCloseAt); _wtCloseAt = null;
 }
 // итог за текущий месяц (из уже загруженного wtData, без новых запросов)
@@ -854,7 +863,11 @@ function wtBtnTap() {
   else if (st === 'done') wtStartSeg();
 }
 function openWtPanel() { wtPanelMode = 'view'; document.getElementById('wtPanel').classList.add('on'); renderWtPanel(); }
-function closeWtPanel() { document.getElementById('wtPanel').classList.remove('on'); }
+function closeWtPanel() {
+  // передумав закривати день — завісу геть
+  if (wtState(wtToday()) !== 'done') dayVeil(false);
+  document.getElementById('wtPanel').classList.remove('on');
+}
 function wtRepanel() { var p = document.getElementById('wtPanel'); if (p && p.classList.contains('on')) renderWtPanel(); }
 function wtAsk(m) { wtPanelMode = m; renderWtPanel(); }
 function wtBack() { wtPanelMode = 'view'; renderWtPanel(); }
@@ -943,9 +956,11 @@ function dayDoneExit() {
     }
   }
   closeMonthSummary();
-  try { firebase.auth().signOut().then(function () { location.replace('login.html'); })
-    .catch(function () { location.replace('login.html'); }); }
-  catch (e) { location.replace('login.html'); }
+  dayVeil(true);                              // до самого переходу нічого не показуємо
+  try { firebase.auth().signOut(); } catch (e) {}   // фоном, не чекаємо
+  try { location.replace('login.html'); } catch (e) {}
+  // ⛔запасний шлях: якщо через півтори секунди ми все ще тут
+  setTimeout(function () { try { location.href = 'login.html'; } catch (e) {} }, 1500);
 }
 function wtLogout() { if (confirm('Выйти и сменить вход?')) { firebase.auth().signOut().then(function () { location.replace('login.html'); }); } }
 function flushWtQueue() {
@@ -2824,7 +2839,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-15';
+var APP_V = '2026-08-13-17';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
