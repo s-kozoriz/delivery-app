@@ -255,6 +255,11 @@ body{background:#0d1520;color:#eaf0f8}
 
 #dayVeil{position:fixed;inset:0;z-index:399;background:#0d1520;display:none}
 #dayVeil.on{display:block}
+
+/* питання в панелі часу — читабельні на темному */
+.wt-q{color:#eaf0f8}
+.wt-qs{color:#9fb0c8}
+.wt-cancel{background:#1c2836;color:#eaf0f8;border-color:#2a3a50}
 </style>
 </head>
 <body>
@@ -870,7 +875,7 @@ function closeWtPanel() {
 }
 function wtRepanel() { var p = document.getElementById('wtPanel'); if (p && p.classList.contains('on')) renderWtPanel(); }
 function wtAsk(m) { wtPanelMode = m; renderWtPanel(); }
-function wtBack() { wtPanelMode = 'view'; renderWtPanel(); }
+function wtBack() { wtPanelMode = 'view'; closeWtPanel(); }
 function wtDoStart() { wtPanelMode = 'view'; wtStartSeg(); }
 function wtDoFinish() { wtPanelMode = 'view'; wtFinishDay(); }
 function wtDoFinishAt(at) { wtPanelMode = 'view'; wtFinishDay(at); }
@@ -2839,7 +2844,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-17';
+var APP_V = '2026-08-13-18';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
