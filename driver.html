@@ -159,7 +159,7 @@ body{background:#f0f8f4;color:#141a16;font-family:'Segoe UI',sans-serif;font-siz
 .wt3.dim{background:rgba(255,255,255,.12);color:rgba(255,255,255,.42);cursor:default}
 .exit-btn{border:none;background:rgba(255,255,255,.16);color:#fff;border-radius:10px;padding:0 12px;height:36px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0}
 .exit-btn:active{background:rgba(255,255,255,.3)}
-.wt-panel{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:20px}
+.wt-panel{position:fixed;inset:0;z-index:300;background:#0d1520;display:none;align-items:center;justify-content:center;padding:20px}
 .wt-panel.on{display:flex}
 .wt-panel-inner{background:#fff;width:100%;max-width:340px;border-radius:18px;padding:22px 20px;text-align:center;animation:wtPop .2s ease}
 @keyframes wtPop{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
@@ -803,7 +803,7 @@ function renderWtBtn() {
   odoRemindBar();
   // ⛔«+» лише в роботі: після закриття дня й на паузі завдання не додають.
   var _fab = document.getElementById('fabAddTask');
-  if (_fab) _fab.style.display = (st === 'run') ? '' : 'none';
+  if (_fab) _fab.style.display = (st === 'run' && !isLoaderToday()) ? '' : 'none';
   pairRecheck();
   // ⛔Затверджений вигляд початку дня: на екрані ОДНА дія. Поки день не почато, велика кнопка
   //   «Начать день» уже стоїть у блоці з обсягом дня — три кнопки над нею лише плутають
@@ -2685,7 +2685,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-08';
+var APP_V = '2026-08-13-09';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
