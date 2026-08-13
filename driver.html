@@ -1461,6 +1461,8 @@ function odoPickRole(r) {
   //   Показуємо місце під знімок лише тоді, коли знімок справді є.
   var _cam = document.getElementById('odoCam');
   if (_cam) _cam.style.display = (drv && odoPhotoFile) ? '' : 'none';
+  var _tb2 = document.getElementById('odoTestBtn');
+  if (_tb2) _tb2.style.display = drv ? '' : 'none';   // вантажнику фото не підставляють
   var go = document.getElementById('odoGo'); if (go) go.style.display = drv ? '' : 'none';
   var gl = document.getElementById('odoGoL'); if (gl) gl.style.display = drv ? 'none' : '';
   if (drv) odoValidate();
@@ -2647,7 +2649,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-05';
+var APP_V = '2026-08-13-06';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
