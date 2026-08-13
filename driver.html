@@ -2128,6 +2128,8 @@ function valDayStarted() {
     if (rec && (wtSegs(rec).length > 0 || rec.done)) return true;
     var od = (typeof odoData !== 'undefined' && odoData) ? odoData[wtDate()] : null;
     if (od && (od.start || od.end)) return true;
+    try { if (wtQueue && wtQueue[wtDate()]) return true; } catch (e) {}   // запис ще летить у базу
+    try { if (localStorage.getItem('wtQueue_' + DRV) && localStorage.getItem('wtQueue_' + DRV).indexOf(wtDate()) > -1) return true; } catch (e) {}
     return false;
   } catch (e) { return true; }
 }
@@ -2887,7 +2889,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-23';
+var APP_V = '2026-08-13-24';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
