@@ -963,12 +963,18 @@ function dayDoneExit() {
       return;
     }
   }
-  closeMonthSummary();
-  dayVeil(true);                              // до самого переходу нічого не показуємо
+  var _b = document.querySelector('.wts-done');
+  if (_b) { _b.disabled = true; _b.textContent = 'Выход…'; }
   try { firebase.auth().signOut(); } catch (e) {}   // фоном, не чекаємо
+  try { location.href = 'login.html'; } catch (e) {}
   try { location.replace('login.html'); } catch (e) {}
-  // ⛔запасний шлях: якщо через півтори секунди ми все ще тут
-  setTimeout(function () { try { location.href = 'login.html'; } catch (e) {} }, 1500);
+  // ⛔Не вийшло за 2 с — повертаємо людині екран, а не лишаємо в порожнечі.
+  setTimeout(function () {
+    dayVeil(false);
+    var b2 = document.querySelector('.wts-done');
+    if (b2) { b2.disabled = false; b2.textContent = 'Выйти'; }
+    try { render(); renderWtBtn(); } catch (e) {}
+  }, 2000);
 }
 function wtLogout() { if (confirm('Выйти и сменить вход?')) { firebase.auth().signOut().then(function () { location.replace('login.html'); }); } }
 function flushWtQueue() {
@@ -2854,7 +2860,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-19';
+var APP_V = '2026-08-13-20';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
