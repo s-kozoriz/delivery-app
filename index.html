@@ -3303,17 +3303,17 @@ function incUnplace(inv){
   db.ref('1c/delivery/placed/'+inv).remove();
 }
 // когда рапер снова присылает накладную — наш оверлей-копия больше не нужен
-var RET_TTL_MS = 3*24*3600*1000;   // скільки чекаємо на повернення накладної в потік 1С
+var RET_TTL_MS = 24*3600*1000;   // доба: не повернулась наступного дня — копії тут не місце
 function incCleanReturned(){
   var nowTs=Date.now();
   Object.keys(incReturned).forEach(function(k){
     // накладна знову в потоці — копія більше не потрібна
     if(incAll[k]){ db.ref('1c/delivery/returned/'+k).remove(); return; }
-    // …або не повернулась за 3 доби — значить вже доставлена або скасована
+    // …або не повернулась за добу — значить вже доставлена або скасована
     var t=(incReturned[k]||{}).returned_at||0;
     if(t && nowTs-t>RET_TTL_MS){
       db.ref('1c/delivery/returned/'+k).remove();
-      try{ auditLog('авточистка: накладная не вернулась в 1С за 3 дня', k, {}); }catch(e){}
+      try{ auditLog('авточистка: накладная не вернулась в 1С за сутки', k, {}); }catch(e){}
     }
   });
 }
