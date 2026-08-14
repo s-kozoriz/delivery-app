@@ -849,7 +849,7 @@ db.ref('odometer').on('value',function(s){odoAll=s.val()||{};var t=document.getE
 db.ref('nord_driver').on('value',function(s){nordDriver=s.val()||{};gm();},function(){});
 db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=document.getElementById('cs-nord');if(p&&p.style.display!=='none')renderNordPlanners();},function(){});
 db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
-db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incTrackFresh();incCleanReturned();incBadge();renderDelivMismatch();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
+db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incTrackFresh();incCleanReturned();incFillWeights();incBadge();renderDelivMismatch();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
 db.ref('1c/delivery/returned').on('value',function(s){incReturned=s.val()||{};incCleanReturned();incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
 db.ref('1c/delivery/meta').on('value',function(s){incMeta=s.val()||{};incRenderFresh();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
@@ -3304,6 +3304,26 @@ function incUnplace(inv){
 }
 // когда рапер снова присылает накладную — наш оверлей-копия больше не нужен
 var RET_TTL_MS = 24*3600*1000;   // доба: не повернулась наступного дня — копії тут не місце
+function incFillWeights(){
+  if(IS_VIEWER)return;
+  var today=isoD(0);
+  rows.forEach(function(r){
+    if(!r||r.done)return;                         // закритий день не чіпаємо
+    if(r.date&&r.date<today)return;               // і минуле теж
+    if(typeof r.weight==='number'&&r.weight>0)return;   // ┴вага вже є — зокрема вписана руками
+    var invs=(r.invs||[]).map(function(x){return (''+(x||'')).trim();}).filter(Boolean);
+    if(!invs.length)return;
+    var sum=0,seen=false;
+    invs.forEach(function(inv){
+      var src2=incAll[inv]||incReturned[inv];
+      if(src2&&typeof src2.weight_kg==='number'&&src2.weight_kg>0){ sum+=src2.weight_kg; seen=true; }
+    });
+    if(!seen)return;                              // в 1С ваги ще немає — чекаємо далі
+    var w=Math.round(sum*100)/100;
+    r.weight=w;
+    db.ref('rows/'+r.id+'/weight').set(w);
+  });
+}
 function incCleanReturned(){
   var nowTs=Date.now();
   Object.keys(incReturned).forEach(function(k){
