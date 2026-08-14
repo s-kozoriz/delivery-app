@@ -290,6 +290,24 @@ body{background:#0d1520;color:#eaf0f8}
 .add-form-send:disabled{background:#2f3d4e;color:#7c8aa0}
 /* картка завдання, доданого водієм */
 .card.driver-added{background:linear-gradient(to right,#16263d 0,#16263d 4px,#131c28 4px);border-color:#2f6ab0}
+
+/* Картка завдання — читабельність на темному */
+.adr{color:#ffffff;font-size:16px;font-weight:700}
+.city{color:#c88ae0}
+.invs{color:#9fb0c8}
+.inv{background:#16263d;color:#8fc0ff}
+.cmt{color:#9fb0c8}
+.ssv{background:#2a1a3a;color:#d9a8ec}
+.ttag{background:#3a2a10;color:#e2b25f}
+.mln{border-top-color:#2a3a50;background:rgba(255,255,255,.03);color:#c88ae0}
+.photo-section{border-top-color:#2a3a50;background:#16202c}
+.photo-thumb{border-color:#3a4a60}
+.dbtn{background:#1c2836;border-color:#3a4a60}
+.num.dn{background:rgba(255,255,255,.18)}
+
+.photo-add{border-color:#3a4a60}
+.photo-hint{color:#e2a24f}
+.card{border-color:#2a3a50}
 </style>
 </head>
 <body>
@@ -2909,7 +2927,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-13-29';
+var APP_V = '2026-08-14-01';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
