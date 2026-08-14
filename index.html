@@ -1117,6 +1117,8 @@ function applyViewMode(){
   style.textContent=[
     'td input, td select { pointer-events:none!important; border:none!important; background:transparent!important; color:var(--tx)!important; opacity:1!important; font-weight:500!important; }',
     'td button, .iadd, .ix, .dbtn, .rchk { pointer-events:none!important; opacity:.3!important; }',
+/* ⛔виняток: галочка «завантажено» і друк — інструменти самого складу */
+'td button.wh-btn, td button.wh-print-btn, td button.wh-ship-btn, .wh-ship-btn { pointer-events:auto!important; opacity:1!important; }',
     'button.btn-rt, button.wag, button.wal, button.war, button.wac { pointer-events:none!important; opacity:.4!important; }',
     '#mftL button, #mftR button, #mftC button { pointer-events:none!important; opacity:.4!important; }',
     '#tblBtns { display:none!important; }',
@@ -2332,7 +2334,7 @@ function renderWarehouse(){
     html+='<div style="display:flex;align-items:center;gap:10px">';
     html+='<div style="font-size:14px;font-weight:700;color:'+drvColor+'">&#128666; '+xe(dname(d))+'</div>';
     html+='<button class="btn btn-sm wh-print-btn" data-drv="'+d+'" style="background:#f0f4fc;color:#1856a0;border-color:#aec6ef;padding:3px 10px;font-size:12px">&#128438; Печать</button>';
-    html+='<button class="btn btn-sm" onclick="whShipDone(\''+d+'\')" style="background:#e8f5ec;color:#1a7a40;border-color:#9fd6b4;padding:3px 10px;font-size:12px">&#10004; Отгрузка завершена</button>';
+    html+='<button class="btn btn-sm wh-ship-btn" onclick="whShipDone(\''+d+'\')" style="background:#e8f5ec;color:#1a7a40;border-color:#9fd6b4;padding:3px 10px;font-size:12px">&#10004; Отгрузка завершена</button>';
     html+='</div>';
     html+='<span style="font-size:12px;color:var(--mu)">&#128230; '+loadedInvs+'/'+totalInvs+' накл. загружено</span>';
     html+='</div>';
