@@ -850,7 +850,7 @@ db.ref('nord_driver').on('value',function(s){nordDriver=s.val()||{};gm();},funct
 db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=document.getElementById('cs-nord');if(p&&p.style.display!=='none')renderNordPlanners();},function(){});
 db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
 db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incTrackFresh();incCleanReturned();incBadge();renderDelivMismatch();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
-db.ref('1c/delivery/returned').on('value',function(s){incReturned=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
+db.ref('1c/delivery/returned').on('value',function(s){incReturned=s.val()||{};incCleanReturned();incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
 db.ref('1c/delivery/meta').on('value',function(s){incMeta=s.val()||{};incRenderFresh();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
 db.ref('warehouse').on('value',function(s){
@@ -3303,7 +3303,20 @@ function incUnplace(inv){
   db.ref('1c/delivery/placed/'+inv).remove();
 }
 // когда рапер снова присылает накладную — наш оверлей-копия больше не нужен
-function incCleanReturned(){ Object.keys(incReturned).forEach(function(k){ if(incAll[k]) db.ref('1c/delivery/returned/'+k).remove(); }); }
+var RET_TTL_MS = 3*24*3600*1000;   // скільки чекаємо на повернення накладної в потік 1С
+function incCleanReturned(){
+  var nowTs=Date.now();
+  Object.keys(incReturned).forEach(function(k){
+    // накладна знову в потоці — копія більше не потрібна
+    if(incAll[k]){ db.ref('1c/delivery/returned/'+k).remove(); return; }
+    // …або не повернулась за 3 доби — значить вже доставлена або скасована
+    var t=(incReturned[k]||{}).returned_at||0;
+    if(t && nowTs-t>RET_TTL_MS){
+      db.ref('1c/delivery/returned/'+k).remove();
+      try{ auditLog('авточистка: накладная не вернулась в 1С за 3 дня', k, {}); }catch(e){}
+    }
+  });
+}
 // ⛔План складається за потребами техніків, але склад не завжди може відвантажити все:
 //   на адресу заплановано три накладні, а фактично їде дві, одна або жодної. Раніше різницю
 //   ніде не було видно — водій їхав за списком, якого в машині немає.
