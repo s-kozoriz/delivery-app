@@ -1818,8 +1818,7 @@ function _rtblNow(){
     h+='<tr><td colspan="13" style="background:#1856a0;padding:4px 10px;font-size:10px;font-weight:700;color:#fff;letter-spacing:.04em">+ НОВАЯ СТРОКА</td></tr>';
     h+='<tr style="background:#e8f0fe" onclick="event.stopPropagation()">';
     h+='<td style="text-align:center;color:#ccc">×</td>';
-    h+='<td><input type="checkbox" checked></td>';
-    h+='<td><input id="nrf-date-inp" type="date" value="'+xe(nd.date)+'" onclick="event.stopPropagation()" style="border:1px solid #aec6ef;border-radius:5px;padding:5px 6px;font-size:12px;font-weight:600;color:#0c447c;background:#dce8fb;width:100%;cursor:pointer"></td>';
+        h+='<td><input id="nrf-date-inp" type="date" value="'+xe(nd.date)+'" onclick="event.stopPropagation()" style="border:1px solid #aec6ef;border-radius:5px;padding:5px 6px;font-size:12px;font-weight:600;color:#0c447c;background:#dce8fb;width:100%;cursor:pointer"></td>';
     h+='<td><select id="nrf-drv" style="border:1px solid #aec6ef;border-radius:5px;padding:4px;font-size:12px;width:100%;background:#dce8fb;font-weight:600;color:#0c447c">'+drvOpts+'</select></td>';
     h+='<td><select id="nrf-city" class="ac-city" style="border:1px solid #aec6ef;border-radius:5px;padding:4px;font-size:12px;width:100%;background:#dce8fb;font-weight:600;color:#0c447c">'+cityOpts+'</select></td>';
     h+='<td><input id="nrf-time" type="time" value="'+xe(nd.timeSlot||'')+'" style="border:1px solid #aec6ef;border-radius:5px;padding:4px;font-size:12px;width:100%"></td>';
