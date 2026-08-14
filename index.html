@@ -853,7 +853,12 @@ db.ref('1c/delivery/incoming').on('value',function(s){incAll=s.val()||{};incTrac
 db.ref('1c/delivery/returned').on('value',function(s){incReturned=s.val()||{};incBadge();var ti=document.getElementById('tinc');if(ti&&ti.style.display!=='none')renderInc();});
 db.ref('1c/delivery/meta').on('value',function(s){incMeta=s.val()||{};incRenderFresh();});
 db.ref('notes').on('value',function(s){notes=s.val()||{};loadNotes();});
-db.ref('warehouse').on('value',function(s){warehouseStatus=s.val()||{};gm();});
+db.ref('warehouse').on('value',function(s){
+warehouseStatus=s.val()||{};
+gm();
+var _wt=document.getElementById('warehouse');
+if(_wt&&_wt.style.display!=='none'&&typeof renderWarehouse==='function')renderWarehouse();
+});
 __startTechsListener();
 __startVoiceListener();
 }
@@ -2397,7 +2402,14 @@ function renderWarehouse(){
     btn.addEventListener('click',function(){
       var key=this.getAttribute('data-key');
       var isLoaded=this.getAttribute('data-loaded')==='1';
-      db.ref('warehouse/'+key).set(isLoaded?null:true);
+// ⛔миттєвий відгук: результат дотику видно відразу, не чекаючи бази
+this.setAttribute('data-loaded',isLoaded?'0':'1');
+this.innerHTML=isLoaded?'&#9675;':'&#10003;';
+this.style.borderColor=isLoaded?'var(--bd)':'#1a7a40';
+this.style.background=isLoaded?'transparent':'#1a7a40';
+this.style.color=isLoaded?'var(--mu)':'#fff';
+if(isLoaded)delete warehouseStatus[key]; else warehouseStatus[key]=true;
+db.ref('warehouse/'+key).set(isLoaded?null:true);
     });
   });
   el.querySelectorAll('.wh-print-btn').forEach(function(btn){
