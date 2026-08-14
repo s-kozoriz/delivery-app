@@ -408,8 +408,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <button class="tab on" onclick="sw('plan')">Маршрут</button>
     <button class="tab" onclick="sw('hist')">История</button>
     <button class="tab" id="tabStat" onclick="sw('stat')">Статистика</button>
-    <button class="tab" id="tabVoice" onclick="sw('voice')">Сообщения</button>
-    <button class="tab" id="tabTabel" onclick="sw('tabel')">Табель</button>
+        <button class="tab" id="tabTabel" onclick="sw('tabel')">Табель</button>
     <button class="tab" id="tabOdo" onclick="sw('odo')">Пробег</button>
     <button class="tab" id="tabCalib" onclick="sw('calib')">Калибровка</button>
     <button class="tab" id="tabInc" onclick="sw('inc')">Входящие 1С</button>
@@ -591,21 +590,6 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <div id="nordmBody" style="overflow-x:auto;padding:8px 6px"></div>
   </div>
 </div>
-<div id="tvoice" style="display:none">
-  <div class="card">
-    <div class="ch">
-      <h2>&#127908; Голосовые сообщения техников</h2>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm" id="vf-all" onclick="setVFilter('all')" style="background:var(--acc);color:#fff;border-color:var(--acc)">Вс&#1110;</button>
-        <button class="btn btn-sm" id="vf-new" onclick="setVFilter('new')">Нов&#1110;</button>
-        <button class="btn btn-sm" id="vf-working" onclick="setVFilter('working')">В робот&#1110;</button>
-        <button class="btn btn-sm" id="vf-done" onclick="setVFilter('done')">Вир&#1110;шен&#1110;</button>
-      </div>
-    </div>
-    <div id="disp-vmsg-list" style="padding:12px 16px">Загрузка...</div>
-  </div>
-</div>
-
 <div id="ts2" style="display:none">
   <div class="card">
     <div class="ch">
@@ -859,7 +843,6 @@ var _wt=document.getElementById('warehouse');
 if(_wt&&_wt.style.display!=='none'&&typeof renderWarehouse==='function')renderWarehouse();
 });
 __startTechsListener();
-__startVoiceListener();
 }
 
 // ── Пробег (одометр) — глобальные функции (вызов из sw() и onclick) ──
@@ -1137,7 +1120,7 @@ function applyViewMode(){
 // Мягкая блокировка UI здесь; ТВЁРДАЯ граница — правила RTDB (у viewer нет ни одного .write).
 function applyViewerMode(){
   document.getElementById('appTitle').textContent='LK Bauservice — Просмотр';
-  ['tabStat','tabVoice','tabOdo','tabCalib','tabRoute','tabCfg','tabNordM'].forEach(function(id){
+  ['tabStat','tabOdo','tabCalib','tabRoute','tabCfg','tabNordM'].forEach(function(id){
     var b=document.getElementById(id); if(b)b.style.display='none';
   });
   var style=document.createElement('style');
@@ -1244,7 +1227,7 @@ firebase.auth().onAuthStateChanged(function(user){
     else if(role==='lager'){disp2Mode=false;enter(true);}
     else if(role==='viewer'){disp2Mode=false;IS_VIEWER=true;enter(false);applyViewerMode();}
     else{disp2Mode=false;enter(false);}
-    if(c.plannerId){ IS_PLANNER=true; PLANNER_ID=c.plannerId; PLANNER_NAME=c.plannerName||''; ['tabVoice','tabCalib','tabOdo','tabRoute'].forEach(function(id){var b=document.getElementById(id);if(b)b.style.display='none';}); } // tabRoute показывает те же данные одометра, что и tabOdo — прячем вместе
+    if(c.plannerId){ IS_PLANNER=true; PLANNER_ID=c.plannerId; PLANNER_NAME=c.plannerName||''; ['tabCalib','tabOdo','tabRoute'].forEach(function(id){var b=document.getElementById(id);if(b)b.style.display='none';}); } // tabRoute показывает те же данные одометра, что и tabOdo — прячем вместе
     if(role==='zentrum'){ var _tn=document.getElementById('tabNordM'); if(_tn)_tn.style.display=''; }
     if(!_dbStarted){ _dbStarted=true; __startDB(); }   // подписки на базу — ровно один раз за жизнь страницы
     setTimeout(restoreTab,250); // после того как роль скрыла/показала вкладки — вернуть последнюю открытую
@@ -2508,12 +2491,12 @@ function swCfg(name){
 
 function sw(n){
   if(n!=='warehouse'){try{sessionStorage.setItem('lastTab',n);}catch(e){}} // запомнить вкладку — восстановить после F5 (кроме режимной «Склад»)
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo',route:'troute'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo',route:'troute'};
   Object.keys(tabMap).forEach(function(t){
     var el=document.getElementById(tabMap[t]);
     if(el)el.style.display=t===n?'':'none';
   });
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег',route:'Анализ маршрута'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег',route:'Анализ маршрута'};
   document.querySelectorAll('.tab').forEach(function(b){
     b.classList.toggle('on',b.textContent.trim()===(nameMap[n]||''));
   });
@@ -2522,8 +2505,7 @@ function sw(n){
   if(n==='warehouse')renderWarehouse();
   if(n==='stat'){statOffset=0;renderStat();}
   if(n==='hist'){loadAllRowsForHist();}
-  if(n==='voice'){loadDispVoiceMsgs();}
-  if(n==='cfg'){lcfg();swCfg('drivers');}
+    if(n==='cfg'){lcfg();swCfg('drivers');}
   if(n==='plan')loadNotes();
   if(n==='tabel')renderTabel();
   if(n==='calib')renderCalib();
@@ -2537,9 +2519,9 @@ function restoreTab(){
   if(viewOnly)return;                       // склад — принудительно warehouse, не трогаем
   var n; try{n=sessionStorage.getItem('lastTab');}catch(e){}
   if(!n||n==='plan'||n==='warehouse')return; // дефолт и так «Маршрут»
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',voice:'tvoice',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo',route:'troute'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo',route:'troute'};
   if(!tabMap[n])return;
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',voice:'Сообщения',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег',route:'Анализ маршрута'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег',route:'Анализ маршрута'};
   var visible=false;                         // вкладка доступна текущей роли?
   document.querySelectorAll('.tab').forEach(function(b){
     if(b.textContent.trim()===nameMap[n]&&b.style.display!=='none')visible=true;
@@ -4401,60 +4383,6 @@ function renderRouteStats(drv, date, totalMin, totalWeight, driveMin, unloadMin,
     }
   }
   db.ref('trips/stats_'+drv).set({min:totalMin,kg:totalWeight,date:date,ts:Date.now(),driveMin:driveMin||0,unloadMin:unloadMin||0,detail:detailText||'',source:source||'google'});
-}
-
-var vFilter='all', allVoiceMsgs={};
-function __startVoiceListener(){
-db.ref('voiceMessages').on('value', function(s){
-  allVoiceMsgs = s.val() || {};
-  if(document.getElementById('disp-vmsg-list')) renderDispVoiceMsgs();
-});
-}
-function setVFilter(f){
-  vFilter = f;
-  ['all','new','working','done'].forEach(function(x){
-    var b = document.getElementById('vf-'+x);
-    if(!b) return;
-    var active = x===f;
-    b.style.background = active?'var(--acc)':'var(--card)';
-    b.style.color = active?'#fff':'var(--tx)';
-    b.style.borderColor = active?'var(--acc)':'var(--bd2)';
-  });
-  renderDispVoiceMsgs();
-}
-function loadDispVoiceMsgs(){ renderDispVoiceMsgs(); }
-function renderDispVoiceMsgs(){
-  var el = document.getElementById('disp-vmsg-list');
-  if(!el) return;
-  var msgs = Object.values(allVoiceMsgs).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
-  if(vFilter !== 'all') msgs = msgs.filter(function(m){return m.status===vFilter;});
-  if(!msgs.length){el.innerHTML='<div class="empty">Повідомлень немає</div>';return;}
-  var statusMap = {new:'Отримано',working:'В роботі',clarify:'Потребує уточнення',done:'Вирішено'};
-  var statusColors = {new:'#e8f0fe;color:#1856a0',working:'#fff3da;color:#854F0B',clarify:'#fce8e6;color:#c62828',done:'#e6f4ea;color:#1a7a40'};
-  el.innerHTML = msgs.map(function(m){
-    var st = m.status||'new';
-    return '<div style="border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-bottom:10px">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
-      +'<div style="font-size:13px;font-weight:600">'+xe(m.techName||'Технік')+'</div>'
-      +'<div style="font-size:11px;color:var(--mu)">'+new Date(m.createdAt).toLocaleDateString('uk')+' '+new Date(m.createdAt).toLocaleTimeString('uk',{hour:'2-digit',minute:'2-digit'})+'</div>'
-      +'</div>'
-      +'<div style="font-size:12px;color:var(--mu);margin-bottom:6px">→ '+xe(m.to||'')+' · '+xe(m.city||'')+' · '+xe(m.addr||'')+'</div>'
-      +(m.translation?'<div style="font-size:13px;margin-bottom:8px;line-height:1.5">'+xe(m.translation)+'</div>':'')
-      +(m.audioUrl?'<audio controls src="'+xe(m.audioUrl)+'" style="width:100%;height:32px;margin-bottom:8px"></audio>':'')
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +Object.keys(statusMap).map(function(s){
-        var active=st===s;
-        var col2=statusColors[s]||statusColors.new;
-        var bg=active?'background:'+col2+';':'background:var(--bg);';
-        return '<button onclick="setVMsgStatus(\''+m.id+'\',\''+s+'\')" style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--bd2);'+bg+'">'+(statusMap[s]||s)+'</button>';
-      }).join('')
-      +'</div></div>';
-  }).join('');
-}
-function setVMsgStatus(id, status){
-  db.ref('voiceMessages/'+id+'/status').set(status);
-  if(allVoiceMsgs[id]) allVoiceMsgs[id].status = status;
-  renderDispVoiceMsgs();
 }
 
 var _histLoaded=false;
