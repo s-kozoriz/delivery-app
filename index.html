@@ -434,8 +434,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <div class="tbl"><table>
       <thead><tr>
         <th style="width:28px"></th>
-        <th style="width:32px">&#128506;</th>
-        <th style="width:90px">Дата</th>
+                <th style="width:90px">Дата</th>
         <th style="width:92px;vertical-align:top">Водитель<select id="cf-drv" onchange="setColFilter('drv',this.value)" onclick="event.stopPropagation()" style="display:block;width:100%;margin-top:3px;font-size:10px;font-weight:400;border:1px solid #c4c0b4;border-radius:4px;padding:1px 2px;background:#fff;color:#333"><option value="">все</option></select></th>
         <th style="width:122px;vertical-align:top">Город<select id="cf-city" onchange="setColFilter('city',this.value)" onclick="event.stopPropagation()" style="display:block;width:100%;margin-top:3px;font-size:10px;font-weight:400;border:1px solid #c4c0b4;border-radius:4px;padding:1px 2px;background:#fff;color:#333"><option value="">все</option></select></th>
         <th style="width:70px">До</th>
@@ -1649,7 +1648,7 @@ function rtbl(){
 function _rtblNow(){
   acInit(); if(_ac.open)acClose();
   var tb=document.getElementById('tb');
-  if(!rows.length){tb.innerHTML='<tr><td colspan="14"><div class="empty">Нет строк — нажмите «+ строка»</div></td></tr>';return;}
+  if(!rows.length){tb.innerHTML='<tr><td colspan="13"><div class="empty">Нет строк — нажмите «+ строка»</div></td></tr>';return;}
   var today=isoD(0);
   var visible=rows.filter(function(r){
     if(r.done && r.date<today)return false;
@@ -1708,7 +1707,7 @@ function _rtblNow(){
       var _col=!!collapsedDates[r.date];
       var _cr=_col?'&#9656;':'&#9662;'; // ▸ свёрнуто / ▾ развёрнуто
       var _sm=_col?_daySummary(_sum[r.date]):'';
-      h+='<tr class="date-group-hdr"><td colspan="14" onclick="toggleDate(\''+r.date+'\')" title="Свернуть/развернуть день" style="cursor:pointer;border-left:6px solid '+dColors[dci]+';background:'+dBgs[dci]+';color:'+dColors[dci]+';border-top:2px solid '+dColors[dci]+'"><span style="display:inline-block;width:16px">'+_cr+'</span>'+fmt(r.date)+_sm+'</td></tr>';
+      h+='<tr class="date-group-hdr"><td colspan="13" onclick="toggleDate(\''+r.date+'\')" title="Свернуть/развернуть день" style="cursor:pointer;border-left:6px solid '+dColors[dci]+';background:'+dBgs[dci]+';color:'+dColors[dci]+';border-top:2px solid '+dColors[dci]+'"><span style="display:inline-block;width:16px">'+_cr+'</span>'+fmt(r.date)+_sm+'</td></tr>';
     }
     if(collapsedDates[r.date]&&(r.addr&&r.addr.trim())) return; // день свёрнут — строки не рисуем
     var dgClass=' dg-'+(_dc[r.date]||0);
@@ -1725,8 +1724,7 @@ function _rtblNow(){
       else h+='<div style="font-size:9px;color:#9aa;line-height:1.05" title="Адрес другого техника — только автор может удалить">'+xe((((r.plannerName||'')+'').split(' ')[0])||'др.')+'</div>';
     }
     h+='</td>';
-    h+='<td style="width:32px;text-align:center"><input type="checkbox" class="rchk"'+(r.inRoute!==false?' checked':'')+(canEditRow(r)?'':' disabled')+' onchange="tr(\''+r.id+'\',this.checked)"></td>';
-    var dis=viewOnly?' disabled':'';
+        var dis=viewOnly?' disabled':'';
     h+='<td style="width:90px">'+(isEditing?'<input type="date" value="'+(r.date_pending?'':(r.date||''))+'"'+dis+' onchange="ur(\''+r.id+'\',\'date\',this.value)" style="font-size:12px;padding:5px 4px">':(r.date_pending?'<span style="font-size:11px;padding:2px 4px;display:block;color:#E24B4A;font-weight:600" title="1С не передала дату отгрузки — задайте дату">— нет даты</span>':'<span style="font-size:12px;padding:2px 4px;display:block">'+fmt(r.date||'')+'</span>'))+'</td>';
     if(isEditing){
       var sel='<td style="width:80px"><select onchange="ur(\''+r.id+'\',\'drv\',this.value)" style="'+dc+'">';
@@ -1817,7 +1815,7 @@ function _rtblNow(){
     var cl=disp2Mode?CITIESC:CITIES;
     cl.forEach(function(city){cityOpts+='<option value="'+xe(city)+'"'+(nd.city===city?' selected':'')+'>'+xe(city)+'</option>';});
     STATS.forEach(function(s){statOpts+='<option value="'+xe(s)+'"'+(nd.status===s?' selected':'')+'>'+xe(s)+'</option>';});
-    h+='<tr><td colspan="14" style="background:#1856a0;padding:4px 10px;font-size:10px;font-weight:700;color:#fff;letter-spacing:.04em">+ НОВАЯ СТРОКА</td></tr>';
+    h+='<tr><td colspan="13" style="background:#1856a0;padding:4px 10px;font-size:10px;font-weight:700;color:#fff;letter-spacing:.04em">+ НОВАЯ СТРОКА</td></tr>';
     h+='<tr style="background:#e8f0fe" onclick="event.stopPropagation()">';
     h+='<td style="text-align:center;color:#ccc">×</td>';
     h+='<td><input type="checkbox" checked></td>';
