@@ -172,6 +172,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .tabel-seg.on{background:#1a2a3a;color:#fff;border-color:#1a2a3a}
 .tabel-segedit{display:flex;align-items:center;gap:8px;padding:6px 14px}
 .tabel-dash{color:#9aa5b1}
+.tabel-bad{background:#f6e3e3;color:#b00020;border-radius:8px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap;margin-left:4px}
 .tabel-segdel{border:none;background:#f6e3e3;color:#b00020;border-radius:8px;width:32px;height:32px;cursor:pointer;flex-shrink:0;font-size:13px}
 .tabel-editbtns{display:flex;align-items:center;gap:8px;padding:8px 14px 12px}
 .tabel-addseg{border:1px dashed #c7d0da;background:none;border-radius:8px;padding:9px 12px;color:#5a6470;font-size:13px;cursor:pointer;white-space:nowrap}
@@ -2779,7 +2780,12 @@ function delDynDriver(k){
 // ─── ТАБЕЛЬ рабочего времени (сегменты) ─────────────────────
 function wtHm(s){var p=(s||'0:0').split(':');return (parseInt(p[0],10)||0)*60+(parseInt(p[1],10)||0);}
 function tSegs(rec){var s=rec&&rec.seg;if(!s){if(rec&&rec.start)return [{s:rec.start,e:rec.end||''}];return [];}return Array.isArray(s)?s.slice():Object.keys(s).map(function(k){return s[k];});}
-function tWorked(rec){var L=tSegs(rec),t=0;L.forEach(function(g){if(g&&g.s&&g.e){var d=wtHm(g.e)-wtHm(g.s);if(d<0)d+=1440;t+=d;}});return t;}
+function tWorked(rec){var L=tSegs(rec),t=0;L.forEach(function(g){if(g&&g.s&&g.e){var d=wtHm(g.e)-wtHm(g.s);if(d<0)d=0;/*⛔описка, не нічна зміна*/ t+=d;}});return t;}
+function tHasBadSeg(rec){
+  var L=tSegs(rec);
+  for(var i=0;i<L.length;i++){ var g=L[i]; if(g&&g.s&&g.e&&(wtHm(g.e)-wtHm(g.s))<0) return true; }
+  return false;
+}
 function wtHrs(rec){var L=tSegs(rec);if(!L.length)return null;return Math.round(tWorked(rec)/6)/10;}
 // ── Контроль переработки грузчиков: таймер выключен намного позже последнего водителя своего региона (порог 30 мин) ──
 var LAG_OT_MIN=30;
@@ -2948,16 +2954,17 @@ function tabelEditForm(){
   return h;
 }
 function tabelRow(k,d,rec){
-  var L=tSegs(rec);var h=wtHrs(rec);var open=L.some(function(g){return g&&g.s&&!g.e;});
+  var L=tSegs(rec);var h=wtHrs(rec);var open=L.some(function(g){return g&&g.s&&!g.e;});var badSeg=tHasBadSeg(rec);
   var segtxt=L.map(function(g){return (g.s||'?')+'&#8211;'+(g.e||'…');}).join(', ');
   return '<div class="tabel-row"><span class="tabel-d">'+d.slice(8)+'.'+d.slice(5,7)+'</span>'+
     '<span class="tabel-t">'+(segtxt||'—')+(open?'<span class="tabel-open">идёт</span>':'')+'</span>'+
     '<span class="tabel-h">'+(h!=null?h+' ч':'')+'</span>'+
+(badSeg?'<span class="tabel-bad" title="Конец раньше начала — часы не засчитаны, исправьте">&#9888; время</span>':'')+
     (IS_PLANNER?'':'<button class="tabel-edit" onclick="tabelEditDay(\''+k+'\',\''+d+'\')">&#9998;</button>')+'</div>';
 }
 function liveOpenIdx(rec){var L=tSegs(rec);for(var i=L.length-1;i>=0;i--){if(L[i]&&L[i].s&&!L[i].e)return i;}return -1;}
 function liveState(rec){if(rec&&rec.done)return 'done';if(liveOpenIdx(rec)>=0)return 'run';if(tSegs(rec).length)return 'pause';return 'idle';}
-function liveWorkedMin(rec,live){var L=tSegs(rec),t=0,nowM=null;for(var i=0;i<L.length;i++){var g=L[i];if(!g||!g.s)continue;if(g.e){var d=wtHm(g.e)-wtHm(g.s);if(d<0)d+=1440;t+=d;}else if(live){if(nowM==null){var n=new Date();nowM=n.getHours()*60+n.getMinutes();}var d2=nowM-wtHm(g.s);if(d2<0)d2+=1440;t+=d2;}}return t;}
+function liveWorkedMin(rec,live){var L=tSegs(rec),t=0,nowM=null;for(var i=0;i<L.length;i++){var g=L[i];if(!g||!g.s)continue;if(g.e){var d=wtHm(g.e)-wtHm(g.s);if(d<0)d=0;/*⛔описка, не нічна зміна*/ t+=d;}else if(live){if(nowM==null){var n=new Date();nowM=n.getHours()*60+n.getMinutes();}var d2=nowM-wtHm(g.s);if(d2<0)d2=0;/*⛔те саме для відкритого відрізка*/ t+=d2;}}return t;}
 function liveFmt(m){return Math.floor(m/60)+':'+String(Math.round(m)%60).padStart(2,'0');}
 function liveStart(rec){var L=tSegs(rec);return (L.length&&L[0].s)?L[0].s:'';}
 function renderLiveBoard(){
