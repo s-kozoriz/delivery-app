@@ -175,39 +175,49 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .an-nav{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--bd)}
 .an-per{flex:1;text-align:center;font-size:13px;font-weight:600}
 .an-sel{border:1px solid var(--bd);border-radius:8px;height:30px;padding:0 8px;font-size:13px;background:var(--cd);color:var(--tx)}
-.an-kpi{display:flex;gap:10px;padding:12px 16px;flex-wrap:wrap}
-.an-tile{flex:1;min-width:92px;background:var(--bg);border-radius:8px;padding:12px;text-align:center}
-.an-tile-warn{background:#f6e3e3}
-.an-tv{font-size:20px;font-weight:700;color:var(--acc)}
-.an-tile-warn .an-tv{color:#b00020}
-.an-tl{font-size:11px;color:var(--mu);margin-top:2px}
+.an-seg{display:inline-flex;border:1px solid var(--bd);border-radius:7px;overflow:hidden}
+.an-seg button{border:none;border-right:1px solid var(--bd);background:var(--cd);color:var(--mu);padding:5px 12px;font-size:12.5px;cursor:pointer;font-family:inherit}
+.an-seg button:last-child{border-right:none}
+.an-seg button.on{background:var(--acc);color:#fff;font-weight:600}
+.an-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;padding:14px 16px}
+.an-tile{border:1px solid var(--bd);border-radius:9px;padding:11px 13px}
+.an-tile-warn{background:#f6e3e3;border-color:#e6c9c9}
+.an-tv{font-size:23px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.an-tl{font-size:11.5px;color:var(--mu);margin-top:1px}
 .an-empty{padding:20px 16px;color:var(--mu);font-size:13px;text-align:center}
-.an-card{border-top:1px solid var(--bd);padding:12px 16px}
-.an-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.an-nm{font-size:15px;font-weight:700}
-.an-grade{font-size:12px;font-weight:600}
-.an-line{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13px}
-.an-lb{min-width:64px;color:var(--mu);font-size:12px}
-.an-lv{flex:1}
+.an-tblbox{overflow-x:auto;margin:0 16px 16px;border:1px solid var(--bd);border-radius:9px}
+.an-tbl{border-collapse:collapse;width:100%;font-size:13.5px;min-width:660px}
+.an-tbl th{background:var(--bg);text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);padding:8px 11px;border-bottom:1px solid var(--bd);white-space:nowrap}
+.an-tbl td{padding:9px 11px;border-bottom:1px solid var(--bd);font-variant-numeric:tabular-nums;white-space:nowrap}
+.an-tbl td.txt,.an-tbl th.txt{font-variant-numeric:normal;white-space:normal}
+.an-tbl tr.an-r{cursor:pointer}
+.an-tbl tr.an-r:hover td{background:var(--bg)}
+.an-tbl tr.an-r-on td{background:var(--bg)}
+.an-tbl tr.an-tot td{background:var(--bg);font-weight:700;border-bottom:none}
+.an-tbl tr.an-sub td{background:var(--bg);white-space:normal}
+.an-pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
+.p-ok{background:#e3f0e6;color:#1a7a40}
+.p-warn{background:#fbf0dd;color:#8a5a12}
+.p-bad{background:#f6e3e3;color:#b00020}
+.p-none{background:#eceaea;color:#7a7470}
+.an-warn{color:#b00020;font-weight:700;margin-left:5px}
+.an-run{background:#e3f0e6;color:#1a7a40;border-radius:8px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px}
+.an-edit{border:none;background:transparent;border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:13px;color:var(--mu)}
+.an-edit:hover{background:var(--cd);color:var(--tx)}
+.an-det{display:flex;flex-direction:column;gap:8px;padding:4px 0}
+.an-dl{display:flex;gap:12px;align-items:flex-start;font-size:13px}
+.an-dk{min-width:140px;color:var(--mu);font-size:12px;flex-shrink:0}
+.an-dv{flex:1}
 .an-mu{color:var(--mu)}
-.an-edit{border:none;background:var(--bg);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:13px;flex-shrink:0;color:var(--tx)}
-.an-segs{font-size:12px;color:var(--mu);margin:0 0 6px 72px}
-.an-badge{border-radius:8px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px;white-space:nowrap}
-.an-b-bad{background:#f6e3e3;color:#b00020}
-.an-b-run{background:#e3f0e6;color:#1a7a40}
-.an-photos{display:flex;gap:6px;margin:2px 0 6px 72px;flex-wrap:wrap}
+.an-grade{font-weight:700}
+.an-photos{display:inline-flex;gap:6px;flex-wrap:wrap;vertical-align:middle}
 .an-ph{display:block;text-align:center;text-decoration:none;color:var(--mu);font-size:10px}
 .an-ph img{display:block;width:54px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--bd)}
-.an-addr{margin:2px 0 4px 72px}
-.an-a{font-size:12px;color:var(--mu);padding:1px 0;display:flex;align-items:center;gap:6px}
-.an-a-dot{width:6px;height:6px;border-radius:50%;background:#c9b9a0;flex-shrink:0}
-.an-a-done .an-a-dot{background:#1a7a40}
-.an-mrow{display:grid;grid-template-columns:64px 1fr 78px 64px 54px 34px;align-items:center;gap:6px;padding:7px 16px;border-top:1px solid var(--bd);font-size:13px}
-.an-mhd{color:var(--mu);font-size:11px;text-transform:uppercase;letter-spacing:.04em;border-top:none}
-.an-mclick{cursor:pointer}
-.an-mclick:hover{background:var(--bg)}
-.an-md{font-weight:600}
-.an-medit{border-top:1px solid var(--bd);padding:4px 16px}
+.an-addr{display:flex;flex-direction:column;gap:3px}
+.an-a{font-size:12.5px;display:flex;align-items:center;gap:7px}
+.an-a-n{width:18px;height:18px;border-radius:50%;background:var(--bd);color:var(--mu);font-size:10px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.an-a-done .an-a-n{background:#e3f0e6;color:#1a7a40}
+.an-a-no{color:#b00020;font-size:11px;font-weight:700;margin-left:6px}
 .tabel-bad{background:#f6e3e3;color:#b00020;border-radius:8px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap;margin-left:4px}
 .tabel-segdel{border:none;background:#f6e3e3;color:#b00020;border-radius:8px;width:32px;height:32px;cursor:pointer;flex-shrink:0;font-size:13px}
 .tabel-editbtns{display:flex;align-items:center;gap:8px;padding:8px 14px 12px}
@@ -652,9 +662,10 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
   <div class="card">
     <div class="ch">
       <h2>Аналитика</h2>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm" id="anMD" onclick="anSetMode('day')">День</button>
-        <button class="btn btn-sm" id="anMM" onclick="anSetMode('month')">Месяц</button>
+      <div class="an-seg">
+        <button id="anPD" onclick="anSetPeriod('day')">день</button>
+        <button id="anPW" onclick="anSetPeriod('week')">неделя</button>
+        <button id="anPM" onclick="anSetPeriod('month')">месяц</button>
       </div>
     </div>
     <div class="an-nav">
@@ -662,7 +673,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
       <div id="anPeriodLbl" class="an-per"></div>
       <button class="btn btn-sm" onclick="anShift(1)">&#8250;</button>
       <button class="btn btn-sm" onclick="anShift(0)" style="font-size:11px">Сейчас</button>
-      <select id="anPersonSel" class="an-sel" onchange="anSetPerson(this.value)" style="display:none"></select>
+      <select id="anPersonSel" class="an-sel" onchange="anSetPerson(this.value)"></select>
     </div>
     <div id="anKpi" class="an-kpi"></div>
     <div id="anBody"></div>
@@ -3973,152 +3984,190 @@ function renderStat(){
 }
 
 
-/* ==== АНАЛИТИЧЕСКИЙ ЦЕНТР ==========================================================
-   Вкладки «Статистика», «Пробег» и «Табель» показывали три куска ОДНОГО дня в трёх
-   местах: часы отдельно, километры отдельно, адреса отдельно. Понять, почему день вышел
-   плохим, можно было только листая между ними — и правка времени жила там, где причину
-   не видно. Здесь единица — ДЕНЬ: часы, пробег и адреса рядом, правка на месте.
-   Месячный список — тот же день строками, чтобы не терять скорость ежедневной работы. */
-var anMode='day', anDate='', anMonth='', anPerson='', anKmC=null, anRA=null;
+/* ==== АНАЛИТИЧЕСКИЙ ЦЕНТР =========================================================
+   Отвечает на один вопрос: КУДА ДЕВАЮТСЯ ВРЕМЯ И КИЛОМЕТРЫ. «Статистика», «Пробег» и
+   «Табель» показывали три куска одного дня в трёх местах, и связать их можно было только
+   глазами. Здесь строка = день одного человека: адреса, км, часы, баланс и — главное —
+   что именно съело остальное. Тап по строке раскрывает день целиком, правка времени там же.
+   Баланс считаем ТОЛЬКО из осей, которые уже проверены ночным разбором маршрутов; где
+   разбора или одометра нет, честно пишем «нет данных», а не подставляем ноль. */
+var anPeriod='day', anAnchor='', anPerson='', anKmC=null, anRA=null, anOpenRow='';
 function anAddDays(iso,n){ var d=new Date(iso+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
 function anAddMonths(ym,n){ var y=+ym.slice(0,4), m=+ym.slice(5,7)+n; while(m<1){m+=12;y--;} while(m>12){m-=12;y++;} return y+'-'+(m<10?'0':'')+m; }
-function anInit(){ if(!anDate)anDate=isoD(0); if(!anMonth)anMonth=anDate.slice(0,7); }
+function anMonday(iso){ var d=new Date(iso+'T12:00:00Z'); var w=d.getUTCDay()||7; return anAddDays(iso,1-w); }
+function anMonthEnd(ym){ var nx=anAddMonths(ym,1)+'-01'; return anAddDays(nx,-1); }
+function anInit(){ if(!anAnchor)anAnchor=isoD(0); }
+/* границы периода — одно место, где живёт «что считаем сейчас» */
+function anRange(){
+  anInit();
+  if(anPeriod==='day')return {start:anAnchor,end:anAnchor,label:fmt(anAnchor)+' \u00b7 '+raDow(anAnchor)};
+  if(anPeriod==='week'){
+    var s=anMonday(anAnchor), e=anAddDays(s,6);
+    return {start:s,end:e,label:s.slice(8)+'.'+s.slice(5,7)+' \u2013 '+e.slice(8)+'.'+e.slice(5,7)};
+  }
+  var ym=anAnchor.slice(0,7);
+  return {start:ym+'-01',end:anMonthEnd(ym),label:tabelMonthName(ym)};
+}
 /* пробег считает та же формула, что и вкладка «Пробег» — кешируем, кластеризация не из дешёвых */
 function anKm(){ if(!anKmC)anKmC=odoDriverDayKm(odoCluster()); return anKmC; }
 function anHrs(id,date){ return wtHrs((wtAll[id]||{})[date]); }
-/* адреса дня: строки маршрута этого водителя за эту дату. У грузчиков своих строк нет — там «—» */
+/* адреса дня: строки маршрута этого водителя за эту дату. У грузчиков своих строк нет */
 function anAddr(id,date){
   var L=rows.filter(function(r){ return r.date===date&&r.drv===id&&r.addr&&String(r.addr).trim(); });
   return {total:L.length, done:L.filter(function(r){return r.done;}).length, list:L};
 }
-/* кто в этот день вообще существовал: отметил время, проехал или получил адреса */
-function anPeopleOfDay(date){
-  var km=anKm();
-  return tabelPeople().filter(function(p){
-    if((wtAll[p.id]||{})[date])return true;
-    if(km[p.id]&&km[p.id][date])return true;
-    return anAddr(p.id,date).total>0;
-  });
+function anRAof(id,date){ return (anRA&&anRA[id]&&anRA[id][date])||null; }
+/* ── БАЛАНС ДНЯ ───────────────────────────────────────────────────────────────────────
+   100% минус то, что день потерял. Три потери, все из уже проверенных источников:
+   невыполненные адреса, доля адресов вне плана и лишние километры от порядка объезда.
+   Нет разбора и нет пробега — «нет данных»: подставить ноль значило бы обвинить человека
+   цифрой, которой у нас нет. */
+function anBalance(id,date){
+  var a=anAddr(id,date), d=anRAof(id,date), km=(anKm()[id]||{})[date]||0;
+  var parts=[];
+  if(a.total&&a.done<a.total){
+    var un=a.total-a.done;
+    parts.push({pct:Math.round(un/a.total*100), why:un+' '+(un===1?'адрес не выполнен':'адресов не выполнено')});
+  }
+  if(d){
+    var gr=raDayGrade(d);
+    if(gr.plan>0)parts.push({pct:gr.plan, why:gr.plan+'% адресов вне плана'});
+    var loss=raNum(d.kpi&&d.kpi.lossKm), fact=raNum(d.kpi&&d.kpi.factKm);
+    var isN=raIsNord(id);
+    if(!isN&&loss!=null&&loss>0&&fact&&fact>0)parts.push({pct:Math.round(loss/fact*100), why:'порядок объезда +'+Math.round(loss)+' км'});
+  }
+  if(!d&&!km&&!a.total)return {pct:null, why:'нет данных'};
+  if(!km&&a.total)parts.push({pct:0, why:'пробег не снят'});
+  var lost=0; parts.forEach(function(p){ lost+=p.pct; });
+  var pct=Math.max(0,100-lost);
+  parts.sort(function(x,y){ return y.pct-x.pct; });
+  var why=parts.length?parts[0].why:'\u2014';
+  if(!d&&km)why=(parts.length?parts[0].why:'разбора маршрута нет');
+  return {pct:pct, why:why};
 }
-/* дни месяца, где у человека есть хоть что-то */
-function anDaysOfMonth(id,ym){
-  var out={},km=anKm();
-  Object.keys(wtAll[id]||{}).forEach(function(d){ if(d.indexOf(ym)===0)out[d]=1; });
-  Object.keys((km[id]||{})).forEach(function(d){ if(d.indexOf(ym)===0)out[d]=1; });
-  rows.forEach(function(r){ if(r.drv===id&&r.date&&r.date.indexOf(ym)===0&&r.addr&&String(r.addr).trim())out[r.date]=1; });
-  return Object.keys(out).sort();
+function anPill(pct){
+  if(pct==null)return '<span class="an-pill p-none">нет данных</span>';
+  var c=pct>=85?'p-ok':(pct>=70?'p-warn':'p-bad');
+  return '<span class="an-pill '+c+'">'+pct+'%</span>';
 }
-function anGrade(id,date){
-  var d=anRA&&anRA[id]&&anRA[id][date];
-  return d?raDayGrade(d):null;
+/* строки периода: день × человек, но только там, где в этот день что-то было */
+function anRows(){
+  var r=anRange(), km=anKm(), out=[];
+  var people=tabelPeople().filter(function(p){ return !anPerson||p.id===anPerson; });
+  for(var d=r.start; d<=r.end; d=anAddDays(d,1)){
+    people.forEach(function(p){
+      var hasT=!!(wtAll[p.id]||{})[d], hasK=!!((km[p.id]||{})[d]), a=anAddr(p.id,d);
+      if(!hasT&&!hasK&&!a.total)return;
+      var b=anBalance(p.id,d);
+      out.push({date:d, id:p.id, name:tabelPersonName(p.id)||p.id, addr:a,
+        km:(km[p.id]||{})[d]||0, hrs:anHrs(p.id,d), bal:b,
+        bad:tHasBadSeg((wtAll[p.id]||{})[d]),
+        open:tSegs((wtAll[p.id]||{})[d]).some(function(g){return g&&g.s&&!g.e;})});
+    });
+  }
+  return out;
 }
-function anSetMode(m){ anMode=m; anInit(); renderAn(); }
-function anSetPerson(p){ anPerson=p; renderAn(); }
-function anGoDay(date){ anDate=date; anMonth=date.slice(0,7); anMode='day'; renderAn(); }
+function anSetPeriod(p){ anPeriod=p; anOpenRow=''; renderAn(); }
+function anSetPerson(p){ anPerson=p; anOpenRow=''; renderAn(); }
 function anShift(n){
   anInit();
-  if(anMode==='day'){ anDate=(n===0)?isoD(0):anAddDays(anDate,n); anMonth=anDate.slice(0,7); }
-  else { anMonth=(n===0)?isoD(0).slice(0,7):anAddMonths(anMonth,n); }
-  renderAn();
+  if(n===0){ anAnchor=isoD(0); }
+  else if(anPeriod==='day'){ anAnchor=anAddDays(anAnchor,n); }
+  else if(anPeriod==='week'){ anAnchor=anAddDays(anAnchor,n*7); }
+  else { anAnchor=anAddMonths(anAnchor.slice(0,7),n)+'-01'; }
+  anOpenRow=''; renderAn();
 }
-/* разборы маршрутов приходят от ночного робота — читаем один раз за открытие вкладки */
+function anToggleRow(date,id){ var k=date+'|'+id; anOpenRow=(anOpenRow===k)?'':k; renderAn(); }
+/* разборы маршрутов считает ночной робот — читаем один раз за открытие вкладки */
 function anOpen(){
   anInit();
-  if(anRA){ renderAn(); return; }
   renderAn();
+  if(anRA)return;
   var ref=disp2Mode?db.ref('route_analysis/C'):db.ref('route_analysis');
-  ref.once('value').then(function(s){
-    var v=s.val()||{};
-    anRA=disp2Mode?{C:v}:v;
-    renderAn();
-  }).catch(function(){ anRA={}; });
+  ref.once('value').then(function(s){ var v=s.val()||{}; anRA=disp2Mode?{C:v}:v; renderAn(); })
+    .catch(function(){ anRA={}; });
 }
-function anMonthLbl(ym){ return tabelMonthName(ym); }
-function anDayLbl(iso){ return fmt(iso)+' · '+raDow(iso); }
-function anBadge(txt,cls){ return '<span class="an-badge '+cls+'">'+txt+'</span>'; }
-/* одна плитка сводки */
-function anTile(v,l,warn){
-  return '<div class="an-tile'+(warn?' an-tile-warn':'')+'"><div class="an-tv">'+v+'</div><div class="an-tl">'+l+'</div></div>';
-}
+function anTile(v,l,warn){ return '<div class="an-tile'+(warn?' an-tile-warn':'')+'"><div class="an-tv">'+v+'</div><div class="an-tl">'+l+'</div></div>'; }
 function renderAn(){
   anInit();
-  var lbl=document.getElementById('anPeriodLbl');
-  if(lbl)lbl.textContent=(anMode==='day')?anDayLbl(anDate):anMonthLbl(anMonth);
-  var bd=document.getElementById('anMD'),bm=document.getElementById('anMM');
-  if(bd)bd.style.cssText=(anMode==='day')?'background:var(--acc);color:#fff;border-color:var(--acc)':'';
-  if(bm)bm.style.cssText=(anMode==='month')?'background:var(--acc);color:#fff;border-color:var(--acc)':'';
-  var body=document.getElementById('anBody'); if(!body)return;
-  if(wtDenied){ body.innerHTML='<div class="tabel-soon">Аналитика доступна только в главном входе (Zentrum).</div>'; var k0=document.getElementById('anKpi'); if(k0)k0.innerHTML=''; return; }
+  var r=anRange();
+  var lbl=document.getElementById('anPeriodLbl'); if(lbl)lbl.textContent=r.label;
+  [['anPD','day'],['anPW','week'],['anPM','month']].forEach(function(x){
+    var b=document.getElementById(x[0]); if(b)b.className=(anPeriod===x[1])?'on':'';
+  });
+  var body=document.getElementById('anBody'), kpi=document.getElementById('anKpi');
+  if(!body)return;
+  if(wtDenied){ body.innerHTML='<div class="tabel-soon">Аналитика доступна только в главном входе (Zentrum).</div>'; if(kpi)kpi.innerHTML=''; return; }
   anRenderPersonSel();
-  if(anMode==='day')anRenderDay(); else anRenderMonth();
+  var L=anRows();
+  var sAd=0,sDone=0,sKm=0,sHrs=0,balN=0,balSum=0;
+  L.forEach(function(x){ sAd+=x.addr.total; sDone+=x.addr.done; sKm+=x.km; if(x.hrs)sHrs+=x.hrs; if(x.bal.pct!=null){balN++;balSum+=x.bal.pct;} });
+  var avg=balN?Math.round(balSum/balN):null;
+  if(kpi)kpi.innerHTML=anTile(sDone+'/'+sAd,'адреса выполнено')
+    +anTile(sKm,'километры')
+    +anTile(String(Math.round(sHrs*10)/10).replace('.',','),'часов в сменах')
+    +anTile(avg!=null?avg+'%':'\u2014','баланс');
+  if(!L.length){ body.innerHTML='<div class="an-empty">За этот период отметок нет.</div>'; return; }
+  var h='<div class="an-tblbox"><table class="an-tbl"><thead><tr>'
+    +'<th>День</th><th class="txt">Кто</th><th>Адреса</th><th>Км</th><th>Час</th><th>Баланс</th><th class="txt">Что съело остальное</th><th></th>'
+    +'</tr></thead><tbody>';
+  L.forEach(function(x){
+    var k=x.date+'|'+x.id, isOpen=(anOpenRow===k);
+    h+='<tr class="an-r'+(isOpen?' an-r-on':'')+'" onclick="anToggleRow(\''+x.date+'\',\''+x.id+'\')" title="Открыть день целиком">'
+      +'<td>'+x.date.slice(8)+'.'+x.date.slice(5,7)+'</td>'
+      +'<td class="txt">'+xe(x.name)+'</td>'
+      +'<td>'+(x.addr.total?(x.addr.done+' из '+x.addr.total):'\u2014')+'</td>'
+      +'<td>'+(x.km||'\u2014')+'</td>'
+      +'<td>'+(x.hrs!=null?String(x.hrs).replace('.',','):'\u2014')+(x.bad?'<span class="an-warn" title="Конец раньше начала — часы не засчитаны">\u26a0</span>':'')+(x.open?'<span class="an-run">идёт</span>':'')+'</td>'
+      +'<td>'+anPill(x.bal.pct)+'</td>'
+      +'<td class="txt">'+xe(x.bal.why)+'</td>'
+      +'<td>'+((IS_PLANNER||IS_VIEWER)?'':'<button class="an-edit" onclick="event.stopPropagation();tabelEditDay(\''+x.id+'\',\''+x.date+'\')" title="Исправить время">&#9998;</button>')+'</td>'
+      +'</tr>';
+    if(tabelEdit&&tabelEdit.drv===x.id&&!tabelEdit.nw&&tabelEditDate===x.date)
+      h+='<tr class="an-sub"><td colspan="8">'+tabelEditForm()+'</td></tr>';
+    if(isOpen)h+='<tr class="an-sub"><td colspan="8">'+anDayDetail(x)+'</td></tr>';
+  });
+  /* итог периода: та самая строка, ради которой всё и собиралось в одну таблицу */
+  h+='<tr class="an-tot"><td colspan="2">за период</td>'
+    +'<td>'+sDone+' из '+sAd+'</td><td>'+sKm+'</td><td>'+String(Math.round(sHrs*10)/10).replace('.',',')+'</td>'
+    +'<td>'+anPill(avg)+'</td>'
+    +'<td class="txt">'+(sAd?(String(Math.round(sKm/sAd*10)/10).replace('.',',')+' км на адрес'):'\u2014')+'</td><td></td></tr>';
+  h+='</tbody></table></div>';
+  body.innerHTML=h;
 }
 function anRenderPersonSel(){
   var sel=document.getElementById('anPersonSel'); if(!sel)return;
-  if(anMode==='day'){ sel.style.display='none'; return; }
-  sel.style.display='';
   var pp=tabelPeople();
-  if(!anPerson&&pp.length)anPerson=pp[0].id;
-  sel.innerHTML=pp.map(function(p){
+  sel.innerHTML='<option value="">все</option>'+pp.map(function(p){
     return '<option value="'+xe(p.id)+'"'+(p.id===anPerson?' selected':'')+'>'+xe(tabelPersonName(p.id)||p.id)+'</option>';
   }).join('');
 }
-/* ── режим ДЕНЬ: сводка дня + карточка на каждого, кто в этот день работал ─────────── */
-function anRenderDay(){
-  var people=anPeopleOfDay(anDate), km=anKm();
-  var sHrs=0,sKm=0,sAd=0,sDone=0,sBad=0;
-  people.forEach(function(p){
-    var h=anHrs(p.id,anDate); if(h)sHrs+=h;
-    sKm+=(km[p.id]||{})[anDate]||0;
-    var a=anAddr(p.id,anDate); sAd+=a.total; sDone+=a.done;
-    if(tHasBadSeg((wtAll[p.id]||{})[anDate]))sBad++;
-  });
-  var kpi=document.getElementById('anKpi');
-  if(kpi)kpi.innerHTML=anTile(Math.round(sHrs*10)/10+' ч','Часы')
-    +anTile(sKm+' км','Пробег')
-    +anTile(sDone+'/'+sAd,'Адреса')
-    +anTile(people.length,'На смене')
-    +(sBad?anTile(sBad,'Ошибки времени',true):'');
-  var body=document.getElementById('anBody');
-  if(!people.length){ body.innerHTML='<div class="an-empty">За этот день отметок нет.</div>'; return; }
-  body.innerHTML=people.map(anCard).join('');
+/* ── раскрытый день: адреса по порядку, фото одометра, отрезки смены ─────────────── */
+function anDayDetail(x){
+  var rec=(wtAll[x.id]||{})[x.date]||{}, segs=tSegs(rec);
+  var h='<div class="an-det">';
+  h+='<div class="an-dl"><span class="an-dk">Отрезки смены</span><span class="an-dv">'
+    +(segs.length?segs.map(function(g){return (g.s||'?')+'&#8211;'+(g.e||'&#8230;');}).join(', '):'\u2014')
+    +(x.bad?'<span class="an-warn" title="Конец раньше начала">\u26a0 время</span>':'')+'</span></div>';
+  var ph=anOdoPhotos(x.id,x.date);
+  h+='<div class="an-dl"><span class="an-dk">Одометр</span><span class="an-dv">'+(ph||'<span class="an-mu">снимков нет</span>')+'</span></div>';
+  h+='<div class="an-dl"><span class="an-dk">Адреса по порядку</span><span class="an-dv">'
+    +(x.addr.total?('<div class="an-addr">'+x.addr.list.map(function(r,i){
+      return '<div class="an-a'+(r.done?' an-a-done':'')+'"><span class="an-a-n">'+(i+1)+'</span>'+xe(String(r.addr||'').slice(0,80))+(r.done?'':'<span class="an-a-no">не выполнен</span>')+'</div>';
+    }).join('')+'</div>'):'<span class="an-mu">адресов нет</span>')+'</span></div>';
+  var d=anRAof(x.id,x.date);
+  if(d){
+    var gr=raDayGrade(d);
+    h+='<div class="an-dl"><span class="an-dk">Ночной разбор</span><span class="an-dv"><span class="an-grade '+gr.level+'">'
+      +({red:'&#128308; Плохо',amb:'&#128993; Средне',grn:'&#128994; Хорошо'}[gr.level])+'</span> \u00b7 вне плана '+gr.plan+'%'
+      +(gr.ord!=null?(' \u00b7 порядок '+gr.ord+' км'):'')+'</span></div>';
+  } else {
+    h+='<div class="an-dl"><span class="an-dk">Ночной разбор</span><span class="an-dv an-mu">за этот день разбора нет</span></div>';
+  }
+  h+='</div>';
+  return h;
 }
-function anCard(p){
-  var id=p.id, rec=(wtAll[id]||{})[anDate]||{};
-  var segs=tSegs(rec), h=wtHrs(rec), bad=tHasBadSeg(rec);
-  var open=segs.some(function(g){return g&&g.s&&!g.e;});
-  var kmv=(anKm()[id]||{})[anDate]||0;
-  var a=anAddr(id,anDate), gr=anGrade(id,anDate);
-  var editing=!!(tabelEdit&&tabelEdit.drv===id&&!tabelEdit.nw&&tabelEditDate===anDate);
-  var role=tabelRoleOf(id);
-  var out='<div class="an-card">';
-  out+='<div class="an-hd"><span class="an-nm">'+xe(tabelPersonName(id)||id)+(role?'<span class="tabel-role">'+xe(role)+'</span>':'')+'</span>';
-  if(gr)out+='<span class="an-grade '+gr.level+'">'+({red:'&#128308; Плохо',amb:'&#128993; Средне',grn:'&#128994; Хорошо'}[gr.level])+'</span>';
-  out+='</div>';
-  /* ЧАСЫ — с правкой прямо здесь: причину видно рядом, не надо уходить на другую вкладку */
-  out+='<div class="an-line"><span class="an-lb">Часы</span><span class="an-lv">'
-    +(h!=null?('<b>'+h+' ч</b>'):'<span class="an-mu">нет отметок</span>')
-    +(open?anBadge('идёт','an-b-run'):'')
-    +(bad?anBadge('&#9888; конец раньше начала','an-b-bad'):'')
-    +'</span>'
-    +(IS_PLANNER||IS_VIEWER?'':'<button class="an-edit" onclick="tabelEditDay(\''+id+'\',\''+anDate+'\')" title="Исправить время">&#9998;</button>')
-    +'</div>';
-  out+='<div class="an-segs">'+(segs.length?segs.map(function(g){return (g.s||'?')+'&#8211;'+(g.e||'&#8230;');}).join(', '):'&#8212;')+'</div>';
-  if(editing)out+=tabelEditForm();
-  /* ПРОБЕГ — та же цифра, что во вкладке «Пробег»: одна формула, копий нет */
-  out+='<div class="an-line"><span class="an-lb">Пробег</span><span class="an-lv">'
-    +(kmv?('<b>'+kmv+' км</b>'):'<span class="an-mu">&#8212;</span>')+'</span></div>';
-  out+=anOdoPhotos(id,anDate);
-  /* АДРЕСА */
-  out+='<div class="an-line"><span class="an-lb">Адреса</span><span class="an-lv">'
-    +(a.total?('<b>'+a.done+' из '+a.total+'</b>'+(a.done<a.total?anBadge((a.total-a.done)+' не выполнено','an-b-bad'):'')):'<span class="an-mu">&#8212;</span>')
-    +'</span></div>';
-  if(a.total)out+='<div class="an-addr">'+a.list.map(function(r){
-    return '<div class="an-a'+(r.done?' an-a-done':'')+'"><span class="an-a-dot"></span>'+xe(String(r.addr||'').slice(0,70))+'</div>';
-  }).join('')+'</div>';
-  out+='</div>';
-  return out;
-}
-/* снимки одометра за день — доказательство цифр, лежит рядом с ними */
+/* снимки одометра — доказательство цифр, лежит рядом с ними */
 function anOdoPhotos(id,date){
   var r=(odoAll[id]||{})[date]; if(!r)return '';
   var ph=[];
@@ -4127,51 +4176,11 @@ function anOdoPhotos(id,date){
   var ev=r.ev||{};
   Object.keys(ev).forEach(function(k){ var e=ev[k]||{}; if(e.photo)ph.push({t:odoEvRu(e.kind||e.m),km:e.km,u:e.photo}); });
   if(!ph.length)return '';
-  return '<div class="an-photos">'+ph.map(function(x){
-    return '<a class="an-ph" href="'+xe(x.u)+'" target="_blank" title="'+xe(x.t+' · '+(x.km!=null?x.km:''))+'"><img src="'+xe(x.u)+'" loading="lazy"><span>'+xe(x.t)+'</span></a>';
-  }).join('')+'</div>';
+  return '<span class="an-photos">'+ph.map(function(p){
+    return '<a class="an-ph" href="'+xe(p.u)+'" target="_blank" title="'+xe(p.t+' \u00b7 '+(p.km!=null?p.km:''))+'"><img src="'+xe(p.u)+'" loading="lazy"><span>'+xe(p.t)+'</span></a>';
+  }).join('')+'</span>';
 }
-function anEvRuMap(){ return {start:'старт',end:'конец',swap_in:'сел в авто',swap_out:'вышел из авто'}; }
-function odoEvRu(k){ return anEvRuMap()[k]||k||'отметка'; }
-/* ── режим МЕСЯЦ: те же дни строками — быстрый список для ежедневной правки ────────── */
-function anRenderMonth(){
-  var id=anPerson, km=anKm();
-  var body=document.getElementById('anBody'), kpi=document.getElementById('anKpi');
-  if(!id){ if(kpi)kpi.innerHTML=''; body.innerHTML='<div class="an-empty">Нет сотрудников.</div>'; return; }
-  var days=anDaysOfMonth(id,anMonth);
-  var sHrs=0,sKm=0,sAd=0,sDone=0,sBad=0,sOpen=0;
-  days.forEach(function(d){
-    var h=anHrs(id,d); if(h)sHrs+=h;
-    sKm+=(km[id]||{})[d]||0;
-    var a=anAddr(id,d); sAd+=a.total; sDone+=a.done;
-    if(tHasBadSeg((wtAll[id]||{})[d]))sBad++;
-    var L=tSegs((wtAll[id]||{})[d]); if(L.some(function(g){return g&&g.s&&!g.e;}))sOpen++;
-  });
-  if(kpi)kpi.innerHTML=anTile(Math.round(sHrs*10)/10+' ч','Часы за месяц')
-    +anTile(days.length,'Дней')
-    +anTile(sKm+' км','Пробег')
-    +anTile(sDone+'/'+sAd,'Адреса')
-    +(sBad?anTile(sBad,'Ошибки времени',true):'')
-    +(sOpen?anTile(sOpen,'Не закрыто',true):'');
-  if(!days.length){ body.innerHTML='<div class="an-empty">За этот месяц отметок нет.</div>'; return; }
-  var editing=!!(tabelEdit&&tabelEdit.drv===id&&!tabelEdit.nw);
-  var h='<div class="an-mrow an-mhd"><span>Дата</span><span>Часы</span><span>Пробег</span><span>Адреса</span><span>Оценка</span><span></span></div>';
-  days.forEach(function(d){
-    if(editing&&tabelEditDate===d){ h+='<div class="an-medit">'+tabelEditForm()+'</div>'; return; }
-    var hh=anHrs(id,d), a=anAddr(id,d), gr=anGrade(id,d);
-    var bad=tHasBadSeg((wtAll[id]||{})[d]);
-    var L=tSegs((wtAll[id]||{})[d]), op=L.some(function(g){return g&&g.s&&!g.e;});
-    h+='<div class="an-mrow an-mclick" onclick="anGoDay(\''+d+'\')" title="Открыть день целиком">'
-      +'<span class="an-md">'+d.slice(8)+'.'+d.slice(5,7)+'</span>'
-      +'<span>'+(hh!=null?hh+' ч':'<span class="an-mu">&#8212;</span>')+(bad?anBadge('&#9888;','an-b-bad'):'')+(op?anBadge('идёт','an-b-run'):'')+'</span>'
-      +'<span>'+(((km[id]||{})[d])?((km[id][d])+' км'):'<span class="an-mu">&#8212;</span>')+'</span>'
-      +'<span>'+(a.total?(a.done+'/'+a.total):'<span class="an-mu">&#8212;</span>')+'</span>'
-      +'<span>'+(gr?('<span class="an-grade '+gr.level+'">'+({red:'&#128308;',amb:'&#128993;',grn:'&#128994;'}[gr.level])+'</span>'):'<span class="an-mu">&#8212;</span>')+'</span>'
-      +(IS_PLANNER||IS_VIEWER?'<span></span>':'<button class="an-edit" onclick="event.stopPropagation();tabelEditDay(\''+id+'\',\''+d+'\')" title="Исправить время">&#9998;</button>')
-      +'</div>';
-  });
-  body.innerHTML=h;
-}
+function odoEvRu(k){ return ({start:'старт',end:'конец',swap_in:'сел в авто',swap_out:'вышел из авто'})[k]||k||'отметка'; }
 /* Форма правки времени одна на «Табель» и «Аналитику» — рисуем тот экран, который открыт */
 function tabelRerender(){
   var ta=document.getElementById('tAn');
