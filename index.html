@@ -885,7 +885,9 @@ function odoEvents(){
         Object.keys(_ev).forEach(function(k){
           var x=_ev[k]||{}; if(typeof x.km!=='number'||isNaN(x.km))return;
           var kind=x.kind||'start'; _has[kind]=1;
-          a.push({drv:drv,date:date,m:((kind==='end'||kind==='swap_out')?'end':'start'),kind:kind,van:(x.van||null),km:x.km,tsEff:odoTsEff(x,date,kind),noTs:!(typeof x.ts==='number'&&x.ts>0),photo:(x.photo||''),drvNord:odoIsNordDrv(drv)});
+// ⛔Фото в журналі не зберігається — беремо його зі старого запису тієї самої події
+var _ph=x.photo; if(!_ph&&(kind==='start'||kind==='end')&&r[kind]&&r[kind].photo) _ph=r[kind].photo;
+          a.push({drv:drv,date:date,m:((kind==='end'||kind==='swap_out')?'end':'start'),kind:kind,van:(x.van||null),km:x.km,photo:_ph,tsEff:odoTsEff(x,date,kind),noTs:!(typeof x.ts==='number'&&x.ts>0),photo:(x.photo||''),drvNord:odoIsNordDrv(drv)});
         });
       }
       // ПЕРЕХОДНЫЙ ДЕНЬ: начал на старой версии (журнала ещё нет), закончил на новой — журнал
