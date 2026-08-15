@@ -172,6 +172,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .tabel-seg.on{background:#1a2a3a;color:#fff;border-color:#1a2a3a}
 .tabel-segedit{display:flex;align-items:center;gap:8px;padding:6px 14px}
 .tabel-dash{color:#9aa5b1}
+.odo-bad{color:#b00020;font-weight:700}
 .an-nav{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--bd)}
 .an-per{flex:1;text-align:center;font-size:13px;font-weight:600}
 .an-sel{border:1px solid var(--bd);border-radius:8px;height:30px;padding:0 8px;font-size:13px;background:var(--cd);color:var(--tx)}
@@ -1045,7 +1046,7 @@ function odoPhotoCell(e){
    и аналитический центр читают её же. Раньше расчёт жил внутри renderOdo вперемешку
    с вёрсткой, и второй экран неизбежно завёл бы свою копию — а копии расходятся молча. */
 function odoDriverDayKm(cl){
-  var out={};
+  var out={}, bad={};
   ((cl&&cl.vans)||[]).forEach(function(v){
     (v.evs||[]).forEach(function(e){
       if(e.clean&&e.delta>0){ out[e.drv]=out[e.drv]||{}; out[e.drv][e.date]=(out[e.drv][e.date]||0)+e.delta; }
@@ -1056,14 +1057,28 @@ function odoDriverDayKm(cl){
   var _seg=odoSegments(cl).filter(function(s){return s.declared;});
   var _z={};
   _seg.forEach(function(s){ var k=s.drv+"|"+s.date; if(!_z[k]){ _z[k]=1; if(out[s.drv])out[s.drv][s.date]=0; } });
-  _seg.forEach(function(s){ if(s.km>0){ out[s.drv]=out[s.drv]||{}; out[s.drv][s.date]=(out[s.drv][s.date]||0)+s.km; } });
-  return out;
+  /* ⛔ОПИСКА ПРИ ВВОДЕ ОДОМЕТРА. Живой случай 14.08: старт 325 957, конец 178 676 699 —
+     водитель набрал лишние цифры. Событийный расчёт от такого защищён (ODO_DAY_KM), а отрезки — нет,
+     и в таблице появлялись миллионы километров. Ставим ту же границу: такой день даёт НОЛЬ
+     и ВИДИМУЮ пометку — исчезнуть незамеченным он не должен, его надо исправить. */
+  _seg.forEach(function(s){
+    if(s.km<=0)return;
+    if(s.km>ODO_DAY_KM){ bad[s.drv+'|'+s.date]=Math.round(s.km); return; }
+    out[s.drv]=out[s.drv]||{}; out[s.drv][s.date]=(out[s.drv][s.date]||0)+s.km;
+  });
+  /* то же самое для старых дней без указанной машины — там сумма событий тоже может уйти за предел */
+  Object.keys(out).forEach(function(drv){
+    Object.keys(out[drv]).forEach(function(d){
+      if(out[drv][d]>ODO_DAY_KM){ bad[drv+'|'+d]=Math.round(out[drv][d]); out[drv][d]=0; }
+    });
+  });
+  return {km:out, bad:bad};
 }
 function renderOdo(){
   var body=document.getElementById('odoBody'); if(!body)return;
   if(!odoAll||!Object.keys(odoAll).length){ body.innerHTML='<div class="tabel-empty">Нет данных о пробеге.</div>'; return; }
   var cl=odoCluster(), vans=cl.vans, unknown=cl.unknown;
-  var driverDay=odoDriverDayKm(cl); var review=[]; var h='';
+  var _dd=odoDriverDayKm(cl), driverDay=_dd.km, odoBadDay=_dd.bad; var review=[]; var h='';
   ['main','nord'].forEach(function(region){
     var rgVans=vans.filter(function(v){ return v.region===region && v.evs.length; });
     if(!rgVans.length)return;
@@ -1117,7 +1132,10 @@ function renderOdo(){
     h+='<h3 style="margin:16px 14px 4px;font-size:14px">Пробег по водителям</h3><div style="overflow-x:auto"><table class="odo-tbl"><thead><tr><th>Водитель</th><th>По дням</th><th>Всего</th></tr></thead><tbody>';
     drvKeys.forEach(function(drv){
       var dd=driverDay[drv],dts=Object.keys(dd).sort(),tot=0,parts=[];
-      dts.forEach(function(dt){ tot+=dd[dt]; parts.push(odoFmtD(dt)+': '+dd[dt]); });
+      dts.forEach(function(dt){ tot+=dd[dt];
+        var _b=odoBadDay[drv+'|'+dt];
+        parts.push(odoFmtD(dt)+': '+(_b?('<span class="odo-bad" title="Показание введено с ошибкой — вышло '+_b+' км за день, это невозможно. Исправьте одометр.">⚠ ошибка</span>'):dd[dt]));
+      });
       h+='<tr><td>'+xe(dname(drv)||drv)+'</td><td style="font-size:12px">'+parts.join(' &middot; ')+'</td><td style="font-weight:600">'+tot+' км</td></tr>';
     });
     h+='</tbody></table></div>';
@@ -4009,7 +4027,8 @@ function anRange(){
   return {start:ym+'-01',end:anMonthEnd(ym),label:tabelMonthName(ym)};
 }
 /* пробег считает та же формула, что и вкладка «Пробег» — кешируем, кластеризация не из дешёвых */
-function anKm(){ if(!anKmC)anKmC=odoDriverDayKm(odoCluster()); return anKmC; }
+function anKm(){ if(!anKmC)anKmC=odoDriverDayKm(odoCluster()); return anKmC.km; }
+function anKmBad(id,date){ if(!anKmC)anKm(); return anKmC.bad[id+'|'+date]||0; }
 function anHrs(id,date){ return wtHrs((wtAll[id]||{})[date]); }
 /* адреса дня: строки маршрута этого водителя за эту дату. У грузчиков своих строк нет */
 function anAddr(id,date){
@@ -4036,13 +4055,16 @@ function anBalance(id,date){
     var isN=raIsNord(id);
     if(!isN&&loss!=null&&loss>0&&fact&&fact>0)parts.push({pct:Math.round(loss/fact*100), why:'порядок объезда +'+Math.round(loss)+' км'});
   }
-  if(!d&&!km&&!a.total)return {pct:null, why:'нет данных'};
-  if(!km&&a.total)parts.push({pct:0, why:'пробег не снят'});
+  var badKm=anKmBad(id,date);
+  if(!d&&!km&&!a.total&&!badKm)return {pct:null, why:'нет данных'};
+  if(badKm)parts.push({pct:0, why:'одометр введён с ошибкой ('+badKm+' км за день)'});
+  else if(!km&&a.total)parts.push({pct:0, why:'пробег не снят'});
   var lost=0; parts.forEach(function(p){ lost+=p.pct; });
   var pct=Math.max(0,100-lost);
   parts.sort(function(x,y){ return y.pct-x.pct; });
   var why=parts.length?parts[0].why:'\u2014';
   if(!d&&km)why=(parts.length?parts[0].why:'разбора маршрута нет');
+  if(badKm)why='одометр введён с ошибкой ('+badKm+' км за день)';
   return {pct:pct, why:why};
 }
 function anPill(pct){
@@ -4060,7 +4082,7 @@ function anRows(){
       if(!hasT&&!hasK&&!a.total)return;
       var b=anBalance(p.id,d);
       out.push({date:d, id:p.id, name:tabelPersonName(p.id)||p.id, addr:a,
-        km:(km[p.id]||{})[d]||0, hrs:anHrs(p.id,d), bal:b,
+        km:(km[p.id]||{})[d]||0, badKm:anKmBad(p.id,d), hrs:anHrs(p.id,d), bal:b,
         bad:tHasBadSeg((wtAll[p.id]||{})[d]),
         open:tSegs((wtAll[p.id]||{})[d]).some(function(g){return g&&g.s&&!g.e;})});
     });
@@ -4117,7 +4139,7 @@ function renderAn(){
       +'<td>'+x.date.slice(8)+'.'+x.date.slice(5,7)+'</td>'
       +'<td class="txt">'+xe(x.name)+'</td>'
       +'<td>'+(x.addr.total?(x.addr.done+' из '+x.addr.total):'\u2014')+'</td>'
-      +'<td>'+(x.km||'\u2014')+'</td>'
+      +'<td>'+(x.badKm?('<span class="an-warn" title="'+x.badKm+' км за день — показание введено с ошибкой">⚠ ошибка</span>'):(x.km||'\u2014'))+'</td>'
       +'<td>'+(x.hrs!=null?String(x.hrs).replace('.',','):'\u2014')+(x.bad?'<span class="an-warn" title="Конец раньше начала — часы не засчитаны">\u26a0</span>':'')+(x.open?'<span class="an-run">идёт</span>':'')+'</td>'
       +'<td>'+anPill(x.bal.pct)+'</td>'
       +'<td class="txt">'+xe(x.bal.why)+'</td>'
@@ -4150,7 +4172,9 @@ function anDayDetail(x){
     +(segs.length?segs.map(function(g){return (g.s||'?')+'&#8211;'+(g.e||'&#8230;');}).join(', '):'\u2014')
     +(x.bad?'<span class="an-warn" title="Конец раньше начала">\u26a0 время</span>':'')+'</span></div>';
   var ph=anOdoPhotos(x.id,x.date);
-  h+='<div class="an-dl"><span class="an-dk">Одометр</span><span class="an-dv">'+(ph||'<span class="an-mu">снимков нет</span>')+'</span></div>';
+  h+='<div class="an-dl"><span class="an-dk">Одометр</span><span class="an-dv">'
+    +(x.badKm?('<span class="an-warn">⚠ за день вышло '+x.badKm+' км — это невозможно, показание введено с ошибкой</span><br>'):'')
+    +(ph||'<span class="an-mu">снимков нет</span>')+'</span></div>';
   h+='<div class="an-dl"><span class="an-dk">Адреса по порядку</span><span class="an-dv">'
     +(x.addr.total?('<div class="an-addr">'+x.addr.list.map(function(r,i){
       return '<div class="an-a'+(r.done?' an-a-done':'')+'"><span class="an-a-n">'+(i+1)+'</span>'+xe(String(r.addr||'').slice(0,80))+(r.done?'':'<span class="an-a-no">не выполнен</span>')+'</div>';
