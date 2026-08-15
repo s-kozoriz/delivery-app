@@ -98,7 +98,7 @@ function wtClone(o){ return o?JSON.parse(JSON.stringify(o)):null; }
 function hm(s){ var p=(s||'0:0').split(':'); return (parseInt(p[0],10)||0)*60+(parseInt(p[1],10)||0); }
 function wtSegs(rec){ var s=rec&&rec.seg; if(!s)return[]; return Array.isArray(s)?s.slice():Object.keys(s).map(function(k){return s[k];}); }
 function wtOpenIdx(rec){ var L=wtSegs(rec); for(var i=L.length-1;i>=0;i--){ if(L[i]&&L[i].s&&!L[i].e) return i; } return -1; }
-function wtWorkedMin(rec,live){ var L=wtSegs(rec),total=0,nowM=null; for(var i=0;i<L.length;i++){ var g=L[i]; if(!g||!g.s)continue; if(g.e){ var d=hm(g.e)-hm(g.s); if(d<0)d+=1440; total+=d; } else if(live){ if(nowM==null){ var n=new Date(); nowM=n.getHours()*60+n.getMinutes(); } var d2=nowM-hm(g.s); if(d2<0)d2+=1440; total+=d2; } } return total; }
+function wtWorkedMin(rec,live){ var L=wtSegs(rec),total=0,nowM=null; for(var i=0;i<L.length;i++){ var g=L[i]; if(!g||!g.s)continue; if(g.e){ var d=hm(g.e)-hm(g.s); if(d<0)d=0;/*⛔описка, не нічна зміна*/  total+=d; } else if(live){ if(nowM==null){ var n=new Date(); nowM=n.getHours()*60+n.getMinutes(); } var d2=nowM-hm(g.s); if(d2<0)d2=0;/*⛔те саме для відкритого відрізка*/  total+=d2; } } return total; }
 function wtFmt(m){ return Math.floor(m/60)+':'+String(Math.round(m)%60).padStart(2,'0'); }
 function wtHoursDec(rec){ return Math.round(wtWorkedMin(rec,false)/6)/10; }
 function wtState(rec){ if(rec&&rec.done)return 'done'; if(wtOpenIdx(rec)>=0)return 'run'; if(wtSegs(rec).length)return 'pause'; return 'idle'; }
