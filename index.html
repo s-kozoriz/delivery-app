@@ -172,6 +172,42 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
 .tabel-seg.on{background:#1a2a3a;color:#fff;border-color:#1a2a3a}
 .tabel-segedit{display:flex;align-items:center;gap:8px;padding:6px 14px}
 .tabel-dash{color:#9aa5b1}
+.an-nav{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--bd)}
+.an-per{flex:1;text-align:center;font-size:13px;font-weight:600}
+.an-sel{border:1px solid var(--bd);border-radius:8px;height:30px;padding:0 8px;font-size:13px;background:var(--cd);color:var(--tx)}
+.an-kpi{display:flex;gap:10px;padding:12px 16px;flex-wrap:wrap}
+.an-tile{flex:1;min-width:92px;background:var(--bg);border-radius:8px;padding:12px;text-align:center}
+.an-tile-warn{background:#f6e3e3}
+.an-tv{font-size:20px;font-weight:700;color:var(--acc)}
+.an-tile-warn .an-tv{color:#b00020}
+.an-tl{font-size:11px;color:var(--mu);margin-top:2px}
+.an-empty{padding:20px 16px;color:var(--mu);font-size:13px;text-align:center}
+.an-card{border-top:1px solid var(--bd);padding:12px 16px}
+.an-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.an-nm{font-size:15px;font-weight:700}
+.an-grade{font-size:12px;font-weight:600}
+.an-line{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13px}
+.an-lb{min-width:64px;color:var(--mu);font-size:12px}
+.an-lv{flex:1}
+.an-mu{color:var(--mu)}
+.an-edit{border:none;background:var(--bg);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:13px;flex-shrink:0;color:var(--tx)}
+.an-segs{font-size:12px;color:var(--mu);margin:0 0 6px 72px}
+.an-badge{border-radius:8px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px;white-space:nowrap}
+.an-b-bad{background:#f6e3e3;color:#b00020}
+.an-b-run{background:#e3f0e6;color:#1a7a40}
+.an-photos{display:flex;gap:6px;margin:2px 0 6px 72px;flex-wrap:wrap}
+.an-ph{display:block;text-align:center;text-decoration:none;color:var(--mu);font-size:10px}
+.an-ph img{display:block;width:54px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--bd)}
+.an-addr{margin:2px 0 4px 72px}
+.an-a{font-size:12px;color:var(--mu);padding:1px 0;display:flex;align-items:center;gap:6px}
+.an-a-dot{width:6px;height:6px;border-radius:50%;background:#c9b9a0;flex-shrink:0}
+.an-a-done .an-a-dot{background:#1a7a40}
+.an-mrow{display:grid;grid-template-columns:64px 1fr 78px 64px 54px 34px;align-items:center;gap:6px;padding:7px 16px;border-top:1px solid var(--bd);font-size:13px}
+.an-mhd{color:var(--mu);font-size:11px;text-transform:uppercase;letter-spacing:.04em;border-top:none}
+.an-mclick{cursor:pointer}
+.an-mclick:hover{background:var(--bg)}
+.an-md{font-weight:600}
+.an-medit{border-top:1px solid var(--bd);padding:4px 16px}
 .tabel-bad{background:#f6e3e3;color:#b00020;border-radius:8px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap;margin-left:4px}
 .tabel-segdel{border:none;background:#f6e3e3;color:#b00020;border-radius:8px;width:32px;height:32px;cursor:pointer;flex-shrink:0;font-size:13px}
 .tabel-editbtns{display:flex;align-items:center;gap:8px;padding:8px 14px 12px}
@@ -408,6 +444,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
   <div class="tabs">
     <button class="tab on" onclick="sw('plan')">Маршрут</button>
     <button class="tab" onclick="sw('hist')">История</button>
+    <button class="tab" id="tabAn" onclick="sw('an')">Аналитика</button>
     <button class="tab" id="tabStat" onclick="sw('stat')">Статистика</button>
         <button class="tab" id="tabTabel" onclick="sw('tabel')">Табель</button>
     <button class="tab" id="tabOdo" onclick="sw('odo')">Пробег</button>
@@ -608,6 +645,27 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
       <button class="btn btn-sm" onclick="shStat(0)" style="font-size:11px">Сейчас</button>
     </div>
     <div id="statContent" style="padding:14px 16px"></div>
+  </div>
+</div>
+
+<div id="tAn" style="display:none">
+  <div class="card">
+    <div class="ch">
+      <h2>Аналитика</h2>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" id="anMD" onclick="anSetMode('day')">День</button>
+        <button class="btn btn-sm" id="anMM" onclick="anSetMode('month')">Месяц</button>
+      </div>
+    </div>
+    <div class="an-nav">
+      <button class="btn btn-sm" onclick="anShift(-1)">&#8249;</button>
+      <div id="anPeriodLbl" class="an-per"></div>
+      <button class="btn btn-sm" onclick="anShift(1)">&#8250;</button>
+      <button class="btn btn-sm" onclick="anShift(0)" style="font-size:11px">Сейчас</button>
+      <select id="anPersonSel" class="an-sel" onchange="anSetPerson(this.value)" style="display:none"></select>
+    </div>
+    <div id="anKpi" class="an-kpi"></div>
+    <div id="anBody"></div>
   </div>
 </div>
 
@@ -829,7 +887,7 @@ db.ref('lager_staff').on('value',function(s){lagerStaff=s.val()||{};var tt=docum
 }
 db.ref('pairs').on('value',function(s){pairsAll=s.val()||{};var tt2=document.getElementById('ttab');if(tt2&&tt2.style.display!=='none')renderTabel();},function(){});
 // ── Пробег (одометр) — временное хранилище для сверки с топливом (Zoll); фото уходит контролёру позже ──
-db.ref('odometer').on('value',function(s){odoAll=s.val()||{};var t=document.getElementById('tOdo');if(t&&t.style.display!=='none')renderOdo();},function(){});
+db.ref('odometer').on('value',function(s){odoAll=s.val()||{};anKmC=null;var t=document.getElementById('tOdo');if(t&&t.style.display!=='none')renderOdo();var ta=document.getElementById('tAn');if(ta&&ta.style.display!=='none')renderAn();},function(){});
 db.ref('nord_driver').on('value',function(s){nordDriver=s.val()||{};gm();},function(){});
 db.ref('nord_planners').on('value',function(s){nordPlanners=s.val()||{};var p=document.getElementById('cs-nord');if(p&&p.style.display!=='none')renderNordPlanners();},function(){});
 db.ref('calibration').on('value',function(s){calibAll=s.val()||{};var tc=document.getElementById('tcalib');if(tc&&tc.style.display!=='none')renderCalibList();});
@@ -972,11 +1030,29 @@ function odoPhotoCell(e){
   if(e.photo)return '<a href="'+xe(e.photo)+'" target="_blank"><img class="odo-thumb" src="'+xe(e.photo)+'" loading="lazy"></a>';
   return '<span title="фото отсутствует">&#128247; нет</span>';
 }
+/* Пробег водителя за день — ОДНА формула на все экраны: вкладка «Пробег»
+   и аналитический центр читают её же. Раньше расчёт жил внутри renderOdo вперемешку
+   с вёрсткой, и второй экран неизбежно завёл бы свою копию — а копии расходятся молча. */
+function odoDriverDayKm(cl){
+  var out={};
+  ((cl&&cl.vans)||[]).forEach(function(v){
+    (v.evs||[]).forEach(function(e){
+      if(e.clean&&e.delta>0){ out[e.drv]=out[e.drv]||{}; out[e.drv][e.date]=(out[e.drv][e.date]||0)+e.delta; }
+    });
+  });
+  /* Дни, где машина УКАЗАНА водителем, пересчитываем отрезками: прирост события
+     «сел в авто» — это пробег ПРЕДЫДУЩЕГО водителя, приписывать его новому нельзя. */
+  var _seg=odoSegments(cl).filter(function(s){return s.declared;});
+  var _z={};
+  _seg.forEach(function(s){ var k=s.drv+"|"+s.date; if(!_z[k]){ _z[k]=1; if(out[s.drv])out[s.drv][s.date]=0; } });
+  _seg.forEach(function(s){ if(s.km>0){ out[s.drv]=out[s.drv]||{}; out[s.drv][s.date]=(out[s.drv][s.date]||0)+s.km; } });
+  return out;
+}
 function renderOdo(){
   var body=document.getElementById('odoBody'); if(!body)return;
   if(!odoAll||!Object.keys(odoAll).length){ body.innerHTML='<div class="tabel-empty">Нет данных о пробеге.</div>'; return; }
   var cl=odoCluster(), vans=cl.vans, unknown=cl.unknown;
-  var driverDay={}; var review=[]; var h='';
+  var driverDay=odoDriverDayKm(cl); var review=[]; var h='';
   ['main','nord'].forEach(function(region){
     var rgVans=vans.filter(function(v){ return v.region===region && v.evs.length; });
     if(!rgVans.length)return;
@@ -995,7 +1071,7 @@ function renderOdo(){
         list.forEach(function(e){
           if(e.m==='end'){ hasEnd=true; endDrv=e.drv; }
           if(e.m==='start'){ hasStart=true; startDrv=e.drv; }
-          if(e.clean&&e.delta>0){ dsum+=e.delta; driverDay[e.drv]=driverDay[e.drv]||{}; driverDay[e.drv][date]=(driverDay[e.drv][date]||0)+e.delta; droveSeq.push(e.drv); if(!e.photo)noPhoto=true; if(e.carry)carry=true; }
+          if(e.clean&&e.delta>0){ dsum+=e.delta; droveSeq.push(e.drv); if(!e.photo)noPhoto=true; if(e.carry)carry=true; }
           if(!e.clean){ susp=true; }
           if(!e.clean||(e.clean&&e.delta>0&&!e.photo)||e.cross||e.flag==='hi'){ review.push({v:v.label,e:e}); }
         });
@@ -1024,14 +1100,6 @@ function renderOdo(){
     h+='<h3 style="margin:16px 14px 4px;font-size:14px;color:#b00">&#9940; Неизвестные машины (проверьте)</h3><div style="overflow-x:auto"><table class="odo-tbl"><thead><tr><th>Дата</th><th>Водитель</th><th>Показание</th><th>Фото</th></tr></thead><tbody>';
     unknown.forEach(function(e){ h+='<tr><td>'+odoFmtD(e.date)+' '+odoML(e.m)+'</td><td>'+xe(dname(e.drv)||e.drv)+'</td><td>'+e.km+'</td><td>'+odoPhotoCell(e)+'</td></tr>'; });
     h+='</tbody></table></div>';
-  }
-  // Дни, где машина УКАЗАНА водителем, пересчитываем отрезками: прирост события «сел в авто» —
-  // это пробег ПРЕДЫДУЩЕГО водителя машины, приписывать его новому нельзя (зарплата, штрафы).
-  var _dseg=odoSegments(cl).filter(function(s){return s.declared;});
-  if(_dseg.length){
-    var _z={};
-    _dseg.forEach(function(s){ var k=s.drv+'|'+s.date; if(!_z[k]){ _z[k]=1; if(driverDay[s.drv])driverDay[s.drv][s.date]=0; } });
-    _dseg.forEach(function(s){ if(s.km>0){ driverDay[s.drv]=driverDay[s.drv]||{}; driverDay[s.drv][s.date]=(driverDay[s.drv][s.date]||0)+s.km; } });
   }
   var drvKeys=Object.keys(driverDay);
   if(drvKeys.length){
@@ -2494,12 +2562,12 @@ function swCfg(name){
 
 function sw(n){
   if(n!=='warehouse'){try{sessionStorage.setItem('lastTab',n);}catch(e){}} // запомнить вкладку — восстановить после F5 (кроме режимной «Склад»)
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo',route:'troute'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo',route:'troute',an:'tAn'};
   Object.keys(tabMap).forEach(function(t){
     var el=document.getElementById(tabMap[t]);
     if(el)el.style.display=t===n?'':'none';
   });
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег',route:'Анализ маршрута'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег',route:'Анализ маршрута',an:'Аналитика'};
   document.querySelectorAll('.tab').forEach(function(b){
     b.classList.toggle('on',b.textContent.trim()===(nameMap[n]||''));
   });
@@ -2516,15 +2584,16 @@ function sw(n){
   if(n==='nordm')renderNordMirror();
   if(n==='odo')renderOdo();
   if(n==='route')raOpen();
+  if(n==='an'){loadAllRowsForHist();anOpen();}
 }
 // после F5 остаться на той же вкладке, где был; НО только если её кнопка видима для этой роли и это не режим «Склад»
 function restoreTab(){
   if(viewOnly)return;                       // склад — принудительно warehouse, не трогаем
   var n; try{n=sessionStorage.getItem('lastTab');}catch(e){}
   if(!n||n==='plan'||n==='warehouse')return; // дефолт и так «Маршрут»
-  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo',route:'troute'};
+  var tabMap={plan:'tp',hist:'th',cfg:'tc',stat:'ts2',warehouse:'tw',tabel:'ttab',calib:'tcalib',inc:'tinc',nordm:'tnordm',odo:'tOdo',route:'troute',an:'tAn'};
   if(!tabMap[n])return;
-  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег',route:'Анализ маршрута'};
+  var nameMap={plan:'Маршрут',hist:'История',cfg:'Настройки',stat:'Статистика',warehouse:'LK Lager — Склад',tabel:'Табель',calib:'Калибровка',inc:'Входящие 1С',nordm:'Nord',odo:'Пробег',route:'Анализ маршрута',an:'Аналитика'};
   var visible=false;                         // вкладка доступна текущей роли?
   document.querySelectorAll('.tab').forEach(function(b){
     if(b.textContent.trim()===nameMap[n]&&b.style.display!=='none')visible=true;
@@ -2926,12 +2995,12 @@ function tabelMonthName(ym){var mn=['Январь','Февраль','Март','
 function tabelShift(d){var p=tabelMonth.split('-');var dt=new Date(parseInt(p[0],10),(parseInt(p[1],10)-1)+d,1);tabelMonth=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');tabelEdit=null;renderTabel();}
 // tabelSeg удалён вместе с разделением на «Водители/Грузчики» — теперь один список
 var tabelEditSegs=[],tabelEditDone=false,tabelEditDate='';
-function tabelEditDay(k,d){if(IS_VIEWER)return;tabelOpen[k]=1;var rec=(wtAll[k]||{})[d]||{};tabelEdit={drv:k,date:d};tabelEditSegs=tSegs(rec).map(function(g){return {s:g.s||'',e:g.e||''};});if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];tabelEditDone=!!rec.done;tabelEditDate=d;renderTabel();}
+function tabelEditDay(k,d){if(IS_VIEWER)return;tabelOpen[k]=1;var rec=(wtAll[k]||{})[d]||{};tabelEdit={drv:k,date:d};tabelEditSegs=tSegs(rec).map(function(g){return {s:g.s||'',e:g.e||''};});if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];tabelEditDone=!!rec.done;tabelEditDate=d;tabelRerender();}
 function tabelAddDay(k){if(IS_VIEWER)return;tabelOpen[k]=1;tabelEdit={drv:k,nw:true};tabelEditSegs=[{s:'',e:''}];tabelEditDone=false;tabelEditDate=isoD(0);renderTabel();}
-function tabelCancel(){tabelEdit=null;renderTabel();}
+function tabelCancel(){tabelEdit=null;tabelRerender();}
 function tabelReadInputs(){tabelEditSegs.forEach(function(g,i){var es=document.getElementById('tseg_s_'+i),ee=document.getElementById('tseg_e_'+i);if(es)g.s=es.value;if(ee)g.e=ee.value;});var dt=document.getElementById('tabelNewDate');if(dt)tabelEditDate=dt.value;}
-function tabelAddSeg(){tabelReadInputs();tabelEditSegs.push({s:'',e:''});renderTabel();}
-function tabelDelSeg(i){tabelReadInputs();tabelEditSegs.splice(i,1);if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];renderTabel();}
+function tabelAddSeg(){tabelReadInputs();tabelEditSegs.push({s:'',e:''});tabelRerender();}
+function tabelDelSeg(i){tabelReadInputs();tabelEditSegs.splice(i,1);if(!tabelEditSegs.length)tabelEditSegs=[{s:'',e:''}];tabelRerender();}
 function tabelSave(){
   if(IS_VIEWER)return;
   tabelReadInputs();
@@ -2940,7 +3009,7 @@ function tabelSave(){
   var segs=tabelEditSegs.filter(function(g){return g.s;}).map(function(g){return g.e?{s:g.s,e:g.e}:{s:g.s};});
   if(!segs.length){db.ref('worktime/'+k+'/'+d).remove().then(function(){toast('Удалено');});}
   else{var rec={seg:segs};if(tabelEditDone)rec.done=true;db.ref('worktime/'+k+'/'+d).set(rec).then(function(){toast('Сохранено');});}
-  tabelEdit=null;renderTabel();
+  tabelEdit=null;tabelRerender();
 }
 function tabelEditForm(){
   var h='<div class="tabel-row tabel-row-edit">';
@@ -3903,6 +3972,212 @@ function renderStat(){
   el.innerHTML=html;
 }
 
+
+/* ==== АНАЛИТИЧЕСКИЙ ЦЕНТР ==========================================================
+   Вкладки «Статистика», «Пробег» и «Табель» показывали три куска ОДНОГО дня в трёх
+   местах: часы отдельно, километры отдельно, адреса отдельно. Понять, почему день вышел
+   плохим, можно было только листая между ними — и правка времени жила там, где причину
+   не видно. Здесь единица — ДЕНЬ: часы, пробег и адреса рядом, правка на месте.
+   Месячный список — тот же день строками, чтобы не терять скорость ежедневной работы. */
+var anMode='day', anDate='', anMonth='', anPerson='', anKmC=null, anRA=null;
+function anAddDays(iso,n){ var d=new Date(iso+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+function anAddMonths(ym,n){ var y=+ym.slice(0,4), m=+ym.slice(5,7)+n; while(m<1){m+=12;y--;} while(m>12){m-=12;y++;} return y+'-'+(m<10?'0':'')+m; }
+function anInit(){ if(!anDate)anDate=isoD(0); if(!anMonth)anMonth=anDate.slice(0,7); }
+/* пробег считает та же формула, что и вкладка «Пробег» — кешируем, кластеризация не из дешёвых */
+function anKm(){ if(!anKmC)anKmC=odoDriverDayKm(odoCluster()); return anKmC; }
+function anHrs(id,date){ return wtHrs((wtAll[id]||{})[date]); }
+/* адреса дня: строки маршрута этого водителя за эту дату. У грузчиков своих строк нет — там «—» */
+function anAddr(id,date){
+  var L=rows.filter(function(r){ return r.date===date&&r.drv===id&&r.addr&&String(r.addr).trim(); });
+  return {total:L.length, done:L.filter(function(r){return r.done;}).length, list:L};
+}
+/* кто в этот день вообще существовал: отметил время, проехал или получил адреса */
+function anPeopleOfDay(date){
+  var km=anKm();
+  return tabelPeople().filter(function(p){
+    if((wtAll[p.id]||{})[date])return true;
+    if(km[p.id]&&km[p.id][date])return true;
+    return anAddr(p.id,date).total>0;
+  });
+}
+/* дни месяца, где у человека есть хоть что-то */
+function anDaysOfMonth(id,ym){
+  var out={},km=anKm();
+  Object.keys(wtAll[id]||{}).forEach(function(d){ if(d.indexOf(ym)===0)out[d]=1; });
+  Object.keys((km[id]||{})).forEach(function(d){ if(d.indexOf(ym)===0)out[d]=1; });
+  rows.forEach(function(r){ if(r.drv===id&&r.date&&r.date.indexOf(ym)===0&&r.addr&&String(r.addr).trim())out[r.date]=1; });
+  return Object.keys(out).sort();
+}
+function anGrade(id,date){
+  var d=anRA&&anRA[id]&&anRA[id][date];
+  return d?raDayGrade(d):null;
+}
+function anSetMode(m){ anMode=m; anInit(); renderAn(); }
+function anSetPerson(p){ anPerson=p; renderAn(); }
+function anGoDay(date){ anDate=date; anMonth=date.slice(0,7); anMode='day'; renderAn(); }
+function anShift(n){
+  anInit();
+  if(anMode==='day'){ anDate=(n===0)?isoD(0):anAddDays(anDate,n); anMonth=anDate.slice(0,7); }
+  else { anMonth=(n===0)?isoD(0).slice(0,7):anAddMonths(anMonth,n); }
+  renderAn();
+}
+/* разборы маршрутов приходят от ночного робота — читаем один раз за открытие вкладки */
+function anOpen(){
+  anInit();
+  if(anRA){ renderAn(); return; }
+  renderAn();
+  var ref=disp2Mode?db.ref('route_analysis/C'):db.ref('route_analysis');
+  ref.once('value').then(function(s){
+    var v=s.val()||{};
+    anRA=disp2Mode?{C:v}:v;
+    renderAn();
+  }).catch(function(){ anRA={}; });
+}
+function anMonthLbl(ym){ return tabelMonthName(ym); }
+function anDayLbl(iso){ return fmt(iso)+' · '+raDow(iso); }
+function anBadge(txt,cls){ return '<span class="an-badge '+cls+'">'+txt+'</span>'; }
+/* одна плитка сводки */
+function anTile(v,l,warn){
+  return '<div class="an-tile'+(warn?' an-tile-warn':'')+'"><div class="an-tv">'+v+'</div><div class="an-tl">'+l+'</div></div>';
+}
+function renderAn(){
+  anInit();
+  var lbl=document.getElementById('anPeriodLbl');
+  if(lbl)lbl.textContent=(anMode==='day')?anDayLbl(anDate):anMonthLbl(anMonth);
+  var bd=document.getElementById('anMD'),bm=document.getElementById('anMM');
+  if(bd)bd.style.cssText=(anMode==='day')?'background:var(--acc);color:#fff;border-color:var(--acc)':'';
+  if(bm)bm.style.cssText=(anMode==='month')?'background:var(--acc);color:#fff;border-color:var(--acc)':'';
+  var body=document.getElementById('anBody'); if(!body)return;
+  if(wtDenied){ body.innerHTML='<div class="tabel-soon">Аналитика доступна только в главном входе (Zentrum).</div>'; var k0=document.getElementById('anKpi'); if(k0)k0.innerHTML=''; return; }
+  anRenderPersonSel();
+  if(anMode==='day')anRenderDay(); else anRenderMonth();
+}
+function anRenderPersonSel(){
+  var sel=document.getElementById('anPersonSel'); if(!sel)return;
+  if(anMode==='day'){ sel.style.display='none'; return; }
+  sel.style.display='';
+  var pp=tabelPeople();
+  if(!anPerson&&pp.length)anPerson=pp[0].id;
+  sel.innerHTML=pp.map(function(p){
+    return '<option value="'+xe(p.id)+'"'+(p.id===anPerson?' selected':'')+'>'+xe(tabelPersonName(p.id)||p.id)+'</option>';
+  }).join('');
+}
+/* ── режим ДЕНЬ: сводка дня + карточка на каждого, кто в этот день работал ─────────── */
+function anRenderDay(){
+  var people=anPeopleOfDay(anDate), km=anKm();
+  var sHrs=0,sKm=0,sAd=0,sDone=0,sBad=0;
+  people.forEach(function(p){
+    var h=anHrs(p.id,anDate); if(h)sHrs+=h;
+    sKm+=(km[p.id]||{})[anDate]||0;
+    var a=anAddr(p.id,anDate); sAd+=a.total; sDone+=a.done;
+    if(tHasBadSeg((wtAll[p.id]||{})[anDate]))sBad++;
+  });
+  var kpi=document.getElementById('anKpi');
+  if(kpi)kpi.innerHTML=anTile(Math.round(sHrs*10)/10+' ч','Часы')
+    +anTile(sKm+' км','Пробег')
+    +anTile(sDone+'/'+sAd,'Адреса')
+    +anTile(people.length,'На смене')
+    +(sBad?anTile(sBad,'Ошибки времени',true):'');
+  var body=document.getElementById('anBody');
+  if(!people.length){ body.innerHTML='<div class="an-empty">За этот день отметок нет.</div>'; return; }
+  body.innerHTML=people.map(anCard).join('');
+}
+function anCard(p){
+  var id=p.id, rec=(wtAll[id]||{})[anDate]||{};
+  var segs=tSegs(rec), h=wtHrs(rec), bad=tHasBadSeg(rec);
+  var open=segs.some(function(g){return g&&g.s&&!g.e;});
+  var kmv=(anKm()[id]||{})[anDate]||0;
+  var a=anAddr(id,anDate), gr=anGrade(id,anDate);
+  var editing=!!(tabelEdit&&tabelEdit.drv===id&&!tabelEdit.nw&&tabelEditDate===anDate);
+  var role=tabelRoleOf(id);
+  var out='<div class="an-card">';
+  out+='<div class="an-hd"><span class="an-nm">'+xe(tabelPersonName(id)||id)+(role?'<span class="tabel-role">'+xe(role)+'</span>':'')+'</span>';
+  if(gr)out+='<span class="an-grade '+gr.level+'">'+({red:'&#128308; Плохо',amb:'&#128993; Средне',grn:'&#128994; Хорошо'}[gr.level])+'</span>';
+  out+='</div>';
+  /* ЧАСЫ — с правкой прямо здесь: причину видно рядом, не надо уходить на другую вкладку */
+  out+='<div class="an-line"><span class="an-lb">Часы</span><span class="an-lv">'
+    +(h!=null?('<b>'+h+' ч</b>'):'<span class="an-mu">нет отметок</span>')
+    +(open?anBadge('идёт','an-b-run'):'')
+    +(bad?anBadge('&#9888; конец раньше начала','an-b-bad'):'')
+    +'</span>'
+    +(IS_PLANNER||IS_VIEWER?'':'<button class="an-edit" onclick="tabelEditDay(\''+id+'\',\''+anDate+'\')" title="Исправить время">&#9998;</button>')
+    +'</div>';
+  out+='<div class="an-segs">'+(segs.length?segs.map(function(g){return (g.s||'?')+'&#8211;'+(g.e||'&#8230;');}).join(', '):'&#8212;')+'</div>';
+  if(editing)out+=tabelEditForm();
+  /* ПРОБЕГ — та же цифра, что во вкладке «Пробег»: одна формула, копий нет */
+  out+='<div class="an-line"><span class="an-lb">Пробег</span><span class="an-lv">'
+    +(kmv?('<b>'+kmv+' км</b>'):'<span class="an-mu">&#8212;</span>')+'</span></div>';
+  out+=anOdoPhotos(id,anDate);
+  /* АДРЕСА */
+  out+='<div class="an-line"><span class="an-lb">Адреса</span><span class="an-lv">'
+    +(a.total?('<b>'+a.done+' из '+a.total+'</b>'+(a.done<a.total?anBadge((a.total-a.done)+' не выполнено','an-b-bad'):'')):'<span class="an-mu">&#8212;</span>')
+    +'</span></div>';
+  if(a.total)out+='<div class="an-addr">'+a.list.map(function(r){
+    return '<div class="an-a'+(r.done?' an-a-done':'')+'"><span class="an-a-dot"></span>'+xe(String(r.addr||'').slice(0,70))+'</div>';
+  }).join('')+'</div>';
+  out+='</div>';
+  return out;
+}
+/* снимки одометра за день — доказательство цифр, лежит рядом с ними */
+function anOdoPhotos(id,date){
+  var r=(odoAll[id]||{})[date]; if(!r)return '';
+  var ph=[];
+  if(r.start&&r.start.photo)ph.push({t:'старт',km:r.start.km,u:r.start.photo});
+  if(r.end&&r.end.photo)ph.push({t:'конец',km:r.end.km,u:r.end.photo});
+  var ev=r.ev||{};
+  Object.keys(ev).forEach(function(k){ var e=ev[k]||{}; if(e.photo)ph.push({t:odoEvRu(e.kind||e.m),km:e.km,u:e.photo}); });
+  if(!ph.length)return '';
+  return '<div class="an-photos">'+ph.map(function(x){
+    return '<a class="an-ph" href="'+xe(x.u)+'" target="_blank" title="'+xe(x.t+' · '+(x.km!=null?x.km:''))+'"><img src="'+xe(x.u)+'" loading="lazy"><span>'+xe(x.t)+'</span></a>';
+  }).join('')+'</div>';
+}
+function anEvRuMap(){ return {start:'старт',end:'конец',swap_in:'сел в авто',swap_out:'вышел из авто'}; }
+function odoEvRu(k){ return anEvRuMap()[k]||k||'отметка'; }
+/* ── режим МЕСЯЦ: те же дни строками — быстрый список для ежедневной правки ────────── */
+function anRenderMonth(){
+  var id=anPerson, km=anKm();
+  var body=document.getElementById('anBody'), kpi=document.getElementById('anKpi');
+  if(!id){ if(kpi)kpi.innerHTML=''; body.innerHTML='<div class="an-empty">Нет сотрудников.</div>'; return; }
+  var days=anDaysOfMonth(id,anMonth);
+  var sHrs=0,sKm=0,sAd=0,sDone=0,sBad=0,sOpen=0;
+  days.forEach(function(d){
+    var h=anHrs(id,d); if(h)sHrs+=h;
+    sKm+=(km[id]||{})[d]||0;
+    var a=anAddr(id,d); sAd+=a.total; sDone+=a.done;
+    if(tHasBadSeg((wtAll[id]||{})[d]))sBad++;
+    var L=tSegs((wtAll[id]||{})[d]); if(L.some(function(g){return g&&g.s&&!g.e;}))sOpen++;
+  });
+  if(kpi)kpi.innerHTML=anTile(Math.round(sHrs*10)/10+' ч','Часы за месяц')
+    +anTile(days.length,'Дней')
+    +anTile(sKm+' км','Пробег')
+    +anTile(sDone+'/'+sAd,'Адреса')
+    +(sBad?anTile(sBad,'Ошибки времени',true):'')
+    +(sOpen?anTile(sOpen,'Не закрыто',true):'');
+  if(!days.length){ body.innerHTML='<div class="an-empty">За этот месяц отметок нет.</div>'; return; }
+  var editing=!!(tabelEdit&&tabelEdit.drv===id&&!tabelEdit.nw);
+  var h='<div class="an-mrow an-mhd"><span>Дата</span><span>Часы</span><span>Пробег</span><span>Адреса</span><span>Оценка</span><span></span></div>';
+  days.forEach(function(d){
+    if(editing&&tabelEditDate===d){ h+='<div class="an-medit">'+tabelEditForm()+'</div>'; return; }
+    var hh=anHrs(id,d), a=anAddr(id,d), gr=anGrade(id,d);
+    var bad=tHasBadSeg((wtAll[id]||{})[d]);
+    var L=tSegs((wtAll[id]||{})[d]), op=L.some(function(g){return g&&g.s&&!g.e;});
+    h+='<div class="an-mrow an-mclick" onclick="anGoDay(\''+d+'\')" title="Открыть день целиком">'
+      +'<span class="an-md">'+d.slice(8)+'.'+d.slice(5,7)+'</span>'
+      +'<span>'+(hh!=null?hh+' ч':'<span class="an-mu">&#8212;</span>')+(bad?anBadge('&#9888;','an-b-bad'):'')+(op?anBadge('идёт','an-b-run'):'')+'</span>'
+      +'<span>'+(((km[id]||{})[d])?((km[id][d])+' км'):'<span class="an-mu">&#8212;</span>')+'</span>'
+      +'<span>'+(a.total?(a.done+'/'+a.total):'<span class="an-mu">&#8212;</span>')+'</span>'
+      +'<span>'+(gr?('<span class="an-grade '+gr.level+'">'+({red:'&#128308;',amb:'&#128993;',grn:'&#128994;'}[gr.level])+'</span>'):'<span class="an-mu">&#8212;</span>')+'</span>'
+      +(IS_PLANNER||IS_VIEWER?'<span></span>':'<button class="an-edit" onclick="event.stopPropagation();tabelEditDay(\''+id+'\',\''+d+'\')" title="Исправить время">&#9998;</button>')
+      +'</div>';
+  });
+  body.innerHTML=h;
+}
+/* Форма правки времени одна на «Табель» и «Аналитику» — рисуем тот экран, который открыт */
+function tabelRerender(){
+  var ta=document.getElementById('tAn');
+  if(ta&&ta.style.display!=='none'){ renderAn(); return; }
+  renderTabel();
+}
 var MAPS_KEY = 'AIzaSyC-B53Kk4QF9Sjf9dJr7lFQk8PhXLuHHBs';
 function _unloadMin(w){ if(!w||w<=20)return 15; if(w<=50)return 20; if(w<=100)return 25; if(w<=200)return 30; return 45; }
 function _fmtM(m){var h=Math.floor(m/60),mn=m%60;return h>0?(h+'ч '+(mn?mn+'мин':'')):mn+'мин';}
