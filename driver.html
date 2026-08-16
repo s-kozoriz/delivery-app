@@ -1858,7 +1858,7 @@ function odoNeedVanStep() { return (odoMode === 'start' || odoMode === 'swap_in'
 function odoStep1() {
   odoStep = 1;
   var hd = document.getElementById('odoHd'), sub = document.getElementById('odoSub');
-  if (hd) hd.textContent = (odoMode === 'swap_in') ? 'Смена машины · шаг 2 из 2' : 'Шаг 1 из 2 · Машина';
+  if (hd) hd.textContent = 'Выбор машины';
   if (sub) sub.textContent = 'На какой машине вы сегодня поедете?';
   odoRenderVans(true, (odoMode === 'swap_in') ? odoVan : null);
   odoFields(false);
@@ -1873,8 +1873,9 @@ function odoStep2() {
   odoStep = 2;
   var hd = document.getElementById('odoHd'), sub = document.getElementById('odoSub');
   var end = odoMode === 'end', so = odoMode === 'swap_out';
-  if (hd) hd.textContent = odoNeedVanStep() ? 'Шаг 2 из 2 · Пробег'
-    : (so ? 'Смена машины · шаг 1 из 2' : (end ? 'Конец дня — пробег' : 'Начало дня — пробег'));
+  /* ⛔Никаких «шаг 1 из 2»: страница называется тем, что на ней делают. Конец дня остаётся
+     подписанным отдельно — иначе не отличить от начала, а это разные вещи. */
+  if (hd) hd.textContent = end ? 'Конец дня — пробег' : (so ? 'Сдаю машину — пробег' : 'Пробег авто');
   var van = odoVanSel || odoVan;
   if (sub) sub.textContent = (odoNeedVanStep() && van)
     ? (odoVanLabel(van) + ' · сфотографируйте одометр и впишите км')
@@ -3153,7 +3154,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-16-10';
+var APP_V = '2026-08-16-11';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
