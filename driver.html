@@ -1650,7 +1650,7 @@ function odoCheckShot(file) {
       body: JSON.stringify({ imageBase64: b64, mediaType: 'image/jpeg', expectDate: wtDate() })
     }).then(function (r) { return r.json(); }).then(function (j) {
       if (my !== odoShotSeq) return;   // пока ждали, человек переснял
-      if (!j || !j.verdict) { odoShotNote('&#9888; Не удалось проверить снимок. Попробуйте ещё раз.', 'bad'); return; }
+      if (!j || !j.verdict) { odoShotFailed('ответ не разобрать'); return; }
       odoShotVerdict = j;
       if (j.verdict === 'no_panel') {
         odoShotNote('&#9888; На фото не видно приборной панели. Переснимите так, чтобы одометр попал в кадр.', 'bad');
@@ -1667,17 +1667,27 @@ function odoCheckShot(file) {
       odoValidate();
     }).catch(function () {
       if (my !== odoShotSeq) return;
-      odoShotNote('&#9888; Не удалось проверить снимок. Попробуйте ещё раз.', 'bad');
-      odoValidate();
+      odoShotFailed('сервис проверки не ответил');
     });
   };
   rd.onerror = function () { odoShotNote(''); };
   rd.readAsDataURL(file);
 }
+/* ⛔РАЗНИЦА, КОТОРАЯ РЕШАЕТ ВСЁ: «на фото нет панели» — это вина водителя, тут запрещаем.
+   «Не смогли проверить» — это НАША поломка: воркер упал, кончились деньги на модели,
+   ответ не разобрали. Запрещать за собственную поломку нельзя: встанут все водители
+   сразу, а починить будет некому. Поэтому такой снимок принимаем и метим «непроверен» —
+   разбор придёт позже, уже у диспетчера. */
+function odoShotFailed(why) {
+  odoShotVerdict = { verdict: 'unchecked', reason: String(why || '') };
+  odoShotNote('&#9888; Проверить снимок не удалось (' + String(why || '') + '). Пробег примем как есть — снимите так, чтобы одометр было видно.', 'warn');
+  odoValidate();
+}
 /* Чего не хватает, чтобы записать пробег. Возвращает текст причины или null. */
 function odoShotWhyBad() {
   if (!navigator.onLine) return 'Нет связи — пробег записывается только онлайн';
   if (!odoShotVerdict) return 'Идёт проверка снимка — подождите пару секунд';
+  if (odoShotVerdict.verdict === 'unchecked') return null;   // наша поломка — водителя не держим
   if (odoShotVerdict.verdict === 'no_panel') return 'На снимке не видно панели — переснимите';
   if (odoShotVerdict.verdict === 'wrong_day') return 'Снимок не сегодняшний — снимите пробег сейчас';
   return null;
@@ -3061,7 +3071,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-16-03';
+var APP_V = '2026-08-16-04';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
