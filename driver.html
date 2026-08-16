@@ -1431,6 +1431,8 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '<div class="ocam" id="odoCam"></div>'
     + '<div class="oform"><div class="ovans" id="odoVans"></div><button class="oshot" id="odoShot" onclick="odoShoot()">&#128247; Сфотографировать пробег</button>'
     + '<div class="okm"><label>Пробег, км</label><input id="odoKm" type="number" inputmode="numeric" placeholder="напр. 123456" oninput="odoValidate()"></div>'
+    + '<button class="ogo" id="odoNext" style="display:none" onclick="odoStep2()">Далее &#8594;</button>'
+    + '<button class="oshotg" id="odoBack" style="display:none" onclick="odoStep1()">&#8592; Сменить машину</button>'
     + '<button class="ogo" id="odoGo" disabled onclick="odoSave()"></button>'
     + '<button class="ogo" id="odoGoL" style="display:none" onclick="odoStartLoader()">Начать смену грузчиком</button>'
     + '</div>';
@@ -1591,7 +1593,10 @@ function odoOpen(mode) {
     if (_sg2) _sg2.insertAdjacentHTML('afterend',
       '<button type="button" class="oshotg" id="odoTestBtn" onclick="odoTestSkip()" style="border-color:#a35a06;color:#ffd9a0">&#9889; Тест: подставить фото и км</button>');
   }  odoVanSel = null;
-  odoRenderVans(!askRole && (mode === 'start' || si), si ? odoVan : null);   // ⛔машини — лише після вибору ролі
+  /* Крок 1 показуємо лише там, де машину справді обирають: старт дня і «беру машину».
+     Кінець дня і «здаю машину» — одразу пробіг, машина там уже відома. */
+  if (!askRole) { if (odoNeedVanStep()) odoStep1(); else odoStep2(); }
+  else { odoRenderVans(false, null); }
   var sh = document.getElementById('odoShot'); sh.className = 'oshot'; sh.innerHTML = '&#128247; Сфотографировать пробег';
   document.getElementById('odoCam').innerHTML = '<div class="ohint">Нажмите «Сфотографировать пробег»</div>';
   document.getElementById('odoKm').value = '';
@@ -1842,6 +1847,46 @@ function odoKmCheck(km, mode, van) {
   if (km - prev > ODO_MAX_DAY * 3) return { flag: 1 };
   return null;
 }
+/* ⛔ДВА КРОКИ. Раніше машина і пробіг стояли в одній формі, і водій вписував число ще до
+   того, як застосунок узагалі знав, про яку машину мова, — звіряти пробіг не було з чим.
+   Тепер спершу машина, потім її пробіг. І на другому кроці ВИДНО, що за машина обрана:
+   саме тут з'явиться її останній відомий пробіг, коли ви дасте реальні цифри.
+   ⛔Урок 08.08: окремий екран збив Рому, бо він не зрозумів, де опинився. Тому крок
+   підписаний числом («шаг 1 из 2»), а з другого кроку є дорога назад. */
+var odoStep = 2;
+function odoNeedVanStep() { return (odoMode === 'start' || odoMode === 'swap_in') && odoVans().length > 0; }
+function odoStep1() {
+  odoStep = 1;
+  var hd = document.getElementById('odoHd'), sub = document.getElementById('odoSub');
+  if (hd) hd.textContent = (odoMode === 'swap_in') ? 'Смена машины · шаг 2 из 2' : 'Шаг 1 из 2 · Машина';
+  if (sub) sub.textContent = 'На какой машине вы сегодня поедете?';
+  odoRenderVans(true, (odoMode === 'swap_in') ? odoVan : null);
+  odoFields(false);
+  var n = document.getElementById('odoNext'); if (n) n.style.display = '';
+  var g = document.getElementById('odoGo'); if (g) g.style.display = 'none';
+  var b = document.getElementById('odoBack'); if (b) b.style.display = 'none';
+  var t = document.getElementById('odoTestBtn'); if (t) t.style.display = 'none';
+  odoValidate();
+}
+function odoStep2() {
+  if (odoNeedVanStep() && !odoVanSel) { showToast('Сначала выберите машину'); return; }
+  odoStep = 2;
+  var hd = document.getElementById('odoHd'), sub = document.getElementById('odoSub');
+  var end = odoMode === 'end', so = odoMode === 'swap_out';
+  if (hd) hd.textContent = odoNeedVanStep() ? 'Шаг 2 из 2 · Пробег'
+    : (so ? 'Смена машины · шаг 1 из 2' : (end ? 'Конец дня — пробег' : 'Начало дня — пробег'));
+  var van = odoVanSel || odoVan;
+  if (sub) sub.textContent = (odoNeedVanStep() && van)
+    ? (odoVanLabel(van) + ' · сфотографируйте одометр и впишите км')
+    : ('Сфотографируйте одометр и впишите км' + (end ? ', чтобы завершить день.' : '.'));
+  odoRenderVans(false, null);
+  odoFields(true);
+  var n = document.getElementById('odoNext'); if (n) n.style.display = 'none';
+  var g = document.getElementById('odoGo'); if (g) g.style.display = '';
+  var b = document.getElementById('odoBack'); if (b) b.style.display = odoNeedVanStep() ? '' : 'none';
+  var t = document.getElementById('odoTestBtn'); if (t) t.style.display = '';
+  odoValidate();
+}
 function odoValidate() {
   var km = (document.getElementById('odoKm').value || '').trim();
   // на старте дня и на «беру машину» без выбора дальше нельзя — иначе снова придётся гадать,
@@ -1853,6 +1898,8 @@ function odoValidate() {
   var _go = document.getElementById('odoGo');
   _go.disabled = false;
   _go.classList.toggle('wait', !(odoPhotoFile && km.length > 0 && (!needVan || odoVanSel)));
+  var _nx = document.getElementById('odoNext');
+  if (_nx) _nx.classList.toggle('wait', !odoVanSel);
 }
 // ⛔Функция «только посмотреть маршрут» удалена намеренно: это и была дыра в требовании.
 //   Хочешь видеть маршрут — зафиксируй пробег и машину. Других путей нет.
@@ -3106,7 +3153,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-16-09';
+var APP_V = '2026-08-16-10';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
