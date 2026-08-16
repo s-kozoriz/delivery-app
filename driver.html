@@ -755,9 +755,12 @@ function dayVeil(on) {
 function wtFinishDay(at) {
   if (wtState(wtToday()) === 'idle') return;   // день не почато — закривати нічого
   _wtCloseAt = at || null;
-  /* ⛔Пустой снимок = пробег не снят. День не закрываем, пока водитель не переснимет. */
-  var _bad = (!isLoaderToday()) ? odoBadShot() : null;
-  if (_bad) { closeWtPanel(); showToast('Пробег не принят: на снимке нет панели. Переснимите'); odoOpen(_bad === 'end' ? 'end' : 'start'); return; }
+  /* ⛔ЗАМОК ОТСЮДА УБРАН. Он смотрел на УТРЕННИЙ снимок и при попытке закрыть день открывал
+     экран НАЧАЛА дня — с выбором машины и кнопкой «Начать рабочий день». Это и выглядело
+     как поломка. Ошибка была в самом замысле: вечером нельзя требовать переснять утренний
+     одометр — машина уже проехала, того показания больше не существует.
+     Плохой утренний снимок обязаны не пропустить ВОРОТА на экране пробега (odoShotWhyBad),
+     а вечерний точно так же не пройдёт через них же. Здесь ловить нечего. */
   if (!isLoaderToday() && odoDriving()) { closeWtPanel(); dayVeil(true); odoOpen('end'); return; }   // гілка водія
   if (isLoaderToday()) { closeWtPanel(); dayVeil(true); loaderEndAsk(); return; }                   // гілка вантажника   // запишет км и закроет день сам
   dayVeil(true);
@@ -2139,8 +2142,6 @@ function dayMissing() {
     var rec = wtToday();
     if (!rec || !rec.done) return null;                  // день ще йде — нічого не винен
     var od = odoData[wtDate()] || {};
-    var _b = (!isLoaderToday()) ? odoBadShot() : null;
-    if (_b) return { why: 'На снимке пробега не видно панели — переснимите', go: function(){ odoOpen(_b === 'end' ? 'end' : 'start'); } };
     if (!isLoaderToday() && !od.end && _odoEndLocal !== wtDate())
       return { why: 'Не сдан конечный пробег', go: function(){ odoOpen('end'); } };
     if (!isLoaderToday() && !rec.pairAsked && pairRegionIds().length)
@@ -3071,7 +3072,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-16-04';
+var APP_V = '2026-08-16-05';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
