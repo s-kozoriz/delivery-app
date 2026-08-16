@@ -755,6 +755,9 @@ function dayVeil(on) {
 function wtFinishDay(at) {
   if (wtState(wtToday()) === 'idle') return;   // день не почато — закривати нічого
   _wtCloseAt = at || null;
+  /* ⛔Пустой снимок = пробег не снят. День не закрываем, пока водитель не переснимет. */
+  var _bad = (!isLoaderToday()) ? odoBadShot() : null;
+  if (_bad) { closeWtPanel(); showToast('Пробег не принят: на снимке нет панели. Переснимите'); odoOpen(_bad === 'end' ? 'end' : 'start'); return; }
   if (!isLoaderToday() && odoDriving()) { closeWtPanel(); dayVeil(true); odoOpen('end'); return; }   // гілка водія
   if (isLoaderToday()) { closeWtPanel(); dayVeil(true); loaderEndAsk(); return; }                   // гілка вантажника   // запишет км и закроет день сам
   dayVeil(true);
@@ -1915,20 +1918,44 @@ function odoGuardBox() {
   document.body.appendChild(b);
   return b;
 }
+/* ⛔ЗАМОК. Снять пробег — обязанность водителя, а не пожелание: на этих цифрах отчёты Zoll.
+   Пустой кадр (обивка сиденья, размытая темнота) — это НЕ снятый пробег, и день с ним
+   закрывать нельзя. Но замок держится ТОЛЬКО на прямом вердикте «на фото нет панели»:
+   нет связи, воркер молчит, модель не ответила — вердикта нет, и замка нет тоже.
+   Так порушник упирается в замок, а честный при плохой сети не замечает его вовсе. */
+function odoBadShot() {
+  try {
+    var r = odoRec(), ev = (r && r.ev) || {};
+    var keys = Object.keys(ev).sort(function (a, b) { return Number(a) - Number(b); });
+    var last = {};
+    /* по каждому виду отметки смотрим ПОСЛЕДНЮЮ: переснял нормально — замок снят */
+    keys.forEach(function (k) { var e = ev[k] || {}; var kind = e.kind || 'start'; last[kind] = e; });
+    var kinds = Object.keys(last);
+    for (var i = 0; i < kinds.length; i++) { if ((last[kinds[i]] || {}).check === 'no_panel') return kinds[i]; }
+    return null;
+  } catch (e) { return null; }
+}
 function odoGuardHide() { try { var b = document.getElementById('odoGuardBar'); if (b) b.style.display = 'none'; } catch (e) {} }
-function odoGuardShow(reason, date, mode, ts) {
+/* На пустом кадре «Всё верно» НЕ предлагаем: снимок надо переснять, это обязанность.
+   На расхождении цифр — предлагаем, потому что там правым может оказаться и водитель. */
+function odoGuardShow(reason, date, mode, ts, verdict) {
   try {
     var b = odoGuardBox();
     _odoGuardFix = { date: date, mode: mode, ts: ts };
-    b.innerHTML = '<div style="font-weight:700;margin-bottom:4px">&#9888; Проверьте пробег</div>'
+    var empty = (verdict === 'no_panel' || verdict === 'wrong_day');
+    b.innerHTML = '<div style="font-weight:700;margin-bottom:4px">&#9888; ' + (empty ? 'Пробег не принят' : 'Проверьте пробег') + '</div>'
       + '<div style="margin-bottom:10px">' + String(reason || '').replace(/</g, '&lt;') + '</div>'
       + '<div style="display:flex;gap:8px">'
-      + '<button id="odoGuardFixBtn" style="flex:1;border:none;border-radius:9px;padding:10px;font-size:14px;font-weight:700;background:#c9453f;color:#fff">Исправить</button>'
-      + '<button id="odoGuardSkipBtn" style="border:none;border-radius:9px;padding:10px 14px;font-size:14px;background:#4a2a2a;color:#ffd9d9">Всё верно</button>'
+      + (empty
+        ? '<button id="odoGuardShootBtn" style="flex:1;border:none;border-radius:9px;padding:10px;font-size:14px;font-weight:700;background:#c9453f;color:#fff">Переснять</button>'
+        : '<button id="odoGuardFixBtn" style="flex:1;border:none;border-radius:9px;padding:10px;font-size:14px;font-weight:700;background:#c9453f;color:#fff">Исправить</button>'
+          + '<button id="odoGuardSkipBtn" style="border:none;border-radius:9px;padding:10px 14px;font-size:14px;background:#4a2a2a;color:#ffd9d9">Всё верно</button>')
       + '</div>';
     b.style.display = '';
-    document.getElementById('odoGuardFixBtn').onclick = odoGuardFix;
-    document.getElementById('odoGuardSkipBtn').onclick = odoGuardHide;
+    var f = document.getElementById('odoGuardFixBtn'); if (f) f.onclick = odoGuardFix;
+    var s = document.getElementById('odoGuardSkipBtn'); if (s) s.onclick = odoGuardHide;
+    var sh = document.getElementById('odoGuardShootBtn');
+    if (sh) sh.onclick = function () { odoGuardHide(); odoOpen(mode === 'end' ? 'end' : 'start'); };
   } catch (e) {}
 }
 var _odoGuardFix = null;
@@ -1961,8 +1988,12 @@ function odoGuard(url, km, date, mode, ts) {
       .then(function (r) { return r.json(); })
       .then(function (j) {
         clearTimeout(t);
-        if (!j || !j.verdict || j.verdict === 'ok' || j.verdict === 'unknown') return;
-        odoGuardShow(odoGuardWord(j), date, mode, ts);
+        if (!j || !j.verdict || j.verdict === 'unknown') return;
+        /* Вердикт пишем ВСЕГДА, даже «ok»: по нему день понимает, что снимок подтверждён,
+           и по нему же диспетчер видит, кто фотографирует мимо панели. */
+        try { db.ref('odometer/' + DRV + '/' + date + '/ev/' + ts).update({ check: j.verdict }); } catch (e) {}
+        if (j.verdict === 'ok') return;
+        odoGuardShow(odoGuardWord(j), date, mode, ts, j.verdict);
       })
       .catch(function () { clearTimeout(t); });
   } catch (e) {}
@@ -2081,6 +2112,8 @@ function dayMissing() {
     var rec = wtToday();
     if (!rec || !rec.done) return null;                  // день ще йде — нічого не винен
     var od = odoData[wtDate()] || {};
+    var _b = (!isLoaderToday()) ? odoBadShot() : null;
+    if (_b) return { why: 'На снимке пробега не видно панели — переснимите', go: function(){ odoOpen(_b === 'end' ? 'end' : 'start'); } };
     if (!isLoaderToday() && !od.end && _odoEndLocal !== wtDate())
       return { why: 'Не сдан конечный пробег', go: function(){ odoOpen('end'); } };
     if (!isLoaderToday() && !rec.pairAsked && pairRegionIds().length)
@@ -3011,7 +3044,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-16-01';
+var APP_V = '2026-08-16-02';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
