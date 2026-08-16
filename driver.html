@@ -2093,9 +2093,34 @@ function odoFlushKm() {
 window.addEventListener('online', function () { setTimeout(odoFlushKm, 2500); });
 setTimeout(odoFlushKm, 4000);
 setInterval(function () { if (odoKmQ.length && navigator.onLine) odoFlushKm(); }, 30000);
+/* ⛔ЗАПУСК ВЕДЁТ НА ПЕРВЫЙ НЕЗАВЕРШЁННЫЙ ШАГ — и перескочить его нельзя.
+   Мы НЕ запоминаем «последний экран»: это память вкладки, она живёт в телефоне и пропадает
+   при смене устройства или чистке браузера. Шаг вычисляем из состояния дня В БАЗЕ — оно
+   одинаковое откуда угодно. Тот же урок, что был с ролью дня: пока она жила только в
+   localStorage, она терялась, и человек попадал не туда.
+   Порядок ровно такой, каким день идёт на самом деле; закрытый день начинает новый цикл. */
+function odoNextStep() {
+  try {
+    if (typeof valMode !== 'undefined' && valMode === 'loader') return null;   // у грузчика свой путь
+    var rec = wtToday(), od = odoData[wtDate()] || {};
+    if (!odoFixedToday()) return 'start';                       // пробег не снят — день не начат
+    if (!rec) return null;
+    if (!rec.done) return null;                                 // день идёт — маршрут, работа
+    if (!od.end && _odoEndLocal !== wtDate()) return 'end';     // нажал «Конец», но пробег не сдан
+    if (!rec.pairAsked && pairRegionIds().length) return 'pair';// не отмечено, с кем работал
+    return 'summary';                                           // всё сделано — итог дня
+  } catch (e) { return null; }
+}
 function odoMaybeGate() {
-  if (_odoGateChecked) return; _odoGateChecked = true;
-  // авто-гейт одометра убран: водитель берёт руль сам через панель, когда реально садится за руль (в любое время)
+  if (_odoGateChecked) return;
+  /* ⛔Данные приходят из базы асинхронно. Пока их нет, вести человека НЕКУДА: решим,
+     что пробег не снят, и откроем старт поверх уже начатого дня. Ждём загрузки. */
+  if (!odoLoaded) { setTimeout(odoMaybeGate, 300); return; }
+  _odoGateChecked = true;
+  var step = odoNextStep();
+  if (step === 'start' || step === 'end') { odoOpen(step); return; }
+  if (step === 'pair') { try { pairAsk(wtDate()); } catch (e) {} return; }
+  if (step === 'summary') { try { daySummaryOrHint(); } catch (e) {} return; }
 }
 // ===================== /ОДОМЕТР =====================
 
@@ -3072,7 +3097,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-16-05';
+var APP_V = '2026-08-16-06';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
