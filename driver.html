@@ -788,7 +788,11 @@ function showMonthSummary() {
     + '<button class="wts-done" onclick="dayDoneExit()">Готово</button></div>';
   o.onclick = function (e) { if (e.target === o) closeMonthSummary(); };
   document.body.appendChild(o);
-  wtSummaryTimer = setTimeout(closeMonthSummary, 6000);
+  /* ⛔Раньше таймер просто ПРЯТАЛ плашку, и человек оставался в приложении с закрытым днём —
+     выход на пин-код делала только кнопка «Готово». Итог дня — последний экран смены:
+     посмотрел свои часы за день и за месяц и вышел. Поэтому таймер выводит на вход сам.
+     5 секунд: столько хватает прочитать две цифры, и никто не стоит над телефоном зря. */
+  wtSummaryTimer = setTimeout(dayDoneExit, 5000);
 }
 function closeMonthSummary() { if (wtSummaryTimer) { clearTimeout(wtSummaryTimer); wtSummaryTimer = null; } var o = document.getElementById('wtSummary'); if (o && o.parentNode) o.parentNode.removeChild(o); }
 
@@ -3158,7 +3162,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-16-12';
+var APP_V = '2026-08-16-13';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
