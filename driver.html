@@ -1427,7 +1427,6 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '</div>'
     + '<div class="ocam" id="odoCam"></div>'
     + '<div class="oform"><div class="ovans" id="odoVans"></div><button class="oshot" id="odoShot" onclick="odoShoot()">&#128247; Сфотографировать пробег</button>'
-    + '<button class="oshotg" id="odoShotG" onclick="odoShootGal()">&#128444; Взять фото из галереи</button>'
     + '<div class="okm"><label>Пробег, км</label><input id="odoKm" type="number" inputmode="numeric" placeholder="напр. 123456" oninput="odoValidate()"></div>'
     + '<button class="ogo" id="odoGo" disabled onclick="odoSave()"></button>'
     + '<button class="ogo" id="odoGoL" style="display:none" onclick="odoStartLoader()">Начать смену грузчиком</button>'
@@ -1435,9 +1434,10 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
   document.body.appendChild(g);
   var inp = document.createElement('input'); inp.id = 'odoInput'; inp.type = 'file'; inp.accept = 'image/*'; inp.setAttribute('capture', 'environment'); inp.style.display = 'none';
   inp.addEventListener('change', odoOnFile); document.body.appendChild(inp);
-  // без capture → системний вибір/галерея: запасний шлях, коли камера не відкривається
-  var inpg = document.createElement('input'); inpg.id = 'odoInputGal'; inpg.type = 'file'; inpg.accept = 'image/*'; inpg.style.display = 'none';
-  inpg.addEventListener('change', odoOnFile); document.body.appendChild(inpg);
+  /* ⛔Галереи у одометра больше НЕТ. Она стояла запасным путём на случай, когда камера не
+     открывается, но цена оказалась выше пользы: снимок из галереи — это вчерашний снимок,
+     и нечестный водитель может подставлять один и тот же кадр каждый день. Пробег снимается
+     камерой здесь и сейчас, иначе это не фиксация пробега, а её имитация. */
   var ban = document.createElement('div'); ban.id = 'odoBanner';
   ban.innerHTML = '<span>&#9888; Пробег не зафиксирован</span><button onclick="odoOpen(\'start\')">Начать день</button>';
   var app = document.getElementById('driverApp'); if (app) app.insertBefore(ban, app.firstChild);
@@ -1495,7 +1495,7 @@ function odoRenderVans(show, exclude) {
   odoVansExtraBtn();
   // тестовим входам — швидкий спосіб пройти крок без камери
   if (typeof isTestUser === 'function' && isTestUser()) {
-    var _sg = document.getElementById('odoShotG');
+    var _sg = document.getElementById('odoShot');
     if (_sg && !document.getElementById('odoTestBtn')) {
       _sg.insertAdjacentHTML('afterend',
         '<button type="button" class="oshotg" id="odoTestBtn" onclick="odoTestSkip()" style="border-color:#a35a06;color:#ffd9a0">&#9889; Тест: подставить фото и км</button>');
@@ -1584,7 +1584,7 @@ function odoOpen(mode) {
   // ⛔Тестові входи мають пройти і кінець дня — кнопка потрібна й тут, не лише на старті.
   var _tb = document.getElementById('odoTestBtn'); if (_tb && _tb.parentNode) _tb.parentNode.removeChild(_tb);
   if (!askRole && typeof isTestUser === 'function' && isTestUser()) {
-    var _sg2 = document.getElementById('odoShotG');
+    var _sg2 = document.getElementById('odoShot');
     if (_sg2) _sg2.insertAdjacentHTML('afterend',
       '<button type="button" class="oshotg" id="odoTestBtn" onclick="odoTestSkip()" style="border-color:#a35a06;color:#ffd9a0">&#9889; Тест: подставить фото и км</button>');
   }  odoVanSel = null;
@@ -1599,12 +1599,12 @@ function odoOpen(mode) {
 // ⛔НЕ трогаем .value перед click(): присвоение value файловому полю гасит «жест
 // пользователя», и камера молча не открывается. Сброс делает обработчик change.
 function odoShoot() { document.getElementById('odoInput').click(); }
-function odoShootGal() { document.getElementById('odoInputGal').click(); }
 // ⛔Приложение принимало ЛЮБОЙ файл: 3 августа Рома снял потолок — серую поверхность без
 //   единого прибора, и день так и записался. Проверять снимок через неделю бессмысленно:
 //   человек уже уехал. Смотрим сразу, пока он стоит у машины.
 // ⛔Мягко: нет сети или сервис молчит — снимок принимаем как раньше. Запрет по причине
 //   «не смогли проверить» оставил бы водителя без работы на пустом месте.
+var ODO_GUARD_URL = 'https://lk-odo.s-kozorizz.workers.dev/read';
 var odoShotSeq = 0;
 function odoShotNote(html, kind) {
   var el = document.getElementById('odoShotNote');
@@ -1625,46 +1625,62 @@ function odoUseKm(km) {
   odoValidate();
   if (navigator.vibrate) navigator.vibrate(40);
 }
+/* ⛔ВОРОТА. Раньше эта проверка только ПОКАЗЫВАЛА предупреждение, а кнопку не трогала —
+   поэтому снимок чужой панели спокойно проходил дальше. Теперь её вердикт решает, можно ли
+   записать пробег вообще: фиксация пробега — первый и главный шаг отчётности, и обойти его
+   нельзя. Смотрим снимок ДО сохранения, пока человек стоит у машины и может переснять. */
+var odoShotVerdict = null;   // null = ещё не проверяли; {verdict, km, panelDate, reason}
 function odoCheckShot(file) {
   var my = ++odoShotSeq;
-  if (!navigator.onLine) { odoShotNote(''); return; }
-  odoShotNote('⏳ Проверяю снимок…', 'wait');
+  odoShotVerdict = null;
+  odoValidate();
+  if (!navigator.onLine) {
+    /* Решение Сергея 16.08: без связи смену не начинаем вовсе. Снимок непроверяем —
+       значит подставить чужой одометр в авиарежиме тоже не выйдет. */
+    odoShotNote('&#9888; Нет связи. Пробег можно записать только онлайн — включите интернет.', 'bad');
+    return;
+  }
+  odoShotNote('&#9203; Проверяю снимок…', 'wait');
   var rd = new FileReader();
   rd.onload = function () {
     var b64 = String(rd.result || '').split(',')[1];
     if (!b64) { odoShotNote(''); return; }
-    var q = 'Это фото приборной панели фургона? Найди одометр — табло или окошко с общим пробегом. '
-      + 'Верхнее число на табло — общий пробег (целое, 5-7 цифр), нижнее — суточный счётчик. '
-      + 'Ответь строго JSON: {"panel":true|false,"km":число или null}. '
-      + 'panel=false если на фото нет приборной панели. km=null если цифры неразличимы.';
-    fetch('https://lk-proxy.s-kozorizz.workers.dev/', {
+    fetch(ODO_GUARD_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: 200, messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
-        { type: 'text', text: q }] }] })
+      body: JSON.stringify({ imageBase64: b64, mediaType: 'image/jpeg', expectDate: wtDate() })
     }).then(function (r) { return r.json(); }).then(function (j) {
       if (my !== odoShotSeq) return;   // пока ждали, человек переснял
-      var t = (j && j.content && j.content[0] && j.content[0].text) || '';
-      var m = t.match(/\{[\s\S]*\}/);
-      if (!m) { odoShotNote(''); return; }
-      var res = null; try { res = JSON.parse(m[0]); } catch (e) {}
-      if (!res) { odoShotNote(''); return; }
-      if (res.panel === false) {
-        odoShotNote('⚠ На фото не видно приборной панели. Переснимите так, чтобы одометр попал в кадр.', 'bad');
-        return;
-      }
-      if (res.km != null && Number(res.km) > 0) {
-        // ⛔Прочиталось — водію лишається ОДИН дотик замість шести цифр. Це і швидше,
-        //   і дисциплінує знімати так, щоб цифри було видно: зняв погано — вводь руками.
-        odoShotNote('На фото <b>' + String(res.km) + '</b> км'
-          + '<button type="button" class="oshot-use" onclick="odoUseKm(' + Number(res.km) + ')">Подтвердить</button>', 'ok');
+      if (!j || !j.verdict) { odoShotNote('&#9888; Не удалось проверить снимок. Попробуйте ещё раз.', 'bad'); return; }
+      odoShotVerdict = j;
+      if (j.verdict === 'no_panel') {
+        odoShotNote('&#9888; На фото не видно приборной панели. Переснимите так, чтобы одометр попал в кадр.', 'bad');
+      } else if (j.verdict === 'wrong_day') {
+        odoShotNote('&#9888; Снимок не сегодняшний: на панели ' + String(j.panelDate || '').replace(/</g, '&lt;') + '. Снимите пробег сейчас.', 'bad');
+      } else if (j.km != null && Number(j.km) > 0) {
+        /* Прочиталось — водителю остаётся ОДИН тап вместо шести цифр. И это же дисциплинирует
+           снимать так, чтобы цифры было видно: снял плохо — вводи руками. */
+        odoShotNote('На фото <b>' + String(j.km) + '</b> км'
+          + '<button type="button" class="oshot-use" onclick="odoUseKm(' + Number(j.km) + ')">Подтвердить</button>', 'ok');
       } else {
-        odoShotNote('⚠ Цифры на одометре не разобрать. Если так же плохо видно глазом — переснимите ближе.', 'warn');
+        odoShotNote('&#9888; Цифры на одометре не разобрать. Переснимите ближе, чтобы табло было чётким.', 'warn');
       }
-    }).catch(function () { odoShotNote(''); });
+      odoValidate();
+    }).catch(function () {
+      if (my !== odoShotSeq) return;
+      odoShotNote('&#9888; Не удалось проверить снимок. Попробуйте ещё раз.', 'bad');
+      odoValidate();
+    });
   };
   rd.onerror = function () { odoShotNote(''); };
   rd.readAsDataURL(file);
+}
+/* Чего не хватает, чтобы записать пробег. Возвращает текст причины или null. */
+function odoShotWhyBad() {
+  if (!navigator.onLine) return 'Нет связи — пробег записывается только онлайн';
+  if (!odoShotVerdict) return 'Идёт проверка снимка — подождите пару секунд';
+  if (odoShotVerdict.verdict === 'no_panel') return 'На снимке не видно панели — переснимите';
+  if (odoShotVerdict.verdict === 'wrong_day') return 'Снимок не сегодняшний — снимите пробег сейчас';
+  return null;
 }
 function odoOnFile(e) {
   var f = e.target.files[0]; if (!f) return;
@@ -1678,7 +1694,7 @@ function odoOnFile(e) {
 // Поля пробега (машина, фото, км) — только для того, кто за рулём.
 function odoFields(show) {
   // ⛔Машини сюди більше не входять: їх бачать обидві ролі, і показом керує odoRenderVans.
-  var ids = ['odoCam', 'odoShot', 'odoShotG', 'odoKm'];
+  var ids = ['odoCam', 'odoShot', 'odoKm'];
   for (var i = 0; i < ids.length; i++) {
     var el = document.getElementById(ids[i]); if (!el) continue;
     var box = (ids[i] === 'odoKm') ? el.parentNode : el;   // у поля км прячем всю строку с подписью
@@ -1763,6 +1779,8 @@ function odoWhyBlocked() {
   var km = (document.getElementById('odoKm').value || '').trim();
   var needVan = (odoMode === 'start' || odoMode === 'swap_in') && odoVans().length > 0;
   if (!odoPhotoFile) return 'Сначала сфотографируйте одометр';
+  var _bad = odoShotWhyBad();
+  if (_bad) return _bad;
   if (!km.length) return 'Впишите километры с одометра';
   if (needVan && !odoVanSel) return 'Выберите машину, на которой поедете';
   return null;
@@ -1907,7 +1925,6 @@ function saveOdoQ() { return _lsSet('odoQ_' + DRV, _qJSON(odoQ)); }
 
    ⛔Модель НЕ источник числа: на одном и том же снимке она давала 178444, 178544 и 1784444
    при настоящих 178484. Поэтому она лишь сверяет ПОРЯДОК величины, наличие панели и дату. */
-var ODO_GUARD_URL = 'https://lk-odo.s-kozorizz.workers.dev/read';
 var ODO_GUARD_MS = 12000;
 function odoGuardBox() {
   var b = document.getElementById('odoGuardBar');
@@ -3044,7 +3061,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-16-02';
+var APP_V = '2026-08-16-03';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
