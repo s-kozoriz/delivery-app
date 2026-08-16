@@ -1860,7 +1860,7 @@ function odoSave() {
   if (mode === 'start' || mode === 'swap_in') nordPtr('driver');
   var vanEv = (mode === 'swap_out') ? odoVan : (odoVanSel || odoVan);
   odoWriteKm(date, mode, km, ts, vanEv, _suspect);
-  odoUploadPhoto(odoPhotoFile, date, mode, ts);
+  odoUploadPhoto(odoPhotoFile, date, mode, ts, km);
   if (mode === 'swap_out') {
     // сдал старую — сразу ведём на шаг 2, чтобы человек не остался «ни на какой машине»
     odoSetVan(null);
@@ -1890,26 +1890,110 @@ function saveOdoQ() { return _lsSet('odoQ_' + DRV, _qJSON(odoQ)); }
 //   с ~2400 КБ до ~200-300 КБ.
 // Побочно решается ещё одно: браузер рисует снимок с учётом поворота из EXIF, поэтому
 // в хранилище он ложится уже не лежащим на боку.
-function odoUploadPhoto(rawFile, date, mode, ts) {
-  compressPhoto(rawFile, function (f) { odoUploadPhotoNow(f || rawFile, date, mode, ts); }, { side: 1600, q: 0.82 });
+/* ==== СТОРОЖ ОДОМЕТРА ==============================================================
+   Цифры пробега уходят в отчёты Zoll, и опечатка стоит штрафа. Разбор живой базы 15-16.08
+   нашёл три класса брака, которых НЕ видит никакая проверка числа на телефоне:
+     • дописанные цифры  — на панели 178676, записано 178676699 (Лёша, 14.08);
+     • снимок не панели  — сфотографирована обивка сиденья, записано 3215708 (Рома, 07.08);
+     • чужой день        — на панели «Donnerstag 13 August», запись за 14.08 (Рома, 14.08).
+
+   ⛔ГЛАВНОЕ ПРАВИЛО: сторож НИЧЕГО НЕ БЛОКИРУЕТ. Он срабатывает уже ПОСЛЕ того, как пробег
+   записан и снимок залит, — потому что раньше ссылки на снимок просто не существует.
+   Нет сети, воркер молчит, ответ странный, вообще любая ошибка — водитель этого не заметит
+   и продолжит работать. Иначе завтра утром вместо работы будут звонки «у меня не сохраняется».
+
+   ⛔Модель НЕ источник числа: на одном и том же снимке она давала 178444, 178544 и 1784444
+   при настоящих 178484. Поэтому она лишь сверяет ПОРЯДОК величины, наличие панели и дату. */
+var ODO_GUARD_URL = 'https://lk-odo.s-kozorizz.workers.dev/read';
+var ODO_GUARD_MS = 12000;
+function odoGuardBox() {
+  var b = document.getElementById('odoGuardBar');
+  if (b) return b;
+  b = document.createElement('div');
+  b.id = 'odoGuardBar';
+  b.style.cssText = 'display:none;position:fixed;left:10px;right:10px;bottom:12px;z-index:9999;background:#3a1414;color:#ffd9d9;border:1px solid #7a2a2a;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.35;box-shadow:0 6px 22px rgba(0,0,0,.45)';
+  document.body.appendChild(b);
+  return b;
 }
-function odoUploadPhotoNow(file, date, mode, ts) {
+function odoGuardHide() { try { var b = document.getElementById('odoGuardBar'); if (b) b.style.display = 'none'; } catch (e) {} }
+function odoGuardShow(reason, date, mode, ts) {
+  try {
+    var b = odoGuardBox();
+    _odoGuardFix = { date: date, mode: mode, ts: ts };
+    b.innerHTML = '<div style="font-weight:700;margin-bottom:4px">&#9888; Проверьте пробег</div>'
+      + '<div style="margin-bottom:10px">' + String(reason || '').replace(/</g, '&lt;') + '</div>'
+      + '<div style="display:flex;gap:8px">'
+      + '<button id="odoGuardFixBtn" style="flex:1;border:none;border-radius:9px;padding:10px;font-size:14px;font-weight:700;background:#c9453f;color:#fff">Исправить</button>'
+      + '<button id="odoGuardSkipBtn" style="border:none;border-radius:9px;padding:10px 14px;font-size:14px;background:#4a2a2a;color:#ffd9d9">Всё верно</button>'
+      + '</div>';
+    b.style.display = '';
+    document.getElementById('odoGuardFixBtn').onclick = odoGuardFix;
+    document.getElementById('odoGuardSkipBtn').onclick = odoGuardHide;
+  } catch (e) {}
+}
+var _odoGuardFix = null;
+/* Правим ТУ ЖЕ отметку (тот же ts), а не создаём новую: иначе в журнале появится лишнее
+   событие и отрезок «водитель × машина» посчитается дважды. */
+function odoGuardFix() {
+  try {
+    var g = _odoGuardFix; if (!g) { odoGuardHide(); return; }
+    var v = prompt('Введите пробег, как он на панели:');
+    if (v === null) return;
+    var km = Number(String(v).replace(/[^\d]/g, ''));
+    if (!(km > 0)) { showToast('Километры вписаны неверно'); return; }
+    var base = 'odometer/' + DRV + '/' + g.date;
+    if (g.mode === 'start' || g.mode === 'end') { try { db.ref(base + '/' + g.mode).update({ km: km }); } catch (e) {} }
+    try { db.ref(base + '/ev/' + g.ts).update({ km: km, fixed: true }); } catch (e) {}
+    odoGuardHide();
+    showToast('Пробег исправлен ✓');
+    if (navigator.vibrate) navigator.vibrate(40);
+  } catch (e) { odoGuardHide(); }
+}
+/* ⛔Весь вызов — в try/catch и с таймаутом. Любой сбой = тишина, водитель работает дальше. */
+function odoGuard(url, km, date, mode, ts) {
+  try {
+    if (!url || !(km > 0) || !navigator.onLine) return;
+    var ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+    var t = setTimeout(function () { try { if (ctl) ctl.abort(); } catch (e) {} }, ODO_GUARD_MS);
+    var opt = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoUrl: url, enteredKm: km, expectDate: date }) };
+    if (ctl) opt.signal = ctl.signal;
+    fetch(ODO_GUARD_URL, opt)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        clearTimeout(t);
+        if (!j || !j.verdict || j.verdict === 'ok' || j.verdict === 'unknown') return;
+        odoGuardShow(odoGuardWord(j), date, mode, ts);
+      })
+      .catch(function () { clearTimeout(t); });
+  } catch (e) {}
+}
+/* Причина — словами водителя, а не кодом. Он должен понять, что именно переснять или поправить. */
+function odoGuardWord(j) {
+  if (j.verdict === 'no_panel') return 'На снимке не видно приборной панели. Переснимите одометр и отметьтесь заново.';
+  if (j.verdict === 'wrong_day') return 'Снимок сделан не сегодня: на панели ' + (j.panelDate || 'другая дата') + '.';
+  if (j.verdict === 'km_mismatch') return 'На панели около ' + j.km + ' км, а вписано другое число.';
+  return j.reason || 'Показание не сходится со снимком.';
+}
+function odoUploadPhoto(rawFile, date, mode, ts, km) {
+  compressPhoto(rawFile, function (f) { odoUploadPhotoNow(f || rawFile, date, mode, ts, km); }, { side: 1600, q: 0.82 });
+}
+function odoUploadPhotoNow(file, date, mode, ts, km) {
   var path = 'odometer/' + DRV + '/' + date + '/' + mode + '_' + ts + '.jpg';
   if (navigator.onLine) {
     storage.ref(path).put(file).then(function (sn) { return sn.ref.getDownloadURL(); })
-      .then(function (url) { db.ref(odoPhotoDbPath(DRV, date, mode, ts)).set(url); })
-      .catch(function () { odoEnqueue(file, path, date, mode, ts); });
-  } else { odoEnqueue(file, path, date, mode, ts); }
+      .then(function (url) { db.ref(odoPhotoDbPath(DRV, date, mode, ts)).set(url); try { odoGuard(url, km, date, mode, ts); } catch (e) {} })
+      .catch(function () { odoEnqueue(file, path, date, mode, ts, km); });
+  } else { odoEnqueue(file, path, date, mode, ts, km); }
 }
 // ⛔ Фото пробега раньше ложилось в localStorage БЕЗ сжатия: оригинал с камеры 3-8 МБ давал
 // 4-11 МБ base64 и ОДНИМ снимком забивал всю квоту браузера (~5 МБ). После этого любое фото
 // доставки уже не сохранялось на диск, а saveQueue молчал — фото исчезало вместе с вкладкой.
 // Жмём как фото доставки, но ВСЕГДА 1600px/0.7: на одометре нужно читать цифры (это доказательство пробега).
-function odoEnqueue(file, path, date, mode, ts) {
+function odoEnqueue(file, path, date, mode, ts, km) {
   compressPhoto(file, function (blob) {
     var rd = new FileReader();
     rd.onload = function (e) {
-      odoQ.push({ path: path, b64: e.target.result, date: date, mode: mode, ts: ts, dbp: odoPhotoDbPath(DRV, date, mode, ts) });
+      odoQ.push({ path: path, b64: e.target.result, date: date, mode: mode, ts: ts, km: km, dbp: odoPhotoDbPath(DRV, date, mode, ts) });
       if (saveOdoQ()) showToast('Слабая сеть — фото пробега загрузится само');
       else showToast('Мало памяти — НЕ закрывайте приложение, фото пробега не сохранено');
       setTimeout(odoProcessQ, 1500);
@@ -1922,7 +2006,7 @@ function odoProcessQ() {
   var bs = atob(it.b64.split(',')[1]); var mime = it.b64.split(';')[0].split(':')[1];
   var ab = new ArrayBuffer(bs.length), ia = new Uint8Array(ab); for (var i = 0; i < bs.length; i++) ia[i] = bs.charCodeAt(i);
   storage.ref(it.path).put(new Blob([ab], { type: mime })).then(function (sn) { return sn.ref.getDownloadURL(); })
-    .then(function (url) { return db.ref(it.dbp || odoPhotoDbPath(DRV, it.date, it.mode, it.ts)).set(url); })
+    .then(function (url) { try { odoGuard(url, it.km, it.date, it.mode, it.ts); } catch (e) {} return db.ref(it.dbp || odoPhotoDbPath(DRV, it.date, it.mode, it.ts)).set(url); })
     .then(function () { odoQ.shift(); saveOdoQ(); setTimeout(odoProcessQ, 1000); })
     .catch(function () { it._p = false; setTimeout(odoProcessQ, 15000); });
 }
@@ -2927,7 +3011,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-15-01';
+var APP_V = '2026-08-16-01';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
