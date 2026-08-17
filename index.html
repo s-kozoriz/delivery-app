@@ -1831,7 +1831,13 @@ function autoAssignRows(){
   try {
     if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER) return;   // «Просмотр» ничего не пишет
     (rows||[]).forEach(function(r){
-      if (!r || !r.id || !r.fromTech || r.drv) return;
+      /* ⛔СМОТРИМ НА ВСЕ СТРОКИ БЕЗ ВОДИТЕЛЯ, а не только на пришедшие от техников.
+         Сначала здесь стояло r.fromTech — и девять накладных Göttingen, принятых 17.08 из
+         «Входящих 1С», остались без водителя: у них src='1c' и fromTech=false, автомат их
+         просто не видел. Строка без водителя — она и есть строка без водителя, откуда бы
+         ни пришла. Рука диспетчера по-прежнему старше: где водитель стоит, не трогаем. */
+      if (!r || !r.id || r.drv) return;
+      if (!r.addr || !(''+r.addr).trim()) return;   // пустая заготовка — не наше дело
       if (_autoDone[r.id]) return;                                // одна попытка на строку за сеанс
       var drv = autoPickDriver(r);
       if (!drv) return;
