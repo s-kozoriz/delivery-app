@@ -1749,6 +1749,50 @@ function _daySummary(s){
    ⛔Рука диспетчера старше всего: строку, где водитель уже стоит, не трогаем никогда.
    ⛔Каждое назначение помечается autoDrv — чтобы было видно, что это решение машины,
      а не человека, и его можно было проверить. */
+/* ⛔НАЗВА МІСТА БУВАЄ З УТОЧНЕННЯМ. У даних живе «Hannover (Laatzen)» — 5 рядків. Для
+   автомата це БУДЬ-ЯКЕ інше місто, ніж «Hannover»: воно не збігається ні з розкладом, ні з
+   фактом дня, і водія не отримає ніколи — тихо лишиться знеособленим. Рішення Сергія 17.08:
+   передмістя їде в дні свого міста. Зводимо до основної назви — все, що в дужках, відкидаємо. */
+function cityNorm(c){
+  var s = ('' + (c || '')).trim();
+  if (!s) return '';
+  var i = s.indexOf('(');
+  if (i > 0) s = s.slice(0, i).trim();
+  return s;
+}
+/* ⛔ДЕНЬ ДОСТАВКИ ДИКТУЄ РОЗКЛАД РЕЙСІВ, А НЕ 1С.
+   Дата з 1С — це не «саме тоді», а «НЕ РАНІШЕ НІЖ»: доти накладна просто не готова.
+   Везуть її того дня, коли авто їде в це місто. Тому:
+       день = найближчий рейс у це місто, не раніше за пізнішу з дат (сьогодні / з 1С).
+   Живий випадок 17.08: сім накладних на Göttingen стояли на 18.08, а восьма — стара, з 10.08,
+   бо її зібрали давно. Старе правило «минуле → сьогодні» кидало її на 17.08, і водій приїхав
+   би в Göttingen без неї. Тепер вона підтягується до 18.08 сама.
+   Міста немає в розкладі — нічого не вигадуємо, лишаємо як було. */
+function nextTripDay(city, fromISO){
+  try {
+    var c = cityNorm(city); if (!c) return null;
+    var sched = (typeof schedCfg !== 'undefined' && schedCfg) ? schedCfg : {};
+    var has = false;
+    for (var k in sched) { if (sched[k] && sched[k][c]) { has = true; break; } }
+    if (!has) return null;
+    var d = new Date(fromISO + 'T12:00:00Z');
+    for (var i = 0; i < 14; i++) {
+      var wd = d.getUTCDay() || 7;
+      var plan = sched[wd] || sched[String(wd)];
+      if (plan && plan[c]) return d.toISOString().slice(0, 10);
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
+    return null;
+  } catch (e) { return null; }
+}
+/* Дата, на яку ставити накладну при прийомі в маршрут. */
+function shipDayFor(city, shipISO){
+  try {
+    var today = isoD(0);
+    var base = (shipISO && shipISO > today) ? shipISO : today;   // «не раніше ніж»
+    return nextTripDay(city, base) || base;
+  } catch (e) { return isoD(0); }
+}
 var schedCfg = {}, nordWheel = {}, _autoDone = {};
 try { db.ref('cfg/schedule').on('value', function(s){ schedCfg = s.val() || {}; autoAssignRows(); }, function(){}); } catch(e){}
 try { db.ref('nord_wheel').on('value', function(s){ nordWheel = s.val() || {}; autoAssignRows(); }, function(){}); } catch(e){}
@@ -1761,7 +1805,7 @@ function autoWeekday(iso){ try { var d = new Date(iso + 'T12:00:00Z'); return d.
 function autoPickDriver(r){
   try {
     if (!r || r.drv) return null;                       // рука диспетчера старше
-    var city = (''+(r.city||'')).trim(), date = r.date;
+    var city = cityNorm(r.city), date = r.date;
     if (!date) return null;
     // 1. Норд — кто взял руль в этот день
     if (isNordRow(r)) { var w = nordWheel[date]; return (w && w.drv) ? w.drv : null; }
@@ -1771,7 +1815,7 @@ function autoPickDriver(r){
     (rows||[]).forEach(function(x){
       if (byFact || !x || x.id === r.id) return;
       if (x.date !== date || !x.drv) return;
-      if ((''+(x.city||'')).trim() !== city) return;
+      if (cityNorm(x.city) !== city) return;
       if (!x.addr || !(''+x.addr).trim()) return;
       byFact = x.drv;
     });
@@ -3748,7 +3792,13 @@ function incAccept(){
     maxOrder+=10;
     var _seen={}; var _parts=[]; g.forEach(function(r){ [(r.work_type||'').trim(),cleanNote(r.note)].forEach(function(p){ if(p&&!_seen[p]){_seen[p]=1;_parts.push(p);} }); }); var cmt=_parts.join(', ');
     var _sd=(first.ship_date||'').trim(); var _td=isoD(0);
-    var _dt=_sd?((_sd<_td)?_td:_sd):_td; // прошлая/пустая дата отгрузки из 1С → сегодня; будущая/сегодняшняя → на свой день (диспетчер может изменить вручную)
+      /* ⛔ДЕНЬ ДОСТАВКИ ДИКТУЕТ РАСПИСАНИЕ РЕЙСОВ, А НЕ 1С. Дата из 1С — это «НЕ РАНЬШЕ ЧЕМ»:
+         до неё накладная просто не готова. Везут её в тот день, когда машина идёт в этот город.
+         Живой случай 17.08: семь накладных на Göttingen стояли на 18.08, а восьмая — старая,
+         с 10.08, потому что её собрали давно. Прежнее правило «прошлое → сегодня» бросало её
+         на 17.08, и водитель приехал бы в Göttingen без неё. Теперь она подтягивается к 18.08 сама.
+         Города нет в расписании — ничего не выдумываем, работает прежнее правило. */
+      var _dt=shipDayFor(first.city, _sd);
     var row={
       id:uid(), date:_dt, date_pending:(_sd?null:true), drv:(disp2Mode?'C':''), city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
