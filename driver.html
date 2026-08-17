@@ -1466,6 +1466,32 @@ var odoVan = null; try { odoVan = localStorage.getItem('odoVan_' + DRV) || null;
 //   (поле plate) — вписывает диспетчер; пока не вписан, показываем прежнее название.
 // ⛔Каждому — свои машины: у Норда одна, в центре другие. Раньше всем показывались все три,
 //   и человек выбирал наугад.
+/* ⛔РЕЕСТР ПРОБЕГА МАШИН. Водитель видит в базе ТОЛЬКО свои отметки (правило
+   odometer/$id: auth.token.drv === $id), поэтому приложение не знало, что показывала эта
+   машина вчера под другим водителем, — и подставленный снимок чужой панели сверять было
+   не с чем. Общий узел van_odo это чинит: последний пробег КАЖДОЙ машины, доступный всем. */
+var vanOdo = {};
+try { db.ref('van_odo').on('value', function (s) { vanOdo = s.val() || {}; }, function () {}); } catch (e) {}
+function vanLast(id) { var v = vanOdo && vanOdo[id]; return (v && typeof v.km === 'number') ? v : null; }
+/* Сколько километров машина может намотать за день. Тот же предел, что в диспетчере:
+   самая дальняя поездка Зальцгиттер → Аурих и обратно ≈ 800 км, 1100 — с запасом. */
+var VAN_DAY_MAX = 1100;
+/* Вернёт причину, по которой число не сходится с реестром, или null. */
+function vanKmProblem(vanId, km) {
+  var last = vanLast(vanId);
+  if (!last || !(km > 0)) return null;                      // машины в реестре нет — сверять не с чем
+  if (km < last.km) return 'Меньше последнего пробега этой машины (' + last.km + ' км). Проверьте цифры';
+  var gone = km - last.km;
+  var days = 1;
+  try {
+    var d1 = Date.parse(String(last.date) + 'T12:00:00Z'), d2 = Date.parse(wtDate() + 'T12:00:00Z');
+    if (d1 && d2 && d2 > d1) days = Math.max(1, Math.round((d2 - d1) / 86400000));
+  } catch (e) {}
+  if (gone > VAN_DAY_MAX * days) {
+    return 'Слишком много: ' + gone + ' км с прошлой отметки (' + last.km + ' км). Проверьте цифры';
+  }
+  return null;
+}
 function odoVans() {
   var m = (typeof cfg !== 'undefined' && cfg && cfg.machines) ? cfg.machines : null, out = [];
   if (!m) return out;
@@ -1815,6 +1841,10 @@ function odoWhyBlocked() {
   if (_bad) return _bad;
   if (!km.length) return 'Впишите километры с одометра';
   if (needVan && !odoVanSel) return 'Выберите машину, на которой поедете';
+  /* ⛔Число сверяем с реестром той машины, которую водитель выбрал шагом раньше.
+     Одометр не идёт назад и не наматывает больше 1100 км в день — всё остальное описка. */
+  var _vp = vanKmProblem(odoVanSel || odoVan, Number(km));
+  if (_vp) return _vp;
   return null;
 }
 // ⛔Пробег принимался ЛЮБОЙ. 4 августа у Виталия день записан как 641359 → 441480:
@@ -1886,6 +1916,16 @@ function odoStep2() {
      подписанным отдельно — иначе не отличить от начала, а это разные вещи. */
   if (hd) hd.textContent = end ? 'Конец дня — пробег' : (so ? 'Сдаю машину — пробег' : 'Пробег авто');
   var van = odoVanSel || odoVan;
+  var _lastKm = vanLast(van);
+  if (sub && _lastKm) {
+    sub.textContent = odoVanLabel(van) + ' · последний пробег ' + _lastKm.km + ' км (' + _lastKm.date + ')';
+    var n2 = document.getElementById('odoNext'); if (n2) n2.style.display = 'none';
+    var g2 = document.getElementById('odoGo'); if (g2) g2.style.display = '';
+    var b3 = document.getElementById('odoBack'); if (b3) b3.style.display = odoNeedVanStep() ? '' : 'none';
+    var t3 = document.getElementById('odoTestBtn'); if (t3) t3.style.display = '';
+    odoRenderVans(false, null); odoFields(true); odoValidate();
+    return;
+  }
   if (sub) sub.textContent = (odoNeedVanStep() && van)
     ? (odoVanLabel(van) + ' · сфотографируйте одометр и впишите км')
     : ('Сфотографируйте одометр и впишите км' + (end ? ', чтобы завершить день.' : '.'));
@@ -2153,6 +2193,17 @@ function odoFlushKm() {
     var first = p.legacy ? db.ref(p.legacy).update({ km: it.km, ts: it.ts, van: it.van || null }) : Promise.resolve();
     first.then(function () {
       // журнал событий: из него строятся отрезки «водитель × машина» за день
+      /* ⛔Реестр ведёт КАЖДАЯ отметка: иначе завтрашняя сверка будет опираться на позавчерашнее
+         число, и честный водитель упрётся в «слишком много». Пишем только вперёд — назад
+         одометр не идёт, и чужая описка не должна откатывать реестр. */
+      try {
+        if (it.van) {
+          var _prev = vanLast(it.van);
+          if (!_prev || it.km > _prev.km) {
+            db.ref('van_odo/' + it.van).set({ km: it.km, ts: it.ts, drv: DRV, date: it.date, name: String(myName ? myName() : DRV) });
+          }
+        }
+      } catch (e) {}
       return db.ref(p.ev).update({ kind: it.mode, van: it.van || null, km: it.km, ts: it.ts, suspect: it.suspect || null });
     }).then(function () {
       var i = odoKmQ.indexOf(it); if (i > -1) { odoKmQ.splice(i, 1); saveOdoKmQ(); }
@@ -3170,7 +3221,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-16-14';
+var APP_V = '2026-08-17-01';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
