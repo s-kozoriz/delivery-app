@@ -4889,6 +4889,56 @@ function loadAllRowsForHist(){
 }
 
 
+
+/* ─── ВЕРСИЯ ──────────────────────────────────────────────────────────────────────
+   ⛔ЗАЧЕМ. Вкладка диспетчера и склада живёт неделями: правка уезжает в прод, а люди
+     продолжают работать со старым кодом из кэша. Именно так двое суток никто не видел,
+     что у роли «склад» нет права записи в rows — кнопка кладовщика молчала, а версия
+     с сообщением об ошибке до него просто не доехала.
+   ⛔НО НЕ САМОВОЛЬНО. Здесь, в отличие от приложения водителя, страница НИКОГДА не
+     перезагружается сама: у диспетчера открытая форма, набранный адрес, наполовину
+     отмеченные накладные. Перезагрузка посреди этого съест работу. Мы только
+     показываем, что обновление есть, — нажимает человек.
+   ⛔Файл версии СВОЙ (ver-d.txt): общий ver.txt принадлежит водителям, и правка
+     driver.html дёргала бы диспетчера напрасно, а правка index.html — водителей.
+   ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
+     страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
+     у всех и навсегда. */
+var APP_V_D = '2026-08-17-d1';
+var _vdLast = 0;
+function vdCheck(){
+  var now = Date.now();
+  if (now - _vdLast < 300000) return;   /* не чаще раза в 5 минут */
+  _vdLast = now;
+  fetch('ver-d.txt?cb=' + now, {cache:'no-store'}).then(function(r){ return r.text(); })
+    .then(function(t){
+      t = (t || '').trim();
+      if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9]+$/.test(t)) return;   /* мусор вместо версии */
+      if (t !== APP_V_D) vdBar(t);
+    })
+    .catch(function(){});
+}
+function vdBar(v){
+  if (document.getElementById('vdBar')) return;
+  var b = document.createElement('div'); b.id = 'vdBar';
+  b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9800;background:#1a7a40;color:#fff;padding:11px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:700;font-size:14px;box-shadow:0 -2px 12px rgba(0,0,0,.25)';
+  b.innerHTML = '<span>Вышла новая версия. Пока не обновите &mdash; работаете со старым кодом</span>'
+    + '<button style="background:#fff;color:#0f2417;border:none;border-radius:8px;padding:8px 16px;font-weight:800;font-family:inherit;cursor:pointer;flex-shrink:0" onclick="vdReload(\'' + v + '\')">Обновить</button>';
+  document.body.appendChild(b);
+}
+function vdReload(v){
+  /* ⛔Просто reload() мало: браузер и GitHub Pages могут отдать ту же копию из кэша,
+     полоса появится снова, и человек будет жать кнопку по кругу. Новый адрес
+     гарантирует свежий файл. Страница параметры URL не читает — добавка безвредна. */
+  var q = location.search.replace(/[?&]_v=[^&]*/g, '');
+  q = q ? (q.charAt(0) === '&' ? '?' + q.slice(1) : q) + '&' : '?';
+  location.replace(location.pathname + q + '_v=' + encodeURIComponent(v) + location.hash);
+}
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) vdCheck(); });
+setTimeout(vdCheck, 20000);
+setInterval(vdCheck, 600000);
+/* ─── /ВЕРСИЯ ─────────────────────────────────────────────────────────────────── */
+
 </script>
 </body>
 </html>
