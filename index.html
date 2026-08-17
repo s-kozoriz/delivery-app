@@ -547,6 +547,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
       <button class="btn btn-sm" onclick="whGoDay(-1)">Вчера</button>
       <button class="btn btn-sm" onclick="whGoDay(0)">Сегодня</button>
       <button class="btn btn-sm" onclick="whGoDay(1)">Завтра</button>
+      <button class="btn btn-sm" onclick="whGoMonday()" title="Ближайший понедельник — день развозки норд-загрузки">Понедельник</button>
     </div>
     <div id="whContent" style="padding:12px 16px"></div>
   </div>
@@ -2397,6 +2398,18 @@ function sample(){
 function whGoDay(n){curD=isoD(n);document.getElementById('whDatePicker').value=curD;renderWarehouse();}
 function whShiftDay(n){var d=new Date(curD+'T12:00:00');d.setDate(d.getDate()+n);curD=d.toISOString().slice(0,10);document.getElementById('whDatePicker').value=curD;renderWarehouse();}
 function whPickDay(){curD=document.getElementById('whDatePicker').value;renderWarehouse();}
+/* ⛔Норд-загрузка: в СУББОТУ Виталик или Василий едут в Зальцгиттер за накладными на все
+   норд-города, а развозят их в ПОНЕДЕЛЬНИК. День доставки — понедельник, поэтому строки
+   стоят там; складу же грузить машину надо в субботу. «Вчера/Сегодня/Завтра» через выходные
+   не достают — до понедельника два дня. Эта кнопка ведёт прямо туда одним нажатием.
+   Сегодня понедельник — ведёт на сегодня, а не на следующую неделю: грузят-то сейчас. */
+function whMondayISO(){
+  var d=new Date(curD+'T12:00:00Z');
+  var add=(8-(d.getUTCDay()||7))%7;   // 0=уже понедельник, иначе дней до ближайшего
+  d.setUTCDate(d.getUTCDate()+add);
+  return d.toISOString().slice(0,10);
+}
+function whGoMonday(){curD=whMondayISO();var p=document.getElementById('whDatePicker');if(p)p.value=curD;renderWarehouse();}
 function renderWarehouse(){
   var el=document.getElementById('whContent');
   if(!el)return;
