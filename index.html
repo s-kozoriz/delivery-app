@@ -3677,6 +3677,44 @@ function incReconcile(){
       if(inv&&incInvValid(inv)&&!incPlaced[inv]){ db.ref('1c/delivery/placed/'+inv).set({rowId:r.id,date:r.date||'',invoice:inv,address:r.addr||'',city:r.city||'',ts:Date.now(),snap:(incRec(inv)||null)}); }
     });
   });
+  incReconcileOrphans();
+}
+/* ⛔ВТОРАЯ СТОРОНА САМОЛЕЧЕНИЯ. Выше мы ставим метку «в плане» накладной, которая лежит в строке.
+   Обратный случай не лечился НИКОГДА: строку удалили или слили с другой, а метка осталась —
+   и накладная пропадает из виду насовсем. Во «Входящие» её не показывают (метка говорит «уже
+   в плане»), а в плане её нет (строки не существует). 17.08 так исчезли LK-00107355 и
+   LK-00107464 — обе Ганновер, обе «Резерв» на 18.08, обе нашлись только вручную.
+
+   ⛔ПОЧЕМУ НЕ ПРОСТО «нет в rows — снять метку»: rows грузится ОКНОМ ДАТ
+   (orderByChild('date').startAt/endAt). Накладная в строке за пределами окна выглядела бы
+   сиротой, метку сняли бы, и при повторном приёме в план появился бы дубль. Поэтому строку
+   проверяем ПРЯМЫМ чтением из базы, а не по локальному массиву.
+
+   ⛔И НЕ ТРОГАЕМ СВЕЖИЕ метки: incAccept создаёт метку и строку не одной операцией — между
+   ними есть зазор, и в этот момент метка законно выглядит сиротой. */
+var _orphChecked={};
+function incReconcileOrphans(){
+  if(IS_VIEWER)return;
+  if(!rows||!rows.length)return;
+  var live={}; rows.forEach(function(r){ if(r&&r.id)live[r.id]=r; });
+  var inRows={};
+  rows.forEach(function(r){ ((r&&r.invs)||[]).forEach(function(x){ x=(''+(x||'')).trim(); if(x)inRows[x]=1; }); });
+  var nowMs=Date.now();
+  Object.keys(incPlaced||{}).forEach(function(inv){
+    var p=incPlaced[inv]; if(!p||!p.rowId)return;
+    if(inRows[inv])return;                      /* накладная лежит в видимой строке — всё честно */
+    if(live[p.rowId])return;                    /* строка жива, ею занимается обычная логика */
+    if(p.ts&&nowMs-p.ts<120000)return;          /* метке меньше двух минут — это может быть приём в план */
+    if(_orphChecked[inv]&&nowMs-_orphChecked[inv]<600000)return;   /* не долбим базу одной и той же проверкой */
+    _orphChecked[inv]=nowMs;
+    db.ref('rows/'+p.rowId).once('value').then(function(s){
+      var row=s.val();
+      if(row&&(row.invs||[]).some(function(x){return (''+(x||'')).trim()===inv;}))return;   /* строка есть, накладная в ней — всё в порядке */
+      db.ref('1c/delivery/placed/'+inv).remove();
+      try{ auditLog('накладная вернулась во Входящие (строки нет)', p.rowId||null, {invoice:inv, address:p.address||'', city:p.city||'', date:p.date||''}); }catch(e){}
+      try{ toast('Накладная '+inv+' вернулась во «Входящие»: строки больше нет'); }catch(e){}
+    }).catch(function(){});
+  });
 }
 function incReady(r){ var s=(r.ready_status||'').trim(); if(!s)return true; return s.indexOf('Собран')===0||s.indexOf('К сбор')===0; }
 function incColor(r){ var s=(r.ready_status||'').trim(); if(!s)return ''; if(s.indexOf('Собран')===0)return 'inc-ready'; if(s.indexOf('К сбор')===0||s.indexOf('Комплект')===0)return 'inc-tosb'; if(s.indexOf('Заказ')===0)return 'inc-order'; if(s.indexOf('Принят')===0)return 'inc-accepted'; if(s.indexOf('Резерв')===0)return 'inc-reserve'; return ''; }
@@ -4904,7 +4942,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-17-d1';
+var APP_V_D = '2026-08-17-d2';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
