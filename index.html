@@ -2555,7 +2555,7 @@ function renderWarehouse(){
     html+='<div style="display:flex;align-items:center;gap:10px">';
     html+='<div style="font-size:14px;font-weight:700;color:'+drvColor+'">&#128666; '+xe(dname(d))+'</div>';
     html+='<button class="btn btn-sm wh-print-btn" data-drv="'+d+'" style="background:#f0f4fc;color:#1856a0;border-color:#aec6ef;padding:3px 10px;font-size:12px">&#128438; Печать</button>';
-    html+='<button class="btn btn-sm wh-ship-btn" onclick="whShipDone(\''+d+'\')" style="background:#e8f5ec;color:#1a7a40;border-color:#9fd6b4;padding:3px 10px;font-size:12px">&#10004; Отгрузка завершена</button>';
+    html+=whShipState(d)+'<button class="btn btn-sm wh-ship-btn" onclick="whShipDone(\''+d+'\')" style="background:#e8f5ec;color:#1a7a40;border-color:#9fd6b4;padding:3px 10px;font-size:12px">&#10004; Закрыть отгрузку &middot; вернуть неотгруженное</button>';
     html+='</div>';
     html+='<span style="font-size:12px;color:var(--mu)">&#128230; '+loadedInvs+'/'+totalInvs+' накл. загружено</span>';
     html+='</div>';
@@ -3565,6 +3565,23 @@ function incCleanReturned(){
 // Комірник ставить галочки на те, що РЕАЛЬНО поїхало, і тисне «Отгрузка завершена»:
 //   відмічене лишається у водія, невідмічене повертається у «Входящие 1С» з причиною.
 // ⛔Нічого не спрацьовує саме: поки кнопку не натиснуто, план не рухається.
+/* Скільки накладних відмічено і чи закрито відвантаження — прямо біля кнопки.
+   ⛔Раніше екран мовчав: «усе закрито» і «нічого не закрито» виглядали однаково. */
+function whShipState(drv){
+  try{
+    var day=curD;
+    var list=rows.filter(function(r){return r.date===day&&r.drv===drv&&r.addr&&r.addr.trim()&&r.inRoute!==false;});
+    var tot=0, mark=0;
+    list.forEach(function(r){
+      var invs=(r.invs||[]).map(function(x){return (''+(x||'')).trim();}).filter(Boolean);
+      tot+=invs.length;
+      invs.forEach(function(inv,ii){ if(warehouseStatus[day+'_'+r.id+'_'+ii]) mark++; });
+    });
+    if(!tot) return '';
+    if(mark===tot) return '<span style="font-size:12px;color:#1a7a40;font-weight:700;margin-right:8px">отмечено все '+tot+'</span>';
+    return '<span style="font-size:12px;color:#a35a06;font-weight:700;margin-right:8px">отмечено '+mark+' из '+tot+' &middot; отгрузка не закрыта</span>';
+  }catch(e){ return ''; }
+}
 function whShipDone(drv){
   if(IS_VIEWER)return;
   var day=curD;
@@ -3586,17 +3603,22 @@ function whShipDone(drv){
   var msg='Отгрузка завершена?\n\nОтгружено: '+keepCnt+' накл.\nНЕ отгружено: '+back.length+' накл. — вернутся во «Входящие 1С».';
   if(emptyRows.length) msg+='\n\nАдресов, по которым не едет НИЧЕГО: '+emptyRows.length+' — они уйдут из маршрута водителя.';
   if(!confirm(msg))return;
+  /* ⛔РАНЬШЕ ВСЕ ЭТИ ЗАПИСИ ШЛИ БЕЗ ПРОВЕРКИ. У роли «склад» не было права писать в rows —
+     Firebase молча отклонял, и кладовщик, нажав кнопку, видел ТИШИНУ. 17-18.08 галочки
+     сохранились, а список водителя остался полным, и никто этого не заметил.
+     Теперь ждём КАЖДУЮ запись и, если хоть одна не прошла, говорим об этом вслух. */
+  var _jobs=[];
   back.forEach(function(x){
     var p=incPlaced[x.inv], cp;
     if(p&&p.snap){ cp={}; for(var kk in p.snap){cp[kk]=p.snap[kk];} }
     else { cp={invoice:x.inv,address:(x.row.addr||''),city:(x.row.city||''),ship_date:(x.row.date||''),ready_status:''}; }
     cp._returned=true; cp.returned_at=Date.now(); cp._reason='not_shipped';
-    db.ref('1c/delivery/returned/'+x.inv).set(cp);
-    db.ref('1c/delivery/placed/'+x.inv).remove();
+    _jobs.push(db.ref('1c/delivery/returned/'+x.inv).set(cp));
+    _jobs.push(db.ref('1c/delivery/placed/'+x.inv).remove());
   });
   list.forEach(function(r){
     if(!keep[r.id])return;
-    db.ref('rows/'+r.id+'/invs').set(keep[r.id].length?keep[r.id]:null);
+    _jobs.push(db.ref('rows/'+r.id+'/invs').set(keep[r.id].length?keep[r.id]:null));
     r.invs=keep[r.id];
   });
   // ⛔Адресу з маршруту НЕ прибираємо: там може бути забір сміття, інструмент чи майстри —
@@ -3604,12 +3626,19 @@ function whShipDone(drv){
   //   (613 рядків за місяць, поле порожнє). Прибрати означало б залишити сміття не забраним.
   //   Тому лишаємо адресу і ставимо явну мітку: водій бачить, що вантажу туди не поїхало.
   emptyRows.forEach(function(r){
-    db.ref('rows/'+r.id+'/noShip').set(true);
+    _jobs.push(db.ref('rows/'+r.id+'/noShip').set(true));
     r.noShip=true;
     try{ auditLog('склад не отгрузил ничего', r.id, {addr:r.addr, city:r.city}); }catch(e){}
   });
-  try{ auditLog('отгрузка завершена', null, {drv:drv, date:day, shipped:keepCnt, returned:back.length}); }catch(e){}
-  toast('Отгрузка закрыта: '+keepCnt+' поехало, '+back.length+' вернулось');
+  Promise.all(_jobs).then(function(){
+    try{ auditLog('отгрузка завершена', null, {drv:drv, date:day, shipped:keepCnt, returned:back.length}); }catch(e){}
+    toast('Отгрузка закрыта: '+keepCnt+' поехало, '+back.length+' вернулось');
+    try{ renderWarehouse(); }catch(e){}
+  }).catch(function(e){
+    /* ⛔Молчать нельзя: именно тишина скрыла отсутствие прав у склада на двое суток. */
+    try{ auditLog('ОШИБКА закрытия отгрузки', null, {drv:drv, date:day, err:String(e&&e.message||e)}); }catch(_){}
+    alert('Не удалось закрыть отгрузку.\n\n' + String(e&&e.message||e) + '\n\nНичего не потеряно: отметки сохранены. Сообщите диспетчеру и попробуйте ещё раз.');
+  });
 }
 // Автоочистка выше срабатывает, только если накладная СНОВА придёт из 1С. Если её там уже
 // доставили/отменили — она не придёт никогда, и метка «проверить» висит вечно. Поэтому нужна
