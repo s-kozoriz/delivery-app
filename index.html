@@ -1733,7 +1733,72 @@ function _daySummary(s){
   var b=(s.done?'<span style="color:#1a7a40;font-weight:800">'+s.done+' &#10003;</span>':'')+(und?' <span style="color:#b00;font-weight:800;background:#fdeceb;border-radius:4px;padding:0 5px" title="есть невыполненные — раскройте день">&#9888; '+und+' &#9675;</span>':'');
   return ' <span style="font-weight:600;color:#8a8a8a;font-size:11px">'+b+' &middot; '+s.n+' адр. &middot; '+cs+'</span>';
 }
+/* ==== АВТОНАЗНАЧЕНИЕ ВОДИТЕЛЯ ======================================================
+   Техники добавляют задания со станции, и в диспетчер они приходят БЕЗ водителя. Раньше
+   каждое такое задание диспетчер разбирал руками.
+
+   Три правила по старшинству — от самого достоверного к самому общему:
+     1. НОРД — «кто взял руль». В субботу Виталик или Василий едут в Зальцгиттер за
+        накладными на все норд-города, а развозят их в понедельник. Кто фактически взял
+        машину в этот день, тот и везёт: приложение водителя пишет это в nord_wheel/{дата}.
+        Ничего не угадываем — берём то, что человек сделал физически.
+     2. ПО ФАКТУ ДНЯ — если на эту дату у кого-то уже есть адреса в том же городе, везёт он.
+        Логично: человек и так туда едет.
+     3. РАСПИСАНИЕ — плановые дни доставок по городам (cfg/schedule, таблица Сергея 17.08).
+
+   ⛔Рука диспетчера старше всего: строку, где водитель уже стоит, не трогаем никогда.
+   ⛔Каждое назначение помечается autoDrv — чтобы было видно, что это решение машины,
+     а не человека, и его можно было проверить. */
+var schedCfg = {}, nordWheel = {}, _autoDone = {};
+try { db.ref('cfg/schedule').on('value', function(s){ schedCfg = s.val() || {}; autoAssignRows(); }, function(){}); } catch(e){}
+try { db.ref('nord_wheel').on('value', function(s){ nordWheel = s.val() || {}; autoAssignRows(); }, function(){}); } catch(e){}
+
+/* Номер дня недели по дате: 1=понедельник … 7=воскресенье. Считаем в UTC-полдень,
+   иначе на границе суток часовой пояс сдвинет день. */
+function autoWeekday(iso){ try { var d = new Date(iso + 'T12:00:00Z'); return d.getUTCDay() || 7; } catch(e){ return 0; } }
+
+/* Кого назначить на эту строку. Вернёт ключ водителя или null. */
+function autoPickDriver(r){
+  try {
+    if (!r || r.drv) return null;                       // рука диспетчера старше
+    var city = (''+(r.city||'')).trim(), date = r.date;
+    if (!date) return null;
+    // 1. Норд — кто взял руль в этот день
+    if (isNordRow(r)) { var w = nordWheel[date]; return (w && w.drv) ? w.drv : null; }
+    if (!city) return null;
+    // 2. По факту дня — у кого уже есть адреса в этом городе
+    var byFact = null;
+    (rows||[]).forEach(function(x){
+      if (byFact || !x || x.id === r.id) return;
+      if (x.date !== date || !x.drv) return;
+      if ((''+(x.city||'')).trim() !== city) return;
+      if (!x.addr || !(''+x.addr).trim()) return;
+      byFact = x.drv;
+    });
+    if (byFact) return byFact;
+    // 3. Расписание
+    var day = autoWeekday(date), plan = schedCfg[day] || schedCfg[String(day)];
+    return (plan && plan[city]) ? plan[city] : null;
+  } catch(e){ return null; }
+}
+
+/* Проходит по строкам от техников без водителя и проставляет. */
+function autoAssignRows(){
+  try {
+    if (typeof IS_VIEWER !== 'undefined' && IS_VIEWER) return;   // «Просмотр» ничего не пишет
+    (rows||[]).forEach(function(r){
+      if (!r || !r.id || !r.fromTech || r.drv) return;
+      if (_autoDone[r.id]) return;                                // одна попытка на строку за сеанс
+      var drv = autoPickDriver(r);
+      if (!drv) return;
+      _autoDone[r.id] = 1;
+      r.drv = drv; r.autoDrv = true;
+      try { db.ref('rows/' + r.id).update({ drv: drv, autoDrv: true }); } catch(e){}
+    });
+  } catch(e){}
+}
 function rtbl(){
+  try { autoAssignRows(); } catch(e){}
   if(_rtblTimer)clearTimeout(_rtblTimer);
   _rtblTimer=setTimeout(_rtblNow,200);
 }
