@@ -2757,8 +2757,12 @@ function myName(){ return (cfg.drivers && cfg.drivers[DRV] && cfg.drivers[DRV].n
 function nordPtr(m){
   if (!isNordDrv()) return;
   try {
-    if (m === 'driver') db.ref('nord_driver/' + wtDate()).set({ drv: DRV, name: myName(), ts: Date.now() });
-    else db.ref('nord_driver/' + wtDate()).once('value', function(s){ var v = s.val(); if (v && v.drv === DRV) db.ref('nord_driver/' + wtDate()).remove(); });
+    /* ⛔РАНЬШЕ ЗДЕСЬ БЫЛА ОДНА ЗАПИСЬ НА ДЕНЬ — и второй Норд-водитель СТИРАЛ первого.
+       18.08 Вася отметился в 07:36, Виталик позже — и вся Васина работа за день выглядела
+       Виталиковой. В Норде теперь две машины и двое за рулём одновременно, поэтому пишем
+       каждого под своим ключом: nord_driver/{дата}/{слот}. */
+    if (m === 'driver') db.ref('nord_driver/' + wtDate() + '/' + DRV).set({ drv: DRV, name: myName(), ts: Date.now() });
+    else db.ref('nord_driver/' + wtDate() + '/' + DRV).remove();
   } catch (e) {}
 }
 // ⛔ЕДИНОЕ место, где решается, показывать ли маршрут. Не «блокируем кнопки» — не показываем
@@ -3221,7 +3225,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-17-01';
+var APP_V = '2026-08-18-01';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
