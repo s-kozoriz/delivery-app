@@ -1865,6 +1865,13 @@ try { db.ref('nord_wheel').on('value', function(s){ nordWheel = s.val() || {}; a
 function autoWeekday(iso){ try { var d = new Date(iso + 'T12:00:00Z'); return d.getUTCDay() || 7; } catch(e){ return 0; } }
 
 /* Кого назначить на эту строку. Вернёт ключ водителя или null. */
+/* ⛔В ОДНОМУ МІСТІ В ОДИН ДЕНЬ ЖИВУТЬ ДВА РІЗНІ ПОТОКИ. 19.08 у Wilhelmshaven стояли поруч
+   накладні з 1С (рейс зі складу в Зальцгітері — це Валентин за розкладом) і місцеві завдання
+   від планувальника Alex без накладних (Свалка, Mega — це Виталик і Вася на місці). Правило
+   «хто вже їде в це місто» бачило їх як одне ціле й віддавало склад місцевому водію.
+   Ознака надійна і видна в даних: рейс зі складу приходить з 1С (src='1c'), місцева робота —
+   ні. Порівнюємо тільки однорідне. */
+function _sameKind(a, b){ return ((a && a.src) === '1c') === ((b && b.src) === '1c'); }
 function autoPickDriver(r){
   try {
     if (!r || r.drv) return null;                       // рука диспетчера старше
@@ -1884,6 +1891,7 @@ function autoPickDriver(r){
       if (x.date !== date || !x.drv) return;
       if (cityNorm(x.city) !== city) return;
       if (!x.addr || !(''+x.addr).trim()) return;
+      if (!_sameKind(x, r)) return;
       byFact = x.drv;
     });
     if (byFact) return byFact;
@@ -5026,7 +5034,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-18-d6';
+var APP_V_D = '2026-08-18-d7';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
