@@ -3035,8 +3035,10 @@ firebase.auth().onAuthStateChanged(function(user){
     try { if (c.name) document.title = c.name; } catch (e) {}
     sessionStorage.removeItem('login_from');
     var __pw=document.getElementById('pinWrap'); if(__pw) __pw.style.display='none';
-    document.getElementById('driverApp').style.display='';
-    __startDB();
+    verForceCheck(function(){
+      document.getElementById('driverApp').style.display='';
+      __startDB();
+    });
   });
 });
 // Самолечение сессии: мобильные браузеры усыпляют фоновую вкладку → токен устаревает → записи молча падают (кнопки «не работают»).
@@ -3257,7 +3259,73 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-18-03';
+/* ─── ОБЯЗАТЕЛЬНОЕ ОБНОВЛЕНИЕ ───────────────────────────────────────────────────────
+   ⛔ЗАЧЕМ. Полоса «есть обновление» внизу экрана водителями просто не замечается: они
+   привыкли, что нужное пишут сверху. 18.08 Васе написали лично — он всё равно не обновил,
+   и вечером пробег снова ушёл мимо реестра машин. Поэтому для правок, которые обязаны
+   доехать, показываем экран сразу после ПИН-кода: пока не обновится — дальше не пройдёт.
+
+   ⛔НО ЗАПЕРЕТЬ ЧЕЛОВЕКА БЕЗ ПРИЛОЖЕНИЯ СТРАШНЕЕ, чем оставить его на старой версии.
+   Поэтому пропускаем дальше при любом сомнении: нет сети, файла нет, ответ не похож на
+   версию, сеть висит дольше четырёх секунд. И после двух неудачных попыток даём кнопку
+   «Продолжить» — иначе водитель с плохим интернетом останется без работы на весь день.
+
+   ⛔ФАЙЛ ver-min.txt — отдельный и НЕОБЯЗАТЕЛЬНЫЙ. Нет его — принуждения нет вообще.
+   Кладём туда версию только тогда, когда обновление действительно обязательное. */
+function verNum(s){
+  var m = String(s||'').trim().match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})-([0-9]+)$/);
+  if (!m) return null;
+  return Number(m[1]) * 10000000 + Number(m[2]) * 100000 + Number(m[3]) * 1000 + Number(m[4]);
+}
+function verForceBar(minV){
+  var b = document.createElement('div'); b.id = 'verForce';
+  b.style.cssText = 'position:fixed;inset:0;z-index:99998;background:#0f2417;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 22px;text-align:center;font-family:inherit';
+  var tries = 0; try { tries = Number(sessionStorage.getItem('verForceTry') || 0); } catch (e) {}
+  b.innerHTML = '<div style="font-size:46px;margin-bottom:14px">&#128260;</div>'
+    + '<div style="font-size:21px;font-weight:800;margin-bottom:10px">Нужно обновить приложение</div>'
+    + '<p style="font-size:15px;line-height:1.5;color:#cfe6d8;margin:0 0 26px;max-width:320px">Вышла обязательная версия. Без неё пробег и задания могут записаться неправильно.</p>'
+    + '<button id="verForceBtn" style="width:100%;max-width:320px;padding:16px;border:none;border-radius:14px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;font-family:inherit;cursor:pointer">Обновить</button>'
+    + (tries >= 2 ? '<button id="verForceSkip" style="margin-top:16px;background:none;border:none;color:#8fb8a0;font-size:14px;font-family:inherit;text-decoration:underline;cursor:pointer">Не получается — продолжить</button>' : '');
+  document.body.appendChild(b);
+  document.getElementById('verForceBtn').addEventListener('click', function(){
+    try { sessionStorage.setItem('verForceTry', String(tries + 1)); } catch (e) {}
+    /* ⛔простий reload може віддати ту саму копію з кешу — тоді екран повернеться і людина
+       натискатиме по колу. Новий адрес гарантує свіжий файл. */
+    var q = location.search.replace(/[?&]_v=[^&]*/g, '');
+    q = q ? (q.charAt(0) === '&' ? '?' + q.slice(1) : q) + '&' : '?';
+    location.replace(location.pathname + q + '_v=' + encodeURIComponent(minV) + location.hash);
+  });
+  var sk = document.getElementById('verForceSkip');
+  if (sk) sk.addEventListener('click', function(){
+    try { sessionStorage.removeItem('verForceTry'); } catch (e) {}
+    b.parentNode.removeChild(b);
+    document.getElementById('driverApp').style.display = '';
+    try { __startDB(); } catch (e) {}
+  });
+}
+function verForceCheck(next){
+  var done = false;
+  var go = function(){ if (done) return; done = true; try { sessionStorage.removeItem('verForceTry'); } catch (e) {} next(); };
+  /* ⛔сеть висит — не держим человека перед пустым экраном */
+  var t = setTimeout(go, 4000);
+  if (!navigator.onLine) { clearTimeout(t); go(); return; }
+  /* ⛔будь-який збій ДО запиту — теж пропускаємо. Якщо fetch недоступний, помилка тут упала б
+     ще до входу і водій не зайшов би взагалі: страшніше за стару версію. */
+  if (typeof fetch !== 'function') { clearTimeout(t); go(); return; }
+  try {
+  fetch('ver-min.txt?cb=' + Date.now(), { cache: 'no-store' }).then(function(r){ return r.text(); })
+    .then(function(txt){
+      if (done) return;
+      var need = verNum(txt), have = verNum(APP_V);
+      if (need === null || have === null || have >= need) { clearTimeout(t); go(); return; }
+      clearTimeout(t); done = true;
+      verForceBar(String(txt).trim());
+    })
+    .catch(function(){ clearTimeout(t); go(); });
+  } catch (e) { clearTimeout(t); go(); }
+}
+/* ─── /ОБЯЗАТЕЛЬНОЕ ОБНОВЛЕНИЕ ─────────────────────────────────────────────────── */
+var APP_V = '2026-08-18-04';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
