@@ -456,7 +456,7 @@ td input[type=text]:focus,td select:focus,td input[type=time]:focus{outline:3px 
     <button class="tab on" onclick="sw('plan')">Маршрут</button>
     <button class="tab" onclick="sw('hist')">История</button>
     <button class="tab" id="tabAn" onclick="sw('an')">Аналитика</button>
-    <button class="tab" id="tabStat" onclick="sw('stat')">Статистика</button>
+    <button class="tab" id="tabStat" onclick="sw('stat')" style="display:none">Статистика</button>
         <button class="tab" id="tabTabel" onclick="sw('tabel')">Табель</button>
     <button class="tab" id="tabOdo" onclick="sw('odo')">Пробег</button>
     <button class="tab" id="tabCalib" onclick="sw('calib')">Калибровка</button>
@@ -5034,7 +5034,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-18-d7';
+var APP_V_D = '2026-08-18-d8';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
