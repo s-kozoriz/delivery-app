@@ -1565,6 +1565,14 @@ function odoPickVan(btn) { odoVanSel = btn.getAttribute('data-van'); odoRenderVa
 function odoSetVan(id) {
   odoVan = id || null;
   try { if (id) localStorage.setItem('odoVan_' + DRV, id); else localStorage.removeItem('odoVan_' + DRV); } catch (e) {}
+  /* ⛔Диспетчеру важлива саме машина: коли в Норді двоє за кермом, суботні накладні чіпляються
+     до тієї, що ходить за товаром (велика 325). Роль обирається раніше за машину, тож на момент
+     nordPtr тут ще порожньо — дописуємо окремо. Тільки для того, хто СЬОГОДНІ за кермом. */
+  try {
+    if (id && typeof valMode !== 'undefined' && valMode === 'driver') {
+      db.ref('nord_driver/' + wtDate() + '/' + DRV + '/van').set(id).catch(function(){});
+    }
+  } catch (e) {}
   odoRenderVanBar();
 }
 // Полоска «на какой машине вы сейчас» — чтобы пересадка не забылась: водитель видит её постоянно.
@@ -2761,7 +2769,9 @@ function nordPtr(m){
        18.08 Вася отметился в 07:36, Виталик позже — и вся Васина работа за день выглядела
        Виталиковой. В Норде теперь две машины и двое за рулём одновременно, поэтому пишем
        каждого под своим ключом: nord_driver/{дата}/{слот}. */
-    if (m === 'driver') db.ref('nord_driver/' + wtDate() + '/' + DRV).set({ drv: DRV, name: myName(), ts: Date.now() });
+    /* ⛔машину пишемо сюди ж: коли в Норді двоє за кермом, диспетчер має знати, хто саме сів
+       на велику 325 — саме вона ходить за товаром, і субботні накладні чіпляються до неї. */
+    if (m === 'driver') db.ref('nord_driver/' + wtDate() + '/' + DRV).set({ drv: DRV, name: myName(), ts: Date.now(), van: odoVan || null });
     else db.ref('nord_driver/' + wtDate() + '/' + DRV).remove();
   } catch (e) {}
 }
@@ -3225,7 +3235,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-18-01';
+var APP_V = '2026-08-18-02';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
