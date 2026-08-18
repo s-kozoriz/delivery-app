@@ -956,6 +956,20 @@ function nordColName(){
   return n.length?('Норд · '+n.join(', ')):'Норд';
 }
 function dcolName(d){ return d==='C' ? nordColName() : dname(d); }
+/* ⛔АДРЕСНОЕ НАЗНАЧЕНИЕ В НОРДЕ. Раньше в списке водителей планировщик Норда видел ВСЕХ —
+   Лёшу, Рому, Валентина, к Норду отношения не имеющих, — а своих не видел по именам: слот C
+   назывался безликим «Норд». Поставить задачу лично Васе или лично Виталику было нельзя,
+   всё валилось на общий Норд. С двумя машинами это перестало работать. */
+function drvOptKeys(){ return disp2Mode ? nordDrvKeys() : DRV_KEYS; }
+/* Слот C — это МАШИНА, а не человек: за её рулём сегодня может быть и Виталик, и Вася.
+   Поэтому подписываем именем того, кто сегодня реально за рулём этого слота, а не тем,
+   за кем слот закреплён — иначе подпись врёт ровно в тот день, когда они поменялись. */
+function nordSlotName(k){
+  var t=nordDrvToday();
+  for(var j=0;j<t.length;j++){ if(t[j].drv===k && t[j].name) return t[j].name; }
+  return k==='C' ? 'Норд' : (dname(k)||'Водитель');
+}
+function drvOptName(k){ return disp2Mode ? nordSlotName(k) : (k==='C' ? 'Норд' : dname(k)); }
 function odoFmtD(d){var p=(''+(d||'')).split('-');return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):d;}
 function odoFmtT(ts){if(typeof ts!=='number')return '';var d=new Date(ts);return (d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();}
 function odoList(){var a=[];Object.keys(odoAll).forEach(function(drv){var bd=odoAll[drv]||{};Object.keys(bd).forEach(function(date){var r=bd[date]||{};a.push({drv:drv,date:date,s:r.start||{},e:r.end||{}});});});return a;}
@@ -1747,7 +1761,7 @@ function _cfOpts(sel,list,cur){ if(!sel)return;
   sel.style.background=cur?'#dce8fb':'#fff';
 }
 function fillColFilters(){
-  var dl=[]; DRV_KEYS.forEach(function(k){  dl.push({v:k,t:(k==='C'?'Норд':dname(k))}); });
+  var dl=[]; drvOptKeys().forEach(function(k){  dl.push({v:k,t:drvOptName(k)}); });
   _cfOpts(document.getElementById('cf-drv'), dl, colFilter.drv);
   var cl=(disp2Mode?CITIESC:CITIES).map(function(c){return {v:c,t:c};});
   _cfOpts(document.getElementById('cf-city'), cl, colFilter.city);
@@ -1967,7 +1981,11 @@ function _rtblNow(){
     if(isEditing){
       var sel='<td style="width:80px"><select onchange="ur(\''+r.id+'\',\'drv\',this.value)" style="'+dc+'">';
       sel+='<option value=""'+((!r.drv||r.drv==='')?' selected':'')+'>— назначить —</option>';
-      DRV_KEYS.forEach(function(k){var n=k==='C'?'Норд':dname(k);if(n||k!=='C')sel+='<option value="'+k+'"'+(r.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
+      drvOptKeys().forEach(function(k){var n=drvOptName(k);if(n||k!=='C')sel+='<option value="'+k+'"'+(r.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
+      /* ⛔строка уже назначена водителю, которого нет в списке этого режима (передали из центра
+         в Норд или наоборот) — показываем его отдельным пунктом, иначе select молча сбросит
+         назначение на первого попавшегося и работа уедет чужому человеку */
+      if(r.drv&&drvOptKeys().indexOf(r.drv)===-1)sel+='<option value="'+r.drv+'" selected>'+xe(dname(r.drv)||r.drv)+'</option>';
       sel+='</select></td>';
       h+=sel;
     } else {
@@ -2049,7 +2067,7 @@ function _rtblNow(){
   if(newRowDraft){
     var nd=newRowDraft;
     var drvOpts='',cityOpts='',statOpts='';
-    DRV_KEYS.forEach(function(k){var n=k==='C'?'Норд':dname(k);if(n||k!=='C')drvOpts+='<option value="'+k+'"'+(nd.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
+    drvOptKeys().forEach(function(k){var n=drvOptName(k);if(n||k!=='C')drvOpts+='<option value="'+k+'"'+(nd.drv===k?' selected':'')+'>'+xe(n||'Водитель 3')+'</option>';});
     var cl=disp2Mode?CITIESC:CITIES;
     cl.forEach(function(city){cityOpts+='<option value="'+xe(city)+'"'+(nd.city===city?' selected':'')+'>'+xe(city)+'</option>';});
     STATS.forEach(function(s){statOpts+='<option value="'+xe(s)+'"'+(nd.status===s?' selected':'')+'>'+xe(s)+'</option>';});
@@ -4977,7 +4995,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-18-d4';
+var APP_V_D = '2026-08-18-d5';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
