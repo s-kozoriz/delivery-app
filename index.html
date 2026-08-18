@@ -960,6 +960,24 @@ function dcolName(d){ return d==='C' ? nordColName() : dname(d); }
    Лёшу, Рому, Валентина, к Норду отношения не имеющих, — а своих не видел по именам: слот C
    назывался безликим «Норд». Поставить задачу лично Васе или лично Виталику было нельзя,
    всё валилось на общий Норд. С двумя машинами это перестало работать. */
+/* Кто из Норд-водителей взял руль в этот день. Если за рулём двое — берём того, кто сел
+   на самую большую машину (SZ LK 325, слот A): именно она ходит за товаром и по адресам.
+   Никто ещё не отметился — возвращаем пусто, строка ждёт живого человека, а не угадывания. */
+function nordDrvOn(date){
+  var v = nordDriver[date]; if (!v) return null;
+  var list = [];
+  if (v.drv) list.push({drv:v.drv, van:v.van||''});
+  Object.keys(v).forEach(function(k){
+    if (k==='drv'||k==='name'||k==='ts'||k==='van') return;
+    var x = v[k]||{};
+    if (list.some(function(y){return y.drv===(x.drv||k);})) return;
+    list.push({drv:x.drv||k, van:x.van||''});
+  });
+  if (!list.length) return null;
+  if (list.length === 1) return list[0].drv;
+  for (var j=0;j<list.length;j++){ if (list[j].van === 'A') return list[j].drv; }
+  return null;   /* двое за рулём и неясно кто на большой машине — пусть решает человек */
+}
 function drvOptKeys(){ return disp2Mode ? nordDrvKeys() : DRV_KEYS; }
 /* Слот C — это МАШИНА, а не человек: за её рулём сегодня может быть и Виталик, и Вася.
    Поэтому подписываем именем того, кто сегодня реально за рулём этого слота, а не тем,
@@ -1852,12 +1870,16 @@ function autoPickDriver(r){
     if (!r || r.drv) return null;                       // рука диспетчера старше
     var city = cityNorm(r.city), date = r.date;
     if (!date) return null;
-    // 1. Норд — кто взял руль в этот день
-    if (isNordRow(r)) { var w = nordWheel[date]; return (w && w.drv) ? w.drv : null; }
-    if (!city) return null;
-    // 2. По факту дня — у кого уже есть адреса в этом городе
+    /* ⛔1. РАСПИСАНИЕ РЕЙСОВ ВЫШЕ ВСЕГО. В Норде три разные вещи, которые раньше были свалены
+       в одну «норд-метку»: ежедневные развозки внутри Норда (их ставят местные техники сами),
+       рейс СО СКЛАДА в Зальцгиттере в Норд (среда — Валентин на Wilhelmshaven/Aurich, Лёша на
+       Wolfsburg) и субботний рейс ИЗ Норда сюда за товаром. Норд-метка стояла первой и обрывала
+       разбор до расписания — поэтому 19.08 тринадцать адресов на среду остались без водителя,
+       хотя в расписании там чётко стоит Валентин. */
+    /* ⛔1. ФАКТ ДНЯ СИЛЬНІШИЙ ЗА РОЗКЛАД — правило Сергія. Якщо хтось уже їде в це місто
+       сьогодні, нову адресу віддаємо йому, навіть коли розклад каже інше: людина вже там. */
     var byFact = null;
-    (rows||[]).forEach(function(x){
+    if (city) (rows||[]).forEach(function(x){
       if (byFact || !x || x.id === r.id) return;
       if (x.date !== date || !x.drv) return;
       if (cityNorm(x.city) !== city) return;
@@ -1865,9 +1887,18 @@ function autoPickDriver(r){
       byFact = x.drv;
     });
     if (byFact) return byFact;
-    // 3. Расписание
-    var day = autoWeekday(date), plan = schedCfg[day] || schedCfg[String(day)];
-    return (plan && plan[city]) ? plan[city] : null;
+    /* ⛔2. РОЗКЛАД РЕЙСІВ ВИЩЕ ЗА НОРД-МІТКУ. У Норді три різні речі, які раніше були звалені
+       в одну мітку: щоденні розвозки всередині Норду (їх ставлять місцеві техніки), рейс
+       ЗІ СКЛАДУ в Зальцгітері до Норду (середа — Валентин на Wilhelmshaven/Aurich, Лёша на
+       Wolfsburg) і суботній рейс З Норду сюди за товаром. Норд-мітка стояла першою і обривала
+       розбір ще до розкладу — тому 19.08 тринадцять адрес на середу лишились без водія, хоча
+       в розкладі там чітко стоїть Валентин. */
+    var _day = autoWeekday(date), _plan = schedCfg[_day] || schedCfg[String(_day)];
+    if (city && _plan && _plan[city]) return _plan[city];
+    /* ⛔3. Норд — хто в цей день узяв кермо. Раніше дивились у nord_wheel, а туди НІКОЛИ нічого
+       не писалось: автопризначення для Норду не працювало жодного разу за весь час. */
+    if (isNordRow(r)) return nordDrvOn(date);
+    return null;
   } catch(e){ return null; }
 }
 
@@ -4995,7 +5026,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-18-d5';
+var APP_V_D = '2026-08-18-d6';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
