@@ -1514,6 +1514,27 @@ function odoVans() {
   });
   return out;
 }
+/* ⛔РУЧНА НАЗВА МАШИНИ ЗАЛИПАЄ В ТЕЛЕФОНІ. Поки машини не було в довіднику, водій вписував
+   номер руками — і він лягав у пам'ять телефона під ключем odoVan_{водій}. Далі машину заводили
+   в довідник, але в телефоні лишалась ручна назва, і пробіг знову писався повз реєстр: 18.08
+   Вася почав день на «E» (SZ C 1016), а закрив о 19:35 на «sz c 1016» — старт і кінець дня
+   опинились на різних машинах, звірка порівнювати вже не могла.
+   Тому при кожному завантаженні звіряємо збережене з довідником: знайшли ту саму машину за
+   номером — підставляємо її ключ; не знайшли нічого схожого — забуваємо, хай водій обере зі
+   списку. Ручний ввід лишається доступним, просто він більше не переживає появу машини. */
+function odoVanHeal() {
+  try {
+    if (!odoVan) return;
+    var list = odoVans(); if (!list.length) return;              /* довідник ще не прийшов — не чіпаємо */
+    for (var i = 0; i < list.length; i++) if (list[i].id === odoVan) return;   /* усе гаразд */
+    var norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
+    var mine = norm(odoVan);
+    for (var j = 0; j < list.length; j++) {
+      if (norm(list[j].label) === mine || norm(list[j].id) === mine) { odoSetVan(list[j].id); return; }
+    }
+    odoSetVan(null);
+  } catch (e) {}
+}
 function odoVanLabel(id) {
   if (!id) return '';
   var f = odoVans().filter(function (v) { return v.id === id; })[0];
@@ -2936,6 +2957,7 @@ db.ref('rows').on('value', function(snap) {
 db.ref('cfg').on('value', function(snap) {
   if (snap.val()) {
     cfg = snap.val();
+    odoVanHeal();   /* довідник прийшов — звіряємо машину, збережену в телефоні */
     document.getElementById('dn').innerHTML = driverName() + ' <span class="sync ok" id="sync"></span>';
     // ім'я приходить із налаштувань уже після старту — тоді й підписуємо вкладку
   try { document.title = 'Маршрут — ' + driverName(); } catch(e) {}
@@ -3235,7 +3257,7 @@ function submitAddTask(){
 //   значит «попросите перезагрузить» не работает, приложение должно обновляться само.
 // ⛔Но не вслепую: перезагрузка посреди заливки фото или с открытым экраном пробега
 //   съест несохранённое. Автоматически — только когда терять нечего; иначе кнопкой.
-var APP_V = '2026-08-18-02';
+var APP_V = '2026-08-18-03';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
