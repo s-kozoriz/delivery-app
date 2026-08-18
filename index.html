@@ -923,7 +923,26 @@ var odoAll={};
 var nordDriver={};
 // «Норд» — это МАШИНА/маршрут, а не человек. Поэтому не подменяем название, а дописываем
 // имя того, кто сегодня за рулём: «Норд · Микола». Нет отметки — остаётся просто «Норд».
-function nordColName(){ var nd=nordDriver[curD]; return (nd&&nd.name)?('Норд · '+nd.name):'Норд'; }
+/* ⛔ФОРМАТ ИЗМЕНИЛСЯ, НО СТАРЫЕ ДНИ ЧИТАЕМ ТОЖЕ. Было: nord_driver/{дата} = {drv,name} —
+   ровно ОДИН человек, и второй Норд-водитель затирал первого. Стало: nord_driver/{дата}/{слот}.
+   Дни до 18.08 лежат в старом виде, и переписывать историю мы не будем — просто понимаем оба. */
+function nordDrvToday(){
+  var v=nordDriver[curD]; if(!v) return [];
+  if(v.drv) return [{drv:v.drv,name:v.name||''}];
+  return Object.keys(v).map(function(k){ var x=v[k]||{}; return {drv:x.drv||k,name:x.name||''}; });
+}
+/* Норд-водитель со СВОИМИ адресами на этот день получает отдельную колонку и в подписи «Норд»
+   не упоминается — иначе одно имя стояло бы в двух местах и было бы непонятно, где чья работа. */
+function nordOwnCols(){
+  return nordDrvKeys().filter(function(k){
+    return k!=='C' && rows.some(function(r){return r.date===curD&&r.drv===k&&r.addr&&r.addr.trim()&&r.inRoute!==false;});
+  });
+}
+function nordColName(){
+  var own=nordOwnCols();
+  var n=nordDrvToday().filter(function(x){return own.indexOf(x.drv)===-1;}).map(function(x){return x.name;}).filter(Boolean);
+  return n.length?('Норд · '+n.join(', ')):'Норд';
+}
 function dcolName(d){ return d==='C' ? nordColName() : dname(d); }
 function odoFmtD(d){var p=(''+(d||'')).split('-');return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):d;}
 function odoFmtT(ts){if(typeof ts!=='number')return '';var d=new Date(ts);return (d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();}
@@ -2085,7 +2104,11 @@ function _autoNordTrash(){
 function secondNordDrv(){ var prim=nordDrvKeys(); var f=''; rows.forEach(function(r){ if(r.date===curD && r.drv && prim.indexOf(r.drv)===-1 && isNordRow(r) && r.addr && r.addr.trim()) f=r.drv; }); return f; }
 function activeDrvs(){
   // Норд = ОДНА машина (слот C): одна колонка «Норд» (имя того, кто вошёл водителем), а не по колонке на каждого Норд-водителя.
-  if(disp2Mode)return ['C'].concat([secondNordDrv()||'2nd']); // слот Норд + всегда «второе поле» (2-я/партнёрская машина)
+  /* ⛔В Норде теперь ДВЕ машины и двое могут быть за рулём одновременно. Раньше здесь была
+     ровно одна колонка «Норд» (слот C) плюс поле для чужого водителя, и Норд-водитель со своими
+     адресами — Вася 18.08, восемь адресов от Alex — не показывался вообще. Теперь колонку
+     получает каждый Норд-водитель, на кого запланировано своё. */
+  if(disp2Mode)return ['C'].concat(nordOwnCols()).concat([secondNordDrv()||'2nd']);
   var dr=(cfg&&cfg.drivers)||{};
   // основной регион слева (L/R/V + не-Норд динамические), Норд-машина (C) — крайней справа для быстрой визуальной идентификации
   // ⛔Норд-водії окремої панелі не мали: у Норду одна машина, все йде на спільний пункт «Норд».
@@ -4942,7 +4965,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-17-d2';
+var APP_V_D = '2026-08-18-d3';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
