@@ -1677,19 +1677,30 @@ function rowKeyAddrSoft(r){
    коли диспетчер сам торкався рядка. Тепер схожі адреси видно одразу при завантаженні плану.
    ⛔Але БЕЗ вікна-запитання: план оновлюється в реальному часі, і confirm вилазив би по колу,
    поки людина не погодиться. Тому — помітна кнопка в самому рядку. */
-function mergeHintHtml(r){
-  try{
-    if(IS_VIEWER)return '';
-    if(!r||!r.addr||!String(r.addr).trim())return '';
-    var c=rowMergeCandidates(r).filter(function(x){return x._mergeSoft && (x.drv||'')===(r.drv||'');});
-    if(!c.length)return '';
-    /* показуємо тільки на ОДНОМУ з пари — на тому, що створений раніше: інакше кнопка задвоїться */
-    var mine=r.createdAt||0;
-    for(var i=0;i<c.length;i++){ if((c[i].createdAt||0) < mine) return ''; }
-    return '<div style="font-size:10.5px;color:#a35a06;font-weight:700;margin-bottom:2px">'
-      + '&#8646; тот же адрес записан иначе '
-      + '<button onclick="rowAutoMerge(&quot;'+r.id+'&quot;)" style="border:1px solid #e0b070;background:#fdf3e4;color:#a35a06;border-radius:5px;padding:1px 6px;font-size:10.5px;font-weight:700;font-family:inherit;cursor:pointer">объединить</button></div>';
-  }catch(e){ return ''; }
+/* ⛔ЗЛИВАЄМО САМІ, ПРИ ЗАВАНТАЖЕННІ ПЛАНУ. Заявка техніка приходить зі станції напряму в базу,
+   минаючи код диспетчера, тому раніше злиття спрацьовувало лише коли диспетчер сам торкався
+   рядка — і дублі жили в плані годинами. 20.08 водій мало не поїхав двічі на Süntelweg 1 3_M:
+   з 1С адреса прийшла з приміткою «+Asbest», зі станції — з назвою міста в кінці.
+   ⛔Кожну пару пробуємо ОДИН раз за сеанс: інакше при кожному перемальовуванні таблиці (а воно
+   часте) ми били б у базу тими самими записами. */
+var _autoMerged={};
+function autoMergeAll(){
+  if(typeof IS_VIEWER!=="undefined" && IS_VIEWER) return;
+  if(!rows||!rows.length) return;
+  var list=rows.slice();
+  for(var i=0;i<list.length;i++){
+    var r=list[i];
+    if(!r||!r.id||!r.addr||!String(r.addr).trim()||r.done===true||r.inRoute===false) continue;
+    if(_autoMerged[r.id]) continue;
+    var c=rowMergeCandidates(r).filter(function(x){ return (x.drv||"")===(r.drv||""); });
+    if(!c.length) continue;
+    /* зливаємо в той рядок, що створений РАНІШЕ: у нього більше шансів мати накладні з 1С */
+    var older=true;
+    for(var j=0;j<c.length;j++){ if((c[j].createdAt||0) < (r.createdAt||0)) { older=false; break; } }
+    if(!older) continue;
+    _autoMerged[r.id]=1;
+    rowAutoMerge(r.id);
+  }
 }
 function rowMergeCandidates(r){
   if(!r||!r.addr||!String(r.addr).trim()||!r.date)return [];
@@ -1743,12 +1754,14 @@ function rowAutoMerge(id){
   /* ⛔ТІЛЬКИ ТОЧНИЙ ЗБІГ ЗЛИВАЄТЬСЯ МОВЧКИ. Схожий — питаємо: прибираючи позначку робіт, ми
      могли з'єднати дві РІЗНІ заявки на одну квартиру, і людина має це підтвердити. */
   c.filter(function(x){return (x.drv||"")===(r.drv||"") && !x._mergeSoft;}).forEach(function(x){ if(mergeRowInto(id,x.id))n++; });
+  /* ⛔СХОЖІ ЗЛИВАЄМО ТАК САМО МОВЧКИ (рішення Сергія 19.08). Спершу тут стояло підтвердження,
+     але диспетчер не має щоразу підтверджувати очевидне: одна квартира, один день, один водій.
+     Дані не губляться — накладні, коментарі й фото обох рядків зводяться в один. У журналі
+     подій лишається слід з обома написаннями адреси, щоб можна було розібратись заднім числом. */
   c.filter(function(x){return (x.drv||"")===(r.drv||"") && x._mergeSoft;}).forEach(function(x){
-    if(confirm('Похоже на тот же адрес, записанный иначе:'+'\n\n'+'· '+(r.addr||'')+'\n'+'· '+(x.addr||'')+'\n\n'+'Объединить в одну строку?')){
-      if(mergeRowInto(id,x.id))n++;
-    }
-  });
-  if(n)toast("Объединено: один адрес и дата — заявок в одну: "+(n+1));
+    var a1=r.addr||"", a2=x.addr||"";
+    if(mergeRowInto(id,x.id)){ n++; try{ auditLog("объединены одинаковые адреса", id, {kept:a1, merged:a2, date:r.date||"", drv:r.drv||""}); }catch(e){} }
+  });  if(n)toast("Объединено: один адрес и дата — заявок в одну: "+(n+1));
   var other=c.filter(function(x){return (x.drv||"")!==(r.drv||"");});
   if(other.length){
     var o=other[0];
@@ -1980,6 +1993,7 @@ function autoAssignRows(){
 }
 function rtbl(){
   try { autoAssignRows(); } catch(e){}
+  try { autoMergeAll(); } catch(e){}
   if(_rtblTimer)clearTimeout(_rtblTimer);
   _rtblTimer=setTimeout(_rtblNow,200);
 }
@@ -2091,7 +2105,7 @@ function _rtblNow(){
     h+='<td style="width:110px">'+(isEditing?'<select class="ac-city" onchange="ur(\''+r.id+'\',\'city\',this.value)">'+co+'</select>':'<span style="font-size:12px;padding:2px 4px;display:block">'+xe(r.city||'')+'</span>')+'</td>';
     h+='<td style="width:70px">'+(isEditing?'<input type="time" value="'+(r.timeSlot||'')+'" onchange="ur(\''+r.id+'\',\'timeSlot\',this.value)">':'<span style="font-size:12px;padding:2px 4px;display:block;color:var(--mu)">'+xe(r.timeSlot||'—')+'</span>')+'</td>';
     // Address cell
-    var addrCellHtml = '<td style="min-width:170px">' + mergeHintHtml(r);
+    var addrCellHtml = '<td style="min-width:170px">';
     if (r.fromTech) {
       addrCellHtml += isEditing
         ? '<input type="text" class="ac-addr" value="'+xe(r.addr)+'" placeholder="Улица, дом..." oninput="ur(\''+r.id+'\',\'addr\',this.value)" style="font-weight:600">'
@@ -5102,7 +5116,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-19-d12';
+var APP_V_D = '2026-08-19-d13';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
