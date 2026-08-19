@@ -1672,6 +1672,25 @@ function rowKeyAddrSoft(r){
   a = a.replace(/[.,;]+/g, ' ').replace(/[ ]+/g, ' ').trim();
   return a;
 }
+/* ⛔ЗНАХОДИМО САМІ, ЗЛИВАЄМО — ТІЛЬКИ ЗА СЛОВОМ ЛЮДИНИ. Заявка техніка приходить зі станції
+   напряму в базу, минаючи код диспетчера, тому раніше пропозиція злити з’являлась лише тоді,
+   коли диспетчер сам торкався рядка. Тепер схожі адреси видно одразу при завантаженні плану.
+   ⛔Але БЕЗ вікна-запитання: план оновлюється в реальному часі, і confirm вилазив би по колу,
+   поки людина не погодиться. Тому — помітна кнопка в самому рядку. */
+function mergeHintHtml(r){
+  try{
+    if(IS_VIEWER)return '';
+    if(!r||!r.addr||!String(r.addr).trim())return '';
+    var c=rowMergeCandidates(r).filter(function(x){return x._mergeSoft && (x.drv||'')===(r.drv||'');});
+    if(!c.length)return '';
+    /* показуємо тільки на ОДНОМУ з пари — на тому, що створений раніше: інакше кнопка задвоїться */
+    var mine=r.createdAt||0;
+    for(var i=0;i<c.length;i++){ if((c[i].createdAt||0) < mine) return ''; }
+    return '<div style="font-size:10.5px;color:#a35a06;font-weight:700;margin-bottom:2px">'
+      + '&#8646; тот же адрес записан иначе '
+      + '<button onclick="rowAutoMerge(&quot;'+r.id+'&quot;)" style="border:1px solid #e0b070;background:#fdf3e4;color:#a35a06;border-radius:5px;padding:1px 6px;font-size:10.5px;font-weight:700;font-family:inherit;cursor:pointer">объединить</button></div>';
+  }catch(e){ return ''; }
+}
 function rowMergeCandidates(r){
   if(!r||!r.addr||!String(r.addr).trim()||!r.date)return [];
   if(r.done===true||r.inRoute===false)return [];
@@ -2072,7 +2091,7 @@ function _rtblNow(){
     h+='<td style="width:110px">'+(isEditing?'<select class="ac-city" onchange="ur(\''+r.id+'\',\'city\',this.value)">'+co+'</select>':'<span style="font-size:12px;padding:2px 4px;display:block">'+xe(r.city||'')+'</span>')+'</td>';
     h+='<td style="width:70px">'+(isEditing?'<input type="time" value="'+(r.timeSlot||'')+'" onchange="ur(\''+r.id+'\',\'timeSlot\',this.value)">':'<span style="font-size:12px;padding:2px 4px;display:block;color:var(--mu)">'+xe(r.timeSlot||'—')+'</span>')+'</td>';
     // Address cell
-    var addrCellHtml = '<td style="min-width:170px">';
+    var addrCellHtml = '<td style="min-width:170px">' + mergeHintHtml(r);
     if (r.fromTech) {
       addrCellHtml += isEditing
         ? '<input type="text" class="ac-addr" value="'+xe(r.addr)+'" placeholder="Улица, дом..." oninput="ur(\''+r.id+'\',\'addr\',this.value)" style="font-weight:600">'
@@ -5069,7 +5088,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-19-d10';
+var APP_V_D = '2026-08-19-d11';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
