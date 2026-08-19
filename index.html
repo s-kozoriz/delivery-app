@@ -3808,12 +3808,26 @@ function incTrackFresh(){
   else if(!(incMeta&&incMeta.seen_at)){ db.ref('1c/delivery/meta/seen_at').set(Date.now()); } // самая первая базовая точка
   incRenderFresh();
 }
+/* ⛔РАНІШЕ ТУТ БУВ ЧАС АКТИВНОСТІ БРАУЗЕРА, А НЕ ОБМІНУ. Мітку seen_at ставила сама сторінка,
+   коли помічала, що список накладних став іншим — а це буває й без обміну, наприклад коли
+   диспетчер прийняв накладну в план. Якщо рапер стояв, напис усе одно виглядав свіжим, і
+   зупинку обміну не було видно взагалі. Тепер показуємо synced_at — час, який ставить брокер
+   у момент прийому даних від 1С. Старий seen_at лишаємо як запасний, поки не прийде перший
+   справжній обмін після оновлення. */
 function incRenderFresh(){
   var el=document.getElementById('incFresh'); if(!el)return;
-  var at=(incMeta&&incMeta.seen_at)?Number(incMeta.seen_at):0;
+  var sync=(incMeta&&incMeta.synced_at)?Date.parse(incMeta.synced_at):0;
+  var at=sync||((incMeta&&incMeta.seen_at)?Number(incMeta.seen_at):0);
   if(!at){ el.textContent=''; return; }
   var d=new Date(at); function p2(n){return (n<10?'0':'')+n;}
-  el.textContent='обновлено '+p2(d.getDate())+'.'+p2(d.getMonth()+1)+'.'+d.getFullYear()+' '+p2(d.getHours())+':'+p2(d.getMinutes());
+  var mins=Math.round((Date.now()-at)/60000);
+  var txt=(sync?'обмен с 1С: ':'обновлено ')+p2(d.getDate())+'.'+p2(d.getMonth()+1)+'.'+d.getFullYear()+' '+p2(d.getHours())+':'+p2(d.getMinutes());
+  /* ⛔мовчання довше трьох годин у робочий час — це вже не «свіжо», а привід подивитись,
+     чи живий рапер. Раніше про це не було видно нічого. */
+  var stale=sync&&mins>180;
+  el.textContent=txt+(stale?'  ·  молчит '+(mins<1440?Math.round(mins/60)+' ч':Math.round(mins/1440)+' дн'):'');
+  el.style.color=stale?'#b3261e':'';
+  el.style.fontWeight=stale?'700':'';
 }
 // самолечение реестра: любая накладная, уже присутствующая в строке плана, помечается placed
 function incReconcile(){
@@ -5088,7 +5102,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-19-d11';
+var APP_V_D = '2026-08-19-d12';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
