@@ -1669,6 +1669,12 @@ function rowKeyAddrSoft(r){
   a = a.replace(/[+][^+,]*$/g, ' ');            /* хвіст після «+»: позначка робіт */
   var c = (''+((r&&r.city)||'')).trim().toLowerCase();
   if (c) a = a.split(c).join(' ');                /* назва міста будь-де в рядку */
+  /* ⛔НІМЕЦЬКА НОТАЦІЯ ПОВЕРХУ. «1OG» = 1. Obergeschoss = той самий перший поверх, що й просто
+     «1». 20.08 через це не злились Eichenkamp 38 1_R (від техніка) і Eichenkamp 38 1OG_R+E-Check
+     (з 1С) — одна квартира, дві нотації.
+     ⛔EG, UG, DG НЕ чіпаємо: EG (Erdgeschoss) — це нульовий поверх, і «EG_M» проти «1_M» —
+     РІЗНІ квартири. Прибираємо тільки «OG» після числа. og_norm */
+  a = a.replace(/([0-9])[ ]*og([^a-z]|$)/g, '$1$2');
   a = a.replace(/[.,;]+/g, ' ').replace(/[ ]+/g, ' ').trim();
   return a;
 }
@@ -5116,7 +5122,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-19-d13';
+var APP_V_D = '2026-08-19-d14';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
