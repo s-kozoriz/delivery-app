@@ -1657,12 +1657,33 @@ function rowKeyAddr(r){
   var a=(""+((r&&r.addr)||"")).trim().toLowerCase().replace(/\s+/g," ");
   return c+"|"+a+"|"+((r&&r.date)||"");
 }
+/* ⛔ОДНА КВАРТИРА, ДВА ЗАПИСИ АДРЕСИ. Диспетчер тягне адресу з 1С, технік пише її на станції —
+   і пишуть по-різному: «Süntelweg 1 3_M +Asbest» проти «Süntelweg 1 3_M, Göttingen». Точне
+   порівняння бачить два різні адреси, рядки не зливаються, водій їде двічі на одну квартиру.
+   М'який ключ прибирає те, що НЕ є адресою: назву міста в кінці, позначки робіт (+Asbest,
+   +E-Check, +Zählerantrag), зайву пунктуацію.
+   ⛔Номер квартири НЕ чіпаємо: «Deisterstraße 8 4_L» і «Deisterstraße 8 2_R» — різні квартири
+   в одному будинку, зливати їх було б гірше за дубль. */
+function rowKeyAddrSoft(r){
+  var a = (''+((r&&r.addr)||'')).toLowerCase();
+  a = a.replace(/[+][^+,]*$/g, ' ');            /* хвіст після «+»: позначка робіт */
+  var c = (''+((r&&r.city)||'')).trim().toLowerCase();
+  if (c) a = a.split(c).join(' ');                /* назва міста будь-де в рядку */
+  a = a.replace(/[.,;]+/g, ' ').replace(/[ ]+/g, ' ').trim();
+  return a;
+}
 function rowMergeCandidates(r){
   if(!r||!r.addr||!String(r.addr).trim()||!r.date)return [];
   if(r.done===true||r.inRoute===false)return [];
-  var k=rowKeyAddr(r);
+  var k=rowKeyAddr(r), ks=rowKeyAddrSoft(r), city=(''+(r.city||'')).trim().toLowerCase();
   return rows.filter(function(x){
-    return x&&x.id!==r.id&&x.done!==true&&x.inRoute!==false&&x.addr&&String(x.addr).trim()&&rowKeyAddr(x)===k;
+    if(!x||x.id===r.id||x.done===true||x.inRoute===false||!x.addr||!String(x.addr).trim())return false;
+    if(x.date!==r.date)return false;
+    if(rowKeyAddr(x)===k) { x._mergeSoft=false; return true; }
+    /* ⛔схожий збіг вимагає ще й того самого міста: без цього однакові назви вулиць у різних
+       містах виглядали б як одна адреса */
+    if(ks && (''+(x.city||'')).trim().toLowerCase()===city && rowKeyAddrSoft(x)===ks){ x._mergeSoft=true; return true; }
+    return false;
   });
 }
 // Сливаем src в dst и удаляем src.
@@ -1700,7 +1721,14 @@ function rowAutoMerge(id){
   var r=rows.find(function(x){return x.id===id;}); if(!r)return;
   var c=rowMergeCandidates(r); if(!c.length)return;
   var n=0;
-  c.filter(function(x){return (x.drv||"")===(r.drv||"");}).forEach(function(x){ if(mergeRowInto(id,x.id))n++; });
+  /* ⛔ТІЛЬКИ ТОЧНИЙ ЗБІГ ЗЛИВАЄТЬСЯ МОВЧКИ. Схожий — питаємо: прибираючи позначку робіт, ми
+     могли з'єднати дві РІЗНІ заявки на одну квартиру, і людина має це підтвердити. */
+  c.filter(function(x){return (x.drv||"")===(r.drv||"") && !x._mergeSoft;}).forEach(function(x){ if(mergeRowInto(id,x.id))n++; });
+  c.filter(function(x){return (x.drv||"")===(r.drv||"") && x._mergeSoft;}).forEach(function(x){
+    if(confirm('Похоже на тот же адрес, записанный иначе:'+'\n\n'+'· '+(r.addr||'')+'\n'+'· '+(x.addr||'')+'\n\n'+'Объединить в одну строку?')){
+      if(mergeRowInto(id,x.id))n++;
+    }
+  });
   if(n)toast("Объединено: один адрес и дата — заявок в одну: "+(n+1));
   var other=c.filter(function(x){return (x.drv||"")!==(r.drv||"");});
   if(other.length){
@@ -5041,7 +5069,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-18-d9';
+var APP_V_D = '2026-08-19-d10';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
