@@ -3748,6 +3748,34 @@ function whShipState(drv){
     return '<span style="font-size:12px;color:#a35a06;font-weight:700;margin-right:8px">отмечено '+mark+' из '+tot+' &middot; отгрузка не закрыта</span>';
   }catch(e){ return ''; }
 }
+/* ⛔СУБОТНІЙ РЕЙС ЖИВЕ ДВОМА ДНЯМИ. У суботу водій Норду їде в Зальцгітер і забирає товар зі
+   складу — рядок з адресою потрібен саме на суботу: по ньому комірник знає, що вантажити, а
+   водій звіряє, що забрав. Але на квартири це їде тільки в понеділок, і не факт, що тим самим
+   водієм. Раніше рядки закривались суботою — і в системі стояло, що доставка відбулась у день,
+   коли машина взагалі не була біля під'їзду. Фото, час і людина писались не ті.
+   Тепер, коли комірник закрив суботню відвантаження, відмічені рядки їдуть на понеділок, а водій
+   з них знімається: у понеділок його підставить той самий механізм, що дивиться, хто взяв кермо. */
+function satMoveToMonday(day, drv, list, keep){
+  try{
+    var d = new Date(day + 'T12:00:00Z');
+    if (d.getDay() !== 6) return 0;                     /* не субота — не наша справа */
+    var mon = new Date(d.getTime() + 2*86400000).toISOString().slice(0,10);
+    var n = 0;
+    list.forEach(function(r){
+      if (!r || !r.id) return;
+      if (r.done === true) return;                      /* уже виконано в суботу — не чіпаємо */
+      if (r.satMoved === true) return;                  /* ⛔один раз: повторне натискання не плодить копій */
+      if (!isNordRow(r)) return;                        /* ⛔чужі суботні рейси (Рома, Braunschweig) не наші */
+      var iv = keep[r.id];
+      if (!iv || !iv.length) return;                    /* склад нічого не відмітив — нема чого везти */
+      n++;
+      r.date = mon; r.drv = ''; r.satMoved = true;
+      db.ref('rows/' + r.id).update({ date: mon, drv: '', satMoved: true }).catch(function(){});
+      try{ auditLog('суббота: перенесено на понедельник', r.id, {addr:r.addr||'', from:day, to:mon, invs:iv.length}); }catch(e){}
+    });
+    return n;
+  }catch(e){ return 0; }
+}
 function whShipDone(drv){
   if(IS_VIEWER)return;
   var day=curD;
@@ -3798,8 +3826,12 @@ function whShipDone(drv){
   });
   Promise.all(_jobs).then(function(){
     try{ auditLog('отгрузка завершена', null, {drv:drv, date:day, shipped:keepCnt, returned:back.length}); }catch(e){}
-    toast('Отгрузка закрыта: '+keepCnt+' поехало, '+back.length+' вернулось');
+    /* ⛔перенос ПІСЛЯ успішного закриття: якщо записи не пройшли, рядки лишаються на суботі,
+       і людина бачить помилку — а не порожню суботу з незрозуміло куди зниклими адресами */
+    var _mv = satMoveToMonday(day, drv, list, keep);
+    toast('Отгрузка закрыта: '+keepCnt+' поехало, '+back.length+' вернулось'+(_mv?('  ·  '+_mv+' на понедельник'):''));
     try{ renderWarehouse(); }catch(e){}
+    try{ rtbl(); }catch(e){}
   }).catch(function(e){
     /* ⛔Молчать нельзя: именно тишина скрыла отсутствие прав у склада на двое суток. */
     try{ auditLog('ОШИБКА закрытия отгрузки', null, {drv:drv, date:day, err:String(e&&e.message||e)}); }catch(_){}
@@ -5122,7 +5154,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-19-d14';
+var APP_V_D = '2026-08-19-d15';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
