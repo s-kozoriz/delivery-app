@@ -1708,6 +1708,21 @@ function autoMergeAll(){
     rowAutoMerge(r.id);
   }
 }
+/* ⛔РЯДОК, ЯКИЙ ЧЕКАЄ НЕ ДИСПЕТЧЕРА, А РАНКУ. У Норді дві машини, і хто поїде, стає відомо лише
+   коли людина бере кермо. Технік може поставити завдання знеособлено «на Норд» — тоді водій
+   підставиться сам уранці. Порожнє поле водія в такому рядку виглядає як недогляд, і людина, що
+   бачить план уперше, почне призначати руками — і зламає те, що мало спрацювати само.
+   ⛔Накладна з 1С сюди НЕ входить: для неї діє розклад рейсів, і якщо водія немає — це справжній
+   сигнал диспетчеру, а не очікування ранку. Розрізняємо за src: його ставить лише диспетчерський
+   шлях прийому з «Входящих», станція його не проставляє. */
+function waitsWheel(r){
+  try{
+    if(!r || r.drv || r.done===true || r.inRoute===false) return false;
+    if(!r.addr || !String(r.addr).trim()) return false;
+    if((r.src||'') === '1c') return false;
+    return isNordRow(r);
+  }catch(e){ return false; }
+}
 function rowMergeCandidates(r){
   if(!r||!r.addr||!String(r.addr).trim()||!r.date)return [];
   if(r.done===true||r.inRoute===false)return [];
@@ -2099,10 +2114,14 @@ function _rtblNow(){
          в Норд или наоборот) — показываем его отдельным пунктом, иначе select молча сбросит
          назначение на первого попавшегося и работа уедет чужому человеку */
       if(r.drv&&drvOptKeys().indexOf(r.drv)===-1)sel+='<option value="'+r.drv+'" selected>'+xe(dname(r.drv)||r.drv)+'</option>';
-      sel+='</select></td>';
+      sel+='</select>';
+      if(waitsWheel(r)) sel+='<div style="color:#5b6672;font-size:10px;font-weight:500;line-height:1.25;margin-top:2px">водитель &mdash; кто сядет за руль утром</div>';
+      sel+='</td>';
       h+=sel;
     } else {
-      var drvLabel=r.drv?xe(dcolName(r.drv)||r.drv):'<span style="color:#E24B4A;font-size:11px;font-weight:600">Не назначен</span>';
+      var drvLabel=r.drv?xe(dcolName(r.drv)||r.drv):(waitsWheel(r)
+        ? '<span style="color:#5b6672;font-size:10.5px;font-weight:500;line-height:1.3">водитель &mdash; кто сядет за руль утром</span>'
+        : '<span style="color:#E24B4A;font-size:11px;font-weight:600">Не назначен</span>');
       h+='<td style="width:80px;'+dc+'"><span style="font-size:12px;font-weight:600;padding:2px 4px;display:block">'+drvLabel+'</span></td>';
     }
     var cityList=disp2Mode?CITIESC:CITIES;
@@ -5154,7 +5173,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-19-d15';
+var APP_V_D = '2026-08-19-d16';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
