@@ -1434,7 +1434,7 @@ function odoBlockToast() { showToast('Сначала зафиксируйте п
     + '</div>'
     + '<div class="ocam" id="odoCam"></div>'
     + '<div class="oform"><div class="ovans" id="odoVans"></div><button class="oshot" id="odoShot" onclick="odoShoot()">&#128247; Сфотографировать пробег</button>'
-    + '<div class="okm"><label>Пробег, км</label><input id="odoKm" type="number" inputmode="numeric" placeholder="напр. 123456" oninput="odoValidate()"></div>'
+    + '<div class="okm"><label>Пробег, км</label><input id="odoKm" type="number" inputmode="numeric" placeholder="напр. 123456" oninput="odoKmTyped()"></div>'
     + '<button class="ogo" id="odoNext" style="display:none" onclick="odoStep2()">Далее &#8594;</button>'
     + '<button class="oshotg" id="odoBack" style="display:none" onclick="odoStep1()">&#8592; Сменить машину</button>'
     + '<button class="ogo" id="odoGo" disabled onclick="odoSave()"></button>'
@@ -1690,7 +1690,7 @@ function odoOpen(mode) {
   else { odoRenderVans(false, null); }
   var sh = document.getElementById('odoShot'); sh.className = 'oshot'; sh.innerHTML = '&#128247; Сфотографировать пробег';
   document.getElementById('odoCam').innerHTML = '<div class="ohint">Нажмите «Сфотографировать пробег»</div>';
-  document.getElementById('odoKm').value = '';
+  document.getElementById('odoKm').value = ''; odoKmAuto = false;
   document.getElementById('odoBanner').classList.remove('on');
   odoValidate();
   document.getElementById('odoGate').classList.add('on');
@@ -1717,9 +1717,15 @@ function odoShotNote(html, kind) {
   el.style.display = html ? '' : 'none';
 }
 // Підставити прочитане число в поле пробігу — один дотик замість ручного вводу.
+/* ⛔Звідки взялося число — вирішує, чи можна на нього спиратися. Підставлене зі знімка
+   звірене з фотографією; набране руками — ні. Пишемо це в день, щоб у звіті було видно,
+   де показання прийшло з панелі, а де людина вписала його сама. */
+var odoKmAuto = false;
+function odoKmTyped() { odoKmAuto = false; odoValidate(); }
 function odoUseKm(km) {
   var el = document.getElementById('odoKm'); if (!el) return;
   el.value = String(km);
+  odoKmAuto = true;
   odoShotNote('Пробег <b>' + String(km) + '</b> км взят с фото', 'ok');
   odoValidate();
   if (navigator.vibrate) navigator.vibrate(40);
@@ -1758,8 +1764,20 @@ function odoCheckShot(file) {
       } else if (j.km != null && Number(j.km) > 0) {
         /* Прочиталось — водителю остаётся ОДИН тап вместо шести цифр. И это же дисциплинирует
            снимать так, чтобы цифры было видно: снял плохо — вводи руками. */
-        odoShotNote('На фото <b>' + String(j.km) + '</b> км'
-          + '<button type="button" class="oshot-use" onclick="odoUseKm(' + Number(j.km) + ')">Подтвердить</button>', 'ok');
+        /* ⛔Раніше тут була кнопка «Подтвердить»: число з фото читалося, показувалось — і ні
+           до чого не зобов'язувало. Вписати можна було будь-що, розбіжність з фото ніде не
+           звірялась. Звідси 178 мільйонів кілометрів і тиждень ручних виправлень.
+           Тепер показання підставляється саме. Людину не тримаємо: поле відкрите, виправити
+           можна — але день тоді піде з міткою «вписано вручну» і буде видно у звіті.
+           ⛔Затирати вже набране НЕ можна: перевірка знімка асинхронна, і водій міг встигнути
+           вписати число сам. Порожнє поле — підставляємо; заповнене — пропонуємо кнопкою. */
+        var _kf = document.getElementById('odoKm');
+        if (_kf && !String(_kf.value || '').trim()) {
+          odoUseKm(Number(j.km));
+        } else {
+          odoShotNote('На фото <b>' + String(j.km) + '</b> км'
+            + '<button type="button" class="oshot-use" onclick="odoUseKm(' + Number(j.km) + ')">Подтвердить</button>', 'ok');
+        }
       } else {
         odoShotNote('&#9888; Цифры на одометре не разобрать. Переснимите ближе, чтобы табло было чётким.', 'warn');
       }
@@ -1794,6 +1812,9 @@ function odoShotWhyBad() {
 function odoOnFile(e) {
   var f = e.target.files[0]; if (!f) return;
   odoPhotoFile = f;
+  /* Перезняв — попереднє ПІДСТАВЛЕНЕ число більше не про цей знімок,
+     звільняємо поле під нове. Набране руками не чіпаємо: вписали свідомо. */
+  if (odoKmAuto) { var _kc = document.getElementById('odoKm'); if (_kc) _kc.value = ''; odoKmAuto = false; }
   var _c = document.getElementById('odoCam'); if (_c) _c.style.display = '';   // знімок є — показуємо його
   compressPhoto(f, function (small) { odoCheckShot(small || f); }, { side: 1600, q: 0.82 });
   document.getElementById('odoCam').innerHTML = '<img src="' + URL.createObjectURL(f) + '">';
@@ -2115,7 +2136,7 @@ function odoSave() {
   var vanEv = (mode === 'end') ? (odoVanOfDay(date) || odoVanSel || odoVan)
             : (mode === 'swap_out') ? (odoVan || odoVanOfDay(date))
             : (odoVanSel || odoVan);
-  odoWriteKm(date, mode, km, ts, vanEv, _suspect);
+  odoWriteKm(date, mode, km, ts, vanEv, _suspect, !odoKmAuto);
   odoUploadPhoto(odoPhotoFile, date, mode, ts, km);
   if (mode === 'swap_out') {
     /* ⛔Раніше тут стояло odoOpen('swap_in') — застосунок вів на «візьміть нову» силою, бо
@@ -2300,11 +2321,11 @@ setInterval(function () { if (odoQ.length && navigator.onLine) odoProcessQ(); },
 // число «км» — своя надёжная очередь (localStorage), чтобы не потерять при слабой сети / закрытии приложения
 var odoKmQ = JSON.parse(localStorage.getItem('odoKmQ_' + DRV) || '[]');
 function saveOdoKmQ() { localStorage.setItem('odoKmQ_' + DRV, JSON.stringify(odoKmQ)); }
-function odoWriteKm(date, mode, km, ts, van, suspect) { odoKmQ.push({ date: date, mode: mode, km: km, ts: ts, van: van || null, suspect: suspect ? true : null }); saveOdoKmQ(); odoFlushKm(); }
+function odoWriteKm(date, mode, km, ts, van, suspect, manual) { odoKmQ.push({ date: date, mode: mode, km: km, ts: ts, van: van || null, suspect: suspect ? true : null, manual: manual ? true : null }); saveOdoKmQ(); odoFlushKm(); }
 function odoFlushKm() {
   odoKmQ.slice().forEach(function (it) {
     var p = odoPaths(DRV, it);
-    var first = p.legacy ? db.ref(p.legacy).update({ km: it.km, ts: it.ts, van: it.van || null }) : Promise.resolve();
+    var first = p.legacy ? db.ref(p.legacy).update({ km: it.km, ts: it.ts, van: it.van || null, kmManual: it.manual || null }) : Promise.resolve();
     first.then(function () {
       // журнал событий: из него строятся отрезки «водитель × машина» за день
       /* ⛔Реестр ведёт КАЖДАЯ отметка: иначе завтрашняя сверка будет опираться на позавчерашнее
@@ -2318,7 +2339,7 @@ function odoFlushKm() {
           }
         }
       } catch (e) {}
-      return db.ref(p.ev).update({ kind: it.mode, van: it.van || null, km: it.km, ts: it.ts, suspect: it.suspect || null });
+      return db.ref(p.ev).update({ kind: it.mode, van: it.van || null, km: it.km, ts: it.ts, suspect: it.suspect || null, kmManual: it.manual || null });
     }).then(function () {
       var i = odoKmQ.indexOf(it); if (i > -1) { odoKmQ.splice(i, 1); saveOdoKmQ(); }
     }).catch(function () {});
@@ -3410,7 +3431,7 @@ function verForceCheck(next){
   } catch (e) { clearTimeout(t); go(); }
 }
 /* ─── /ОБЯЗАТЕЛЬНОЕ ОБНОВЛЕНИЕ ─────────────────────────────────────────────────── */
-var APP_V = '2026-08-20-04';
+var APP_V = '2026-08-20-05';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
