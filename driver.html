@@ -1654,6 +1654,11 @@ function odoOpen(mode) {
   // Вибір ролі — лише на старті дня і лише тим, хто працює у двох ролях.
   // Хто тільки водій — бачить одразу поля пробігу, як і раніше.
   var _role = document.getElementById('odoRole');
+  /* ⛔Кнопки ролі спільні з екраном «здав машину — що далі»: там їм міняють підпис і дію.
+     Повертаємо рідні щоразу, інакше вранці «За рулём» відкрив би вибір нової машини. */
+  var _brd = document.getElementById('odoRoleDrv'), _brl = document.getElementById('odoRoleLoad');
+  if (_brd) { _brd.innerHTML = '&#128666; За рулём'; _brd.onclick = null; _brd.setAttribute('onclick', "odoPickRole('driver')"); }
+  if (_brl) { _brl.innerHTML = '&#128230; Грузчиком'; _brl.onclick = null; _brl.setAttribute('onclick', "odoPickRole('loader')"); }
   var askRole = (mode === 'start' && valCanLoad() && !valMode);
   if (_role) _role.style.display = askRole ? '' : 'none';
   odoFields(!askRole);   // пока роль не выбрана — полей пробега на экране нет
@@ -1809,6 +1814,40 @@ function odoFields(show) {
 // ⛔Окремий екран «Кто ты сегодня?» 08.08 збив Рому: він побачив його вперше після
 //   переїзду на спільний застосунок і зробив три спроби почати день, увівши три
 //   різні числа пробігу.
+/* ⛔ЗДАВ МАШИНУ — ЩО ДАЛІ? Раніше застосунок мовчки вів на «візьміть нову»: інших варіантів
+   він не знав. А водій може здати кермо і далі працювати ВАНТАЖНИКОМ — у Норді так міняються
+   щодня. Хто не брав нової машини і не казав, що став вантажником, лишався «ні на якій машині»:
+   13.08 Рома так здав машину о 12:30, працював до 18:41 і закрив день порожнім записом.
+   Тепер після здачі — прямий вибір із двох. Третього стану не лишається.
+   ⛔Перевикористовуємо той самий блок, що питає роль на старті дня: нового екрана не малюємо. */
+function odoAfterSwapOut() {
+  var g = document.getElementById('odoGate'); if (!g) return;
+  odoMode = 'swap_ask';
+  var hd = document.getElementById('odoHd'), sub = document.getElementById('odoSub');
+  if (hd) hd.textContent = 'Машина сдана';
+  if (sub) sub.textContent = 'Что дальше?';
+  odoFields(false);                                  /* ні фото, ні кілометрів — тут лише вибір */
+  odoRenderVans(false, null);
+  var cam = document.getElementById('odoCam'); if (cam) { cam.style.display = 'none'; cam.innerHTML = ''; }
+  var go = document.getElementById('odoGo'); if (go) go.style.display = 'none';
+  var gl = document.getElementById('odoGoL'); if (gl) gl.style.display = 'none';
+  var nx = document.getElementById('odoNext'); if (nx) nx.style.display = 'none';
+  var bk = document.getElementById('odoBack'); if (bk) bk.style.display = 'none';
+  var bd = document.getElementById('odoRoleDrv'), bl2 = document.getElementById('odoRoleLoad');
+  if (bd) { bd.className = 'orole-b'; bd.innerHTML = '&#128666; Беру другую машину'; bd.onclick = null; bd.setAttribute('onclick', "odoOpen('swap_in')"); }
+  if (bl2) { bl2.className = 'orole-b'; bl2.innerHTML = '&#128230; Дальше грузчиком'; bl2.onclick = null; bl2.setAttribute('onclick', 'odoSwapToLoader()'); }
+  var rl = document.getElementById('odoRole'); if (rl) rl.style.display = '';
+  g.classList.add('on');
+}
+/* Здав кермо і лишився працювати вантажником. Час зміни НЕ чіпаємо: він іде далі тим самим
+   відрізком — людина не переставала працювати, змінилась лише роль. */
+function odoSwapToLoader() {
+  odoSetVan(null);
+  valSetRole('loader');            /* сам закриває екран пробігу і банер «пробіг не зафіксовано» */
+  var g = document.getElementById('odoGate'); if (g) g.classList.remove('on');
+  showToast('Руль сдан &middot; дальше грузчиком'.replace('&middot;', '·'));
+  if (navigator.vibrate) navigator.vibrate(40);
+}
 function odoPickRole(r) {
   var drv = (r !== 'loader');
   var bd = document.getElementById('odoRoleDrv'), bl = document.getElementById('odoRoleLoad');
@@ -2068,11 +2107,12 @@ function odoSave() {
   odoWriteKm(date, mode, km, ts, vanEv, _suspect);
   odoUploadPhoto(odoPhotoFile, date, mode, ts, km);
   if (mode === 'swap_out') {
-    // сдал старую — сразу ведём на шаг 2, чтобы человек не остался «ни на какой машине»
+    /* ⛔Раніше тут стояло odoOpen('swap_in') — застосунок вів на «візьміть нову» силою, бо
+       інших варіантів не знав. Але водій може здати кермо і далі працювати вантажником. */
     odoSetVan(null);
-    showToast('Машина сдана · теперь выберите новую');
+    showToast('Машина сдана');
     if (navigator.vibrate) navigator.vibrate(40);
-    odoOpen('swap_in');
+    odoAfterSwapOut();
     return;
   }
   if (mode === 'start' || mode === 'swap_in') odoSetVan(odoVanSel || odoVan); else if (mode === 'end') odoSetVan(null);
@@ -3359,7 +3399,7 @@ function verForceCheck(next){
   } catch (e) { clearTimeout(t); go(); }
 }
 /* ─── /ОБЯЗАТЕЛЬНОЕ ОБНОВЛЕНИЕ ─────────────────────────────────────────────────── */
-var APP_V = '2026-08-20-02';
+var APP_V = '2026-08-20-03';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
