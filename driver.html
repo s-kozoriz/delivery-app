@@ -1535,6 +1535,29 @@ function odoVanHeal() {
     odoSetVan(null);
   } catch (e) {}
 }
+/* ⛔МАШИНА КІНЦЯ ДНЯ БЕРЕТЬСЯ З ЖУРНАЛУ, А НЕ З ПАМʼЯТІ ТЕЛЕФОНА.
+   Ввечері водій машину не обирає — вона «вже відома». Але відома вона була лише телефону:
+   бралась зі змінної, яку тримає localStorage. Пам'ять телефона порожніє легко — інший
+   браузер, очищений кеш, оновлення застосунку. Тоді в базу йшов запис БЕЗ машини, і нічний
+   розрахунок мітив увесь день як «одометр не вводили»: 19.08 так зникли 221 км Виталика.
+   Тепер джерело — журнал подій дня в базі: остання машина, яку водій узяв (старт або
+   пересадка). Її не можна ні втратити, ні підмінити з телефона.
+   ⛔Саме ОСТАННЯ, а не ранкова: у застосунку є «Сменить машину», і хто вранці взяв A, а в обід
+   пересів на B, ввечері здає B. */
+function odoVanOfDay(date) {
+  try {
+    var d = odoData[date] || {}, ev = d.ev || {}, best = -1, van = null;
+    Object.keys(ev).forEach(function (k) {
+      var e = ev[k] || {};
+      if (!e.van) return;
+      if (e.kind !== 'start' && e.kind !== 'swap_in') return;
+      var t = Number(e.ts || k) || 0;
+      if (t >= best) { best = t; van = e.van; }
+    });
+    if (van) return van;
+    return (d.start && d.start.van) ? d.start.van : null;   /* старі дні без журналу подій */
+  } catch (e) { return null; }
+}
 function odoVanLabel(id) {
   if (!id) return '';
   var f = odoVans().filter(function (v) { return v.id === id; })[0];
@@ -2030,7 +2053,11 @@ function odoSave() {
   // новый день записи не появлялось, и в диспетчере всегда висело «Норд». Пишем и здесь:
   // взял машину = ты и есть водитель дня.
   if (mode === 'start' || mode === 'swap_in') nordPtr('driver');
-  var vanEv = (mode === 'swap_out') ? odoVan : (odoVanSel || odoVan);
+  /* ⛔кінець дня і здача машини — джерело журнал, вибір водія там не питають;
+     старт і взяття машини — те, що людина щойно натиснула */
+  var vanEv = (mode === 'end') ? (odoVanOfDay(date) || odoVanSel || odoVan)
+            : (mode === 'swap_out') ? (odoVan || odoVanOfDay(date))
+            : (odoVanSel || odoVan);
   odoWriteKm(date, mode, km, ts, vanEv, _suspect);
   odoUploadPhoto(odoPhotoFile, date, mode, ts, km);
   if (mode === 'swap_out') {
@@ -3325,7 +3352,7 @@ function verForceCheck(next){
   } catch (e) { clearTimeout(t); go(); }
 }
 /* ─── /ОБЯЗАТЕЛЬНОЕ ОБНОВЛЕНИЕ ─────────────────────────────────────────────────── */
-var APP_V = '2026-08-18-04';
+var APP_V = '2026-08-20-01';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
