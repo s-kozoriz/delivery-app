@@ -1915,7 +1915,15 @@ function odoTestSkip() {
   var sh = document.getElementById('odoShot');
   if (sh) { sh.className = 'oshot done'; sh.textContent = '✓ Тестовое фото'; }
   var km = document.getElementById('odoKm');
-  if (km && !km.value) km.value = String(100000 + Math.floor((Date.now() / 60000) % 900000));
+  /* ⛔ВИПАДКОВЕ ЧИСЛО НЕ ПРОХОДИЛО ПЕРЕВІРКУ. Раніше тут підставлялось число з поточного часу —
+     воно не сходилось із реєстром ЖОДНОЇ машини: або менше останнього показання, або більше
+     на тисячі кілометрів. Тестовий вхід через це не проходив узагалі, а підсвічувався при цьому
+     список машин — і виглядало, ніби машину не обрано. Беремо останнє показання обраної машини
+     і додаємо трохи пробігу: саме так виглядає чесний день. */
+  if (km && !km.value) {
+    var _tv = odoVanSel || odoVan, _tl = _tv ? vanLast(_tv) : null;
+    km.value = String(_tl && _tl.km ? (_tl.km + 40) : (100000 + Math.floor((Date.now() / 60000) % 900000)));
+  }
   /* ⛔Тестовая кнопка обходит камеру, значит снимок никто не проверял — и ворота держали бы
      её вечно на «идёт проверка», подсвечивая выбор машины красным. Здесь ставим вердикт
      руками: это тестовый путь, он и существует ради того, чтобы пройти шаг без камеры. */
@@ -2070,7 +2078,10 @@ function odoDriving() {
 function odoSave() {
   var kmv = (document.getElementById('odoKm').value || '').trim(); var km = Number(kmv);
   var _why = odoWhyBlocked();
-  if (_why) { showToast(_why); var _v = document.getElementById('odoVans'); if (_v) { _v.classList.add('need'); setTimeout(function () { _v.classList.remove('need'); }, 2500); } return; }
+  /* ⛔Підсвітка списку машин раніше спалахувала на БУДЬ-ЯКУ причину відмови — і людина шукала
+     проблему в машині, хоча справа була в кілометрах або в знімку. Підсвічуємо лише коли причина
+     справді про машину; решту пояснює сам текст. */
+  if (_why) { showToast(_why); if (_why.indexOf('машину') > -1) { var _v = document.getElementById('odoVans'); if (_v) { _v.classList.add('need'); setTimeout(function () { _v.classList.remove('need'); }, 2500); } } return; }
   if (!(km >= 0)) { showToast('Километры вписаны неверно'); return; }
   var _van = (odoMode === 'swap_out') ? odoVan : (odoVanSel || odoVan);
   var _chk = odoKmCheck(km, odoMode, _van);
@@ -3399,7 +3410,7 @@ function verForceCheck(next){
   } catch (e) { clearTimeout(t); go(); }
 }
 /* ─── /ОБЯЗАТЕЛЬНОЕ ОБНОВЛЕНИЕ ─────────────────────────────────────────────────── */
-var APP_V = '2026-08-20-03';
+var APP_V = '2026-08-20-04';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
