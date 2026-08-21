@@ -1719,7 +1719,9 @@ function waitsWheel(r){
   try{
     if(!r || r.drv || r.done===true || r.inRoute===false) return false;
     if(!r.addr || !String(r.addr).trim()) return false;
-    if((r.src||'') === '1c') return false;
+    /* ⛔Накладные из 1С в БУДНИ едут по расписанию (среда — Валентин), там ждать руля нечего.
+       А субботний вывоз со склада — ровно тот случай, когда водителя знает только утро. */
+    if((r.src||'') === '1c' && autoWeekday(r.date) !== 6) return false;
     return isNordRow(r);
   }catch(e){ return false; }
 }
@@ -1934,6 +1936,20 @@ function shipDayFor(city, shipISO){
   try {
     var today = isoD(0);
     var base = (shipISO && shipISO > today) ? shipISO : today;   // «не раніше ніж»
+    /* ⛔СУББОТА В НОРДЕ — ЭТО НЕ ДОСТАВКА, А ВЫВОЗ СО СКЛАДА В ЗАЛЬЦГИТТЕРЕ.
+       Расписание рейсов знает только будни: Wilhelmshaven/Aurich/Varel стоят там на среду
+       за Валентином — это рейс СО склада В город. Субботний рейс другой: норд-водитель едет
+       В Зальцгиттер ЗА товаром, а развозит его по адресам уже в понедельник. Расписание про
+       него не знает, поэтому 21.08 одиннадцать накладных, выписанных в 1С на субботу, уехали
+       на среду 26-го — Сергей переносил их обратно руками.
+       Дата отгрузки из 1С попала на субботу — значит это тот самый вывоз, и трогать её нельзя. */
+    /* ⛔Считаем день сами и список берём осторожно: эта функция решает ДАТУ каждой принятой
+       накладной, и любое падение здесь молча свалило бы всё на «сегодня» — незаметно и сразу
+       для всех городов. */
+    var _sat = false, _nord = false;
+    try { _sat = (new Date(base + 'T12:00:00Z')).getUTCDay() === 6; } catch (e) {}
+    try { _nord = (typeof CITIESC !== 'undefined' && CITIESC && CITIESC.indexOf(cityNorm(city)) !== -1); } catch (e) {}
+    if (_sat && _nord) return base;
     return nextTripDay(city, base) || base;
   } catch (e) { return isoD(0); }
 }
@@ -1966,6 +1982,14 @@ function autoPickDriver(r){
        хотя в расписании там чётко стоит Валентин. */
     /* ⛔1. ФАКТ ДНЯ СИЛЬНІШИЙ ЗА РОЗКЛАД — правило Сергія. Якщо хтось уже їде в це місто
        сьогодні, нову адресу віддаємо йому, навіть коли розклад каже інше: людина вже там. */
+    /* ⛔СУББОТНИЙ ВЫВОЗ СО СКЛАДА: РУЛЬ ВЫШЕ И ФАКТА ДНЯ, И РАСПИСАНИЯ.
+       Здесь имя может прийти ТОЛЬКО от руля. «Факт дня» опасен именно в этот день: одна
+       ошибочно назначенная строка расползлась бы на весь рейс (21.08 так и вышло — десять
+       строк ушли Васе, одна Виталику, и все проставил автомат). Расписание субботы не знает
+       вовсе. Никто не взял руль — строка честно ждёт человека, а не угадывает его.
+       ⛔Только строки ИЗ 1С: свои субботние задачи норд-планировщики ставят сами, и они к
+       вывозу со склада отношения не имеют — их смешивать нельзя. */
+    if (autoWeekday(date) === 6 && (r.src||'') === '1c' && isNordRow(r)) return nordDrvOn(date);
     var byFact = null;
     if (city) (rows||[]).forEach(function(x){
       if (byFact || !x || x.id === r.id) return;
@@ -3789,6 +3813,11 @@ function satMoveToMonday(day, drv, list, keep){
       if (!iv || !iv.length) return;                    /* склад нічого не відмітив — нема чого везти */
       n++;
       r.date = mon; r.drv = ''; r.satMoved = true;
+      /* ⛔Иначе имя в понедельник не подтянется. Автоназначение делает ОДНУ попытку на строку
+         за сеанс вкладки, а вкладка у диспетчера живёт неделями: строка уже «пробована» в
+         субботу и в понедельник осталась бы безымянной до ручного F5. Перенос — это новый
+         день и новый руль, поэтому попытку открываем заново. */
+      try { delete _autoDone[r.id]; } catch(e){}
       db.ref('rows/' + r.id).update({ date: mon, drv: '', satMoved: true }).catch(function(){});
       try{ auditLog('суббота: перенесено на понедельник', r.id, {addr:r.addr||'', from:day, to:mon, invs:iv.length}); }catch(e){}
     });
@@ -4104,7 +4133,11 @@ function incAccept(){
          Города нет в расписании — ничего не выдумываем, работает прежнее правило. */
       var _dt=shipDayFor(first.city, _sd);
     var row={
-      id:uid(), date:_dt, date_pending:(_sd?null:true), drv:(disp2Mode?'C':''), city:first.city||'', timeSlot:'',
+      /* ⛔ИМЯ ВОДИТЕЛЯ НЕ ПРОСТАВЛЯЕМ НАПЕРЁД. Слот «C» в списке подписан «Норд», но это не
+         безымянный слот, а конкретно Виталик: планировщик Норда, принимая накладные, молча
+         вешал их на него, хотя ехать может Вася или Микола. Правило Сергея: строка ждёт того,
+         кто утром реально возьмёт руль, и его имя подтянется само (autoPickDriver). */
+      id:uid(), date:_dt, date_pending:(_sd?null:true), drv:((disp2Mode&&CITIESC.indexOf(cityNorm(first.city))===-1)?'C':''), city:first.city||'', timeSlot:'',
       addr:first.address||'', invs:g.map(function(r){return r.invoice;}), status:'—',
       comment:cmt, weight:(wsum?Math.round(wsum*100)/100:null), volume_m3:null, inRoute:true, done:false,
       createdAt:Date.now(), order:maxOrder, src:'1c', order_code:first.order_code||null, plan_date:first.desired_date||null, ship_date:first.ship_date||null,
@@ -5173,7 +5206,7 @@ function loadAllRowsForHist(){
    ⛔Ответ проверяется по образцу: если ver-d.txt не найдётся, сервер вернёт HTML
      страницы 404 — без проверки он никогда не совпадёт с версией и полоса висела бы
      у всех и навсегда. */
-var APP_V_D = '2026-08-19-d16';
+var APP_V_D = '2026-08-21-d17';
 var _vdLast = 0;
 function vdCheck(){
   var now = Date.now();
