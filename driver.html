@@ -1721,6 +1721,13 @@ function odoShotNote(html, kind) {
    звірене з фотографією; набране руками — ні. Пишемо це в день, щоб у звіті було видно,
    де показання прийшло з панелі, а де людина вписала його сама. */
 var odoKmAuto = false;
+/* ⛔Повторне натискання під час збереження. У Романа 17.10 і 19.10 один і той самий
+   старт дня записався в базу десятками копій поспіль, за секунди — хтось мусив тицяти
+   кнопку знову й знову, доки вона не відповідала (мережа, завис рендер — не важливо, що
+   саме спричинило першу затримку). Кнопка не мала жодного захисту від повторного тапу:
+   кожен тап незалежно кладе новий запис у чергу. Цей прапорець ріже другий і наступні
+   тапи, поки перший ще не відпрацював. */
+var _odoSaving = false;
 function odoKmTyped() { odoKmAuto = false; odoValidate(); }
 function odoUseKm(km) {
   var el = document.getElementById('odoKm'); if (!el) return;
@@ -2097,6 +2104,7 @@ function odoDriving() {
   return !!(r && r.start != null && r.end == null);
 }
 function odoSave() {
+  if (_odoSaving) return;   // ⛔другий тап поки перший ще не дописав запис — ігноруємо мовчки
   var kmv = (document.getElementById('odoKm').value || '').trim(); var km = Number(kmv);
   var _why = odoWhyBlocked();
   /* ⛔Підсвітка списку машин раніше спалахувала на БУДЬ-ЯКУ причину відмови — і людина шукала
@@ -2113,6 +2121,7 @@ function odoSave() {
     if (!confirm(_chk.ask)) return;   // спрашиваем ТОЛЬКО про машину
     _suspect = true;
   }
+  _odoSaving = true; setTimeout(function () { _odoSaving = false; }, 1500);
   var mode = odoMode, date = wtDate(), ts = Date.now();
   if (mode === 'end') _odoEndLocal = date;   // база ще не відповіла, але ми вже знаємо
   if (mode === 'start' && valMode !== 'driver') valSetRole('driver'); // роль выбрана на этом же экране
@@ -3431,7 +3440,7 @@ function verForceCheck(next){
   } catch (e) { clearTimeout(t); go(); }
 }
 /* ─── /ОБЯЗАТЕЛЬНОЕ ОБНОВЛЕНИЕ ─────────────────────────────────────────────────── */
-var APP_V = '2026-08-20-05';
+var APP_V = '2026-10-21-01';
 var _verLast = 0, _verNew = null;
 function verCheck() {
   var now = Date.now();
